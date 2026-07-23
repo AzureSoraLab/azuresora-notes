@@ -997,6 +997,14 @@ M834 80h400000v40h-400000z"></path></svg></span></span></span><span class="vlist
 .selection-annotation-menu__action + .selection-annotation-menu__action { border-left: 1px solid #e5e4e0; }
 .selection-annotation-menu__action.is-active { background: #f0f1ed; color: #39433f; }
 .selection-annotation-menu__action--underline { text-decoration: underline 2px currentColor; text-underline-offset: 3px; }
+.selection-annotation-menu--manage { width: 220px; transform: none; }
+.selection-annotation-menu__title, .selection-annotation-menu__item { display: block; width: 100%; padding: 8px 24px; border: 0; border-bottom: 1px solid #e7e6e2; background: #fff; color: #282d2a; text-align: left; font: 13px/1.2 "PingFang SC", "Microsoft YaHei", sans-serif; }
+.selection-annotation-menu__title { color: #8a8d89; }
+.selection-annotation-menu__item { position: relative; cursor: pointer; }
+.selection-annotation-menu__item:hover { background: #f5f5f1; }
+.selection-annotation-menu__item i { display: inline-block; width: 16px; height: 16px; margin-right: 8px; border-radius: 3px; vertical-align: -3px; }
+.selection-annotation-menu__item.is-current:before { position: absolute; left: 8px; content: '✓'; }
+.selection-annotation-menu__item--danger { border-top: 1px solid #e7e6e2; border-bottom: 0; color: #4e5350; }
 mark.selection-annotation { padding: 0 1px; color: inherit; }
 mark.selection-annotation--highlight { background: color-mix(in srgb, var(--selection-annotation-color) 55%, transparent); box-decoration-break: clone; -webkit-box-decoration-break: clone; }
 mark.selection-annotation--underline { background: transparent; text-decoration: underline 3px var(--selection-annotation-color); text-underline-offset: 3px; }
@@ -1010,6 +1018,9 @@ mark.selection-annotation--underline { background: transparent; text-decoration:
   let menu = null;
   let observer = null;
   let applyTimer = 0;
+  let longPressTimer = 0;
+  let longPressTarget = null;
+  let longPressOpened = false;
 
   const reader = () => document.querySelector('.reader-body');
   const read = () => { try { return JSON.parse(localStorage.getItem(storageKey) || '[]'); } catch { return []; } };
@@ -1071,10 +1082,53 @@ mark.selection-annotation--underline { background: transparent; text-decoration:
     observer.observe(root, { childList: true, subtree: true });
   }
   function removeMenu() { menu?.remove(); menu = null; selected = null; }
+  function updateAnnotation(id, changes) {
+    write(read().map(item => item.id === id ? { ...item, ...changes } : item));
+    removeMenu();
+    renderAnnotations();
+  }
+  function deleteAnnotation(id) {
+    write(read().filter(item => item.id !== id));
+    removeMenu();
+    renderAnnotations();
+  }
+  function showManageMenu(mark) {
+    const id = mark.dataset.annotationId;
+    const item = read().find(annotation => annotation.id === id);
+    if (!item) return;
+    removeMenu();
+    const rect = mark.getBoundingClientRect();
+    menu = document.createElement('div');
+    menu.className = 'selection-annotation-menu selection-annotation-menu--manage';
+    menu.style.left = `${Math.min(window.innerWidth - 230, Math.max(8, rect.right + 10))}px`;
+    menu.style.top = `${Math.max(8, rect.top)}px`;
+    const title = document.createElement('div');
+    title.className = 'selection-annotation-menu__title';
+    title.textContent = '添加至笔记';
+    menu.append(title);
+    colors.forEach((color, index) => {
+      const button = document.createElement('button');
+      button.className = `selection-annotation-menu__item ${item.color === color ? 'is-current' : ''}`;
+      const swatch = document.createElement('i');
+      swatch.style.backgroundColor = color;
+      button.append(swatch, `general.${['yellow', 'red', 'green', 'blue', 'purple', 'magenta', 'orange', 'gray'][index]}`);
+      button.addEventListener('click', () => updateAnnotation(id, { color }));
+      menu.append(button);
+    });
+    const convert = document.createElement('button');
+    convert.className = 'selection-annotation-menu__item';
+    convert.textContent = item.kind === 'highlight' ? '转换为下划线' : '转换为高亮';
+    convert.addEventListener('click', () => updateAnnotation(id, { kind: item.kind === 'highlight' ? 'underline' : 'highlight' }));
+    const remove = document.createElement('button');
+    remove.className = 'selection-annotation-menu__item selection-annotation-menu__item--danger';
+    remove.textContent = '删除';
+    remove.addEventListener('click', () => deleteAnnotation(id));
+    menu.append(convert, remove);
+    document.body.append(menu);
+  }
   function choose(color) {
     if (!selected) return;
-    // A selection has one text style: applying another replaces any overlap.
-    const items = read().filter(item => item.end <= selected.start || item.start >= selected.end);
+    const items = read();
     items.push({ id: annotationId(), start: selected.start, end: selected.end, color, kind });
     write(items);
     window.getSelection()?.removeAllRanges();
@@ -1122,10 +1176,25 @@ mark.selection-annotation--underline { background: transparent; text-decoration:
     document.body.append(menu);
   }
   document.addEventListener('mouseup', event => {
+    if (longPressOpened) { longPressOpened = false; return; }
     if (menu?.contains(event.target)) return;
     window.setTimeout(showMenu, 0);
   });
   document.addEventListener('mousedown', event => { if (menu && !menu.contains(event.target)) removeMenu(); });
+  document.addEventListener('pointerdown', event => {
+    if (event.button !== 0) return;
+    const mark = event.target.closest('mark.selection-annotation');
+    if (!mark) return;
+    longPressTarget = mark;
+    longPressTimer = window.setTimeout(() => {
+      if (longPressTarget === mark) { longPressOpened = true; showManageMenu(mark); }
+      longPressTimer = 0;
+    }, 500);
+  });
+  const cancelLongPress = () => { window.clearTimeout(longPressTimer); longPressTimer = 0; longPressTarget = null; };
+  document.addEventListener('pointerup', cancelLongPress);
+  document.addEventListener('pointercancel', cancelLongPress);
+  document.addEventListener('pointermove', cancelLongPress);
   window.addEventListener('resize', removeMenu);
   window.addEventListener('load', () => window.setTimeout(renderAnnotations, 100));
 })();
