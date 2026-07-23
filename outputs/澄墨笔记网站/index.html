@@ -1073,7 +1073,8 @@ mark.selection-annotation--underline { background: transparent; text-decoration:
   function removeMenu() { menu?.remove(); menu = null; selected = null; }
   function choose(color) {
     if (!selected) return;
-    const items = read();
+    // A selection has one text style: applying another replaces any overlap.
+    const items = read().filter(item => item.end <= selected.start || item.start >= selected.end);
     items.push({ id: annotationId(), start: selected.start, end: selected.end, color, kind });
     write(items);
     window.getSelection()?.removeAllRanges();
