@@ -985,4 +985,148 @@ M834 80h400000v40h-400000z"></path></svg></span></span></span><span class="vlist
 </div><canvas class="drawing-canvas" width="413" height="53496" style="width: 330px; height: 42797px;"></canvas></article><aside class="outline"><button class="outline-toggle" aria-label="收起本文目录">›</button><div class="outline-content"><p>本文目录</p><button class="level-2">📺 视频主题概括</button><button class="level-2">📇 核心术语速览表</button><button class="level-2">第一部分：静电场的特征与基本假设</button><button class="level-2">第二部分：库仑定律与电场强度的定义</button><button class="level-2">第三部分：叠加积分法求解连续分布电荷的电场</button><button class="level-2">第四部分：典型例题讲解与“源”概念的升华</button><button class="level-2">🗺️ 全篇知识脉络图</button><button class="level-2">❓ 主动提问清单（三层设计）</button><button class="level-3">基础巩固层 (检验记忆准确度)</button><button class="level-3">深度理解层 (检验逻辑与本质理解)</button><button class="level-3">辨析对比层 (区分相似/易混概念)</button><button class="level-2">🎯 初学者使用建议</button><button class="level-2">📊 公式清单与关键要点总览</button><button class="level-2">📌 全文关键要点说明</button><div class="reading-meta"><span>更新于 2026年7月23日</span><div></div></div></div></aside></div></section><nav class="mobile-nav"><button class="">资料库</button><button class="active">阅读</button><button class="">编辑</button></nav></main></div>
   
 
+<style>
+/* Text-selection annotations, styled after the Zotero reader toolbar. */
+.drawing-canvas { pointer-events: none !important; }
+.selection-annotation-menu { position: fixed; z-index: 10000; width: 238px; overflow: hidden; border: 1px solid #d7d7d3; border-radius: 8px; background: #fff; box-shadow: 0 5px 18px rgba(27, 33, 30, .24); transform: translateX(-50%); user-select: none; }
+.selection-annotation-menu__colors { display: grid; grid-template-columns: repeat(8, 1fr); gap: 10px; padding: 10px 12px 9px; }
+.selection-annotation-menu__color { width: 18px; height: 18px; border: 0; border-radius: 3px; box-shadow: inset 0 0 0 1px rgba(0,0,0,.08); cursor: pointer; }
+.selection-annotation-menu__color:hover, .selection-annotation-menu__color:focus-visible { outline: 2px solid #57635e; outline-offset: 2px; }
+.selection-annotation-menu__actions { display: grid; grid-template-columns: 1fr 1fr; border-top: 1px solid #e5e4e0; background: #fafaf8; }
+.selection-annotation-menu__action { height: 31px; border: 0; background: transparent; color: #6b6f6b; font-family: Georgia, "Songti SC", serif; font-size: 20px; line-height: 1; cursor: pointer; }
+.selection-annotation-menu__action + .selection-annotation-menu__action { border-left: 1px solid #e5e4e0; }
+.selection-annotation-menu__action.is-active { background: #f0f1ed; color: #39433f; }
+.selection-annotation-menu__action--underline { text-decoration: underline 2px currentColor; text-underline-offset: 3px; }
+mark.selection-annotation { padding: 0 1px; color: inherit; }
+mark.selection-annotation--highlight { background: color-mix(in srgb, var(--selection-annotation-color) 55%, transparent); box-decoration-break: clone; -webkit-box-decoration-break: clone; }
+mark.selection-annotation--underline { background: transparent; text-decoration: underline 3px var(--selection-annotation-color); text-underline-offset: 3px; }
+</style>
+<script>
+(() => {
+  const storageKey = 'chengmo-text-selection-annotations-v1';
+  const colors = ['#f8d84b', '#ff6b6b', '#72b64a', '#3ca8df', '#a687e8', '#d86ee8', '#f39a3e', '#a7aaa5'];
+  let selected = null;
+  let kind = 'highlight';
+  let menu = null;
+  let observer = null;
+  let applyTimer = 0;
+
+  const reader = () => document.querySelector('.reader-body');
+  const read = () => { try { return JSON.parse(localStorage.getItem(storageKey) || '[]'); } catch { return []; } };
+  const write = (items) => localStorage.setItem(storageKey, JSON.stringify(items));
+  const offsetOf = (root, container, offset) => {
+    const range = document.createRange();
+    range.selectNodeContents(root);
+    range.setEnd(container, offset);
+    return range.toString().length;
+  };
+  const annotationId = () => `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+
+  function clearMarks(root) {
+    root.querySelectorAll('mark.selection-annotation').forEach(mark => mark.replaceWith(...mark.childNodes));
+    root.normalize();
+  }
+  function applyOne(root, item) {
+    const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+    const nodes = [];
+    let node;
+    while ((node = walker.nextNode())) nodes.push(node);
+    let position = 0;
+    nodes.forEach(textNode => {
+      const start = position;
+      const end = start + textNode.data.length;
+      position = end;
+      const from = Math.max(start, item.start);
+      const to = Math.min(end, item.end);
+      if (from >= to || !textNode.parentNode) return;
+      const before = textNode.data.slice(0, from - start);
+      const middle = textNode.data.slice(from - start, to - start);
+      const after = textNode.data.slice(to - start);
+      const fragment = document.createDocumentFragment();
+      if (before) fragment.append(before);
+      const mark = document.createElement('mark');
+      mark.className = `selection-annotation selection-annotation--${item.kind}`;
+      mark.style.setProperty('--selection-annotation-color', item.color);
+      mark.dataset.annotationId = item.id;
+      mark.textContent = middle;
+      fragment.append(mark);
+      if (after) fragment.append(after);
+      textNode.parentNode.replaceChild(fragment, textNode);
+    });
+  }
+  function renderAnnotations() {
+    const root = reader();
+    if (!root) return;
+    observer && observer.disconnect();
+    clearMarks(root);
+    read().sort((a, b) => b.start - a.start).forEach(item => applyOne(root, item));
+    watch(root);
+  }
+  function watch(root) {
+    if (!window.MutationObserver) return;
+    observer = new MutationObserver(() => {
+      window.clearTimeout(applyTimer);
+      applyTimer = window.setTimeout(renderAnnotations, 80);
+    });
+    observer.observe(root, { childList: true, subtree: true });
+  }
+  function removeMenu() { menu?.remove(); menu = null; selected = null; }
+  function choose(color) {
+    if (!selected) return;
+    const items = read();
+    items.push({ id: annotationId(), start: selected.start, end: selected.end, color, kind });
+    write(items);
+    window.getSelection()?.removeAllRanges();
+    removeMenu();
+    renderAnnotations();
+  }
+  function showMenu() {
+    const root = reader();
+    const selection = window.getSelection();
+    const range = selection?.rangeCount ? selection.getRangeAt(0) : null;
+    const text = selection?.toString().trim();
+    if (!root || !range || !text || !root.contains(range.commonAncestorContainer)) return removeMenu();
+    const rect = range.getBoundingClientRect();
+    selected = { start: offsetOf(root, range.startContainer, range.startOffset), end: offsetOf(root, range.endContainer, range.endOffset) };
+    if (selected.end <= selected.start) return removeMenu();
+    removeMenu();
+    selected = { start: offsetOf(root, range.startContainer, range.startOffset), end: offsetOf(root, range.endContainer, range.endOffset) };
+    menu = document.createElement('div');
+    menu.className = 'selection-annotation-menu';
+    menu.style.left = `${rect.left + rect.width / 2}px`;
+    menu.style.top = `${Math.max(8, rect.bottom + 10)}px`;
+    const colorRow = document.createElement('div');
+    colorRow.className = 'selection-annotation-menu__colors';
+    colors.forEach(color => {
+      const button = document.createElement('button');
+      button.className = 'selection-annotation-menu__color';
+      button.style.backgroundColor = color;
+      button.title = '应用此颜色';
+      button.addEventListener('mousedown', event => event.preventDefault());
+      button.addEventListener('click', () => choose(color));
+      colorRow.append(button);
+    });
+    const actionRow = document.createElement('div');
+    actionRow.className = 'selection-annotation-menu__actions';
+    [['highlight', 'A', '高亮文本'], ['underline', 'A', '下划线文本']].forEach(([value, label, title]) => {
+      const button = document.createElement('button');
+      button.className = `selection-annotation-menu__action ${value === 'underline' ? 'selection-annotation-menu__action--underline' : ''} ${kind === value ? 'is-active' : ''}`;
+      button.textContent = label;
+      button.title = title;
+      button.addEventListener('mousedown', event => event.preventDefault());
+      button.addEventListener('click', () => { kind = value; actionRow.querySelectorAll('button').forEach(item => item.classList.toggle('is-active', item === button)); });
+      actionRow.append(button);
+    });
+    menu.append(colorRow, actionRow);
+    document.body.append(menu);
+  }
+  document.addEventListener('mouseup', event => {
+    if (menu?.contains(event.target)) return;
+    window.setTimeout(showMenu, 0);
+  });
+  document.addEventListener('mousedown', event => { if (menu && !menu.contains(event.target)) removeMenu(); });
+  window.addEventListener('resize', removeMenu);
+  window.addEventListener('load', () => window.setTimeout(renderAnnotations, 100));
+})();
+</script>
 </body></html>
