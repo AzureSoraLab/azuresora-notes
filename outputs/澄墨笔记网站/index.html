@@ -696,8 +696,12 @@ mark.selection-annotation--underline { background: transparent; text-decoration:
 .annotation-shelf__tab--note:before { content: ''; position: absolute; left: -5px; top: -5px; width: 13px; height: 13px; border: 1.5px solid currentColor; border-radius: 2px; background: #fafbfb; }
 .annotation-shelf__tab--note:after { content: ''; position: absolute; z-index: 1; left: 3px; top: 3px; width: 9px; height: 1.5px; background: currentColor; box-shadow: 0 4px 0 currentColor; }
 .annotation-shelf__tab--active { color: #57636c; background-color: #dce2e5; border-radius: 4px; }
-.annotation-shelf__search { margin-left: auto; width: 18px; height: 18px; box-sizing: border-box; border: 2px solid #69737a; border-radius: 50%; position: relative; }
-.annotation-shelf__search:after { content: ''; position: absolute; width: 7px; height: 2px; right: -5px; bottom: -3px; background: #69737a; transform: rotate(48deg); }
+.annotation-shelf__outline { position: relative; width: 27px; height: 28px; padding: 0; border: 0; border-radius: 4px; background: transparent; color: #657077; cursor: pointer; }
+.annotation-shelf__outline::before { content: ''; position: absolute; left: 6px; top: 7px; width: 3px; height: 3px; background: currentColor; box-shadow: 0 5px 0 currentColor, 0 10px 0 currentColor; }
+.annotation-shelf__outline::after { content: ''; position: absolute; left: 12px; top: 7px; width: 9px; height: 2px; background: currentColor; box-shadow: 0 5px 0 currentColor, 0 10px 0 currentColor; }
+.annotation-shelf__outline:hover, .annotation-shelf__outline.is-active { background: #dfe5e8; color: #304b47; }
+.annotation-shelf__search { width: 98px; height: 32px; box-sizing: border-box; margin-left: auto; padding: 0 7px 0 28px; border: 2px solid #6f95fa; border-radius: 7px; outline: 0; background: linear-gradient(45deg, transparent 0 46%, #627077 47% 53%, transparent 54%) 19px 20px / 9px 2px no-repeat, #fff; color: #283238; font: 13px Arial, "Microsoft YaHei", sans-serif; }
+.annotation-shelf__search::placeholder { color: #6d757b; }
 .annotation-shelf__list { min-height: 110px; padding: 9px 8px; overflow: auto; }
 .annotation-shelf__card { width: 100%; box-sizing: border-box; margin: 0 0 8px; padding: 8px 10px 9px; border: 1px solid #dfe3e5; border-radius: 8px; background: #fff; color: #20262a; text-align: left; cursor: pointer; box-shadow: 0 1px 0 rgba(0,0,0,.025); }
 .annotation-shelf__card:hover { border-color: #bac4cb; }
@@ -740,6 +744,7 @@ mark.selection-annotation--underline { background: transparent; text-decoration:
   const palette = ['#f8d84b', '#ff6b6b', '#72b64a', '#3ca8df', '#a687e8', '#d86ee8', '#f39a3e', '#a7aaa5'];
   let filter = null;
   let tagFilter = null;
+  let searchFilter = '';
   let current = null;
   const read = () => { try { return JSON.parse(localStorage.getItem(key) || '[]'); } catch { return []; } };
   const activeIds = () => new Set([...document.querySelectorAll('mark.selection-annotation[data-annotation-id]')].map(mark => mark.dataset.annotationId));
@@ -770,7 +775,8 @@ mark.selection-annotation--underline { background: transparent; text-decoration:
     const tabs = document.createElement('div'); tabs.className = 'annotation-shelf__tabs';
     const grid = document.createElement('button'); grid.className = 'annotation-shelf__tab annotation-shelf__tab--grid'; grid.type = 'button'; grid.title = 'Annotations';
     const note = document.createElement('button'); note.className = 'annotation-shelf__tab annotation-shelf__tab--note annotation-shelf__tab--active'; note.type = 'button'; note.title = 'Notes';
-    const search = document.createElement('span'); search.className = 'annotation-shelf__search'; tabs.append(grid, note); bar.append(tabs, search);
+    const outline = document.createElement('button'); outline.type = 'button'; outline.className = 'annotation-shelf__outline'; outline.title = 'Table of contents'; outline.setAttribute('aria-label', 'Table of contents'); outline.addEventListener('click', () => { const original = document.querySelector('.outline-header-toggle'); original?.click(); outline.classList.toggle('is-active'); });
+    const search = document.createElement('input'); search.type = 'search'; search.className = 'annotation-shelf__search'; search.placeholder = 'Search notes'; search.setAttribute('aria-label', 'Search annotations'); search.addEventListener('input', () => { searchFilter = search.value.trim().toLowerCase(); render(); }); tabs.append(grid, note); bar.append(tabs, outline, search);
     const list = document.createElement('div'); list.className = 'annotation-shelf__list';
     const filters = document.createElement('div'); filters.className = 'annotation-shelf__filters';
     palette.forEach(color => { const button = document.createElement('button'); button.type = 'button'; button.className = 'annotation-shelf__filter'; button.style.background = color; button.title = 'Filter by color'; button.addEventListener('click', () => { filter = filter === color ? null : color; filters.querySelectorAll('button').forEach(item => item.classList.toggle('is-active', item === button && filter === color)); render(); }); filters.append(button); });
@@ -778,7 +784,9 @@ mark.selection-annotation--underline { background: transparent; text-decoration:
     document.body.append(toggle, shelf);
     const positionToggle = () => { const header = document.querySelector('.reader-header'); if (!header) return; const rect = header.getBoundingClientRect(); toggle.style.left = `${Math.max(8, rect.left + 13)}px`; toggle.style.top = `${rect.top + Math.max(5, (rect.height - 30) / 2)}px`; };
     const positionShelf = () => { positionToggle(); const rect = toggle.getBoundingClientRect(); shelf.style.left = `${Math.max(8, rect.left)}px`; shelf.style.top = `${Math.min(window.innerHeight - 54, rect.bottom + 1)}px`; };
-    const syncAvailability = () => { const hasAnnotations = activeIds().size > 0; toggle.hidden = !hasAnnotations; if (!hasAnnotations) shelf.classList.add('is-hidden'); };
+    // Keep the marker button available for every note; empty notes show an
+    // empty shelf rather than making the entry point disappear.
+    const syncAvailability = () => { toggle.hidden = false; };
     // The reader column shifts when either adjacent panel opens, so keep this
     // body-level button aligned with the live header instead of one initial point.
     let lastLeft = ''; let lastTop = '';
@@ -791,10 +799,13 @@ mark.selection-annotation--underline { background: transparent; text-decoration:
     const list = document.querySelector('.annotation-shelf__list'); const summary = document.querySelector('.annotation-shelf__tag-summary'); if (!list || !summary) return;
     const ids = activeIds();
     const allItems = read().filter(item => ids.has(item.id)).sort((a, b) => a.start - b.start);
-    const items = allItems.filter(item => (!filter || item.color === filter) && (!tagFilter || (item.tags || []).includes(tagFilter)));
+    const items = allItems.filter(item => {
+      const searchable = `${excerptFor(item)} ${item.comment || ''} ${(item.tags || []).join(' ')}`.toLowerCase();
+      return (!filter || item.color === filter) && (!tagFilter || (item.tags || []).includes(tagFilter)) && (!searchFilter || searchable.includes(searchFilter));
+    });
     list.replaceChildren();
     const allTags = [...new Set(allItems.flatMap(item => item.tags || []))]; summary.replaceChildren(...allTags.map(tag => { const button = document.createElement('button'); button.type = 'button'; button.textContent = tag; button.classList.toggle('is-active', tagFilter === tag); button.addEventListener('click', () => { tagFilter = tagFilter === tag ? null : tag; render(); }); return button; }));
-    if (!items.length) { const empty = document.createElement('div'); empty.className = 'annotation-shelf__empty'; empty.textContent = filter ? 'No annotations in this color' : 'No annotations yet'; list.append(empty); return; }
+    if (!items.length) { const empty = document.createElement('div'); empty.className = 'annotation-shelf__empty'; empty.textContent = searchFilter ? 'No matching annotations' : filter ? 'No annotations in this color' : 'No annotations yet'; list.append(empty); return; }
     items.forEach(item => {
       const card = document.createElement('div'); card.className = `annotation-shelf__card ${current === item.id ? 'is-current' : ''}`; card.style.setProperty('--annotation-color', item.color);
       const head = document.createElement('div'); head.className = 'annotation-shelf__card-head';
@@ -893,4 +904,8 @@ mark.selection-annotation--underline { background: transparent; text-decoration:
   }, true);
 })();
 </script>
+<style>
+/* The table-of-contents control lives in the annotation shelf toolbar. */
+.reader-actions .outline-header-toggle { display: none; }
+</style>
 </body></html>
