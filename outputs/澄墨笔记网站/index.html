@@ -790,7 +790,7 @@ mark.selection-annotation--underline { background: transparent; text-decoration:
   function render() {
     const list = document.querySelector('.annotation-shelf__list'); const summary = document.querySelector('.annotation-shelf__tag-summary'); if (!list || !summary) return;
     const ids = activeIds();
-    const allItems = read().filter(item => ids.has(item.id));
+    const allItems = read().filter(item => ids.has(item.id)).sort((a, b) => a.start - b.start);
     const items = allItems.filter(item => (!filter || item.color === filter) && (!tagFilter || (item.tags || []).includes(tagFilter)));
     list.replaceChildren();
     const allTags = [...new Set(allItems.flatMap(item => item.tags || []))]; summary.replaceChildren(...allTags.map(tag => { const button = document.createElement('button'); button.type = 'button'; button.textContent = tag; button.classList.toggle('is-active', tagFilter === tag); button.addEventListener('click', () => { tagFilter = tagFilter === tag ? null : tag; render(); }); return button; }));
@@ -815,4 +815,39 @@ mark.selection-annotation--underline { background: transparent; text-decoration:
 })();
 </script>
 
+<style>
+.recent-notes { margin: 20px 0 0; padding-top: 15px; border-top: 1px solid #e5e8e5; }
+.recent-notes__title { margin: 0 0 8px; color: #6d7775; font-size: 12px; }
+.recent-notes__item { display: block; width: 100%; overflow: hidden; padding: 7px 8px; border: 0; border-radius: 5px; background: transparent; color: #34423e; text-align: left; text-overflow: ellipsis; white-space: nowrap; font: 13px Arial, "Microsoft YaHei", sans-serif; cursor: pointer; }
+.recent-notes__item:hover { background: #edf2ed; }
+.recent-notes__item::before { content: '·'; margin-right: 7px; color: #427a6c; font-size: 17px; vertical-align: -1px; }
+</style>
+<script>
+(() => {
+  const recentKey = 'chengmo-recent-notes-v1';
+  const readRecent = () => { try { return JSON.parse(localStorage.getItem(recentKey) || '[]'); } catch { return []; } };
+  const saveRecent = items => localStorage.setItem(recentKey, JSON.stringify(items.slice(0, 6)));
+  function selectedNote() {
+    const button = document.querySelector('.compact-note.selected');
+    const title = button?.querySelector('strong')?.textContent?.trim();
+    return title ? { title, subtitle: button.querySelector('small')?.textContent?.trim() || '' } : null;
+  }
+  function remember() {
+    const note = selectedNote(); if (!note) return;
+    const items = readRecent().filter(item => item.title !== note.title);
+    saveRecent([note, ...items]);
+  }
+  function render() {
+    const content = document.querySelector('.library-content'); if (!content) return;
+    let section = content.querySelector('.recent-notes');
+    if (!section) { section = document.createElement('section'); section.className = 'recent-notes'; const storage = content.querySelector('.storage-note'); content.insertBefore(section, storage || null); }
+    section.replaceChildren();
+    const title = document.createElement('p'); title.className = 'recent-notes__title'; title.textContent = 'Recent notes'; section.append(title);
+    readRecent().forEach(item => { const button = document.createElement('button'); button.type = 'button'; button.className = 'recent-notes__item'; button.title = item.title; button.textContent = item.title; button.addEventListener('click', () => { const matches = [...document.querySelectorAll('.compact-note')]; const target = matches.find(note => note.querySelector('strong')?.textContent?.trim() === item.title); target?.click(); }); section.append(button); });
+  }
+  let previous = '';
+  const sync = () => { const note = selectedNote(); const token = note ? `${note.title}|${note.subtitle}` : ''; if (token && token !== previous) { previous = token; remember(); } render(); window.requestAnimationFrame(sync); };
+  window.addEventListener('load', () => window.requestAnimationFrame(sync));
+})();
+</script>
 </body></html>
