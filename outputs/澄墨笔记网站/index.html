@@ -827,14 +827,17 @@ mark.selection-annotation--underline { background: transparent; text-decoration:
   const recentKey = 'chengmo-recent-notes-v1';
   const readRecent = () => { try { return JSON.parse(localStorage.getItem(recentKey) || '[]'); } catch { return []; } };
   const saveRecent = items => localStorage.setItem(recentKey, JSON.stringify(items.slice(0, 6)));
+  const noteState = () => { try { return JSON.parse(localStorage.getItem('chengmo-notes-v1') || '{}'); } catch { return {}; } };
   function selectedNote() {
     const button = document.querySelector('.compact-note.selected');
     const title = button?.querySelector('strong')?.textContent?.trim();
-    return title ? { title, subtitle: button.querySelector('small')?.textContent?.trim() || '' } : null;
+    if (!title) return null;
+    const note = (noteState().notes || []).find(item => (item.title || '') === title);
+    return { id: note?.id || '', courseId: note?.courseId || '', title, subtitle: button.querySelector('small')?.textContent?.trim() || '' };
   }
   function remember() {
     const note = selectedNote(); if (!note) return;
-    const items = readRecent().filter(item => item.title !== note.title);
+    const items = readRecent().filter(item => (note.id ? item.id !== note.id : item.title !== note.title));
     saveRecent([note, ...items]);
   }
   function render() {
@@ -843,11 +846,51 @@ mark.selection-annotation--underline { background: transparent; text-decoration:
     if (!section) { section = document.createElement('section'); section.className = 'recent-notes'; const storage = content.querySelector('.storage-note'); content.insertBefore(section, storage || null); }
     section.replaceChildren();
     const title = document.createElement('p'); title.className = 'recent-notes__title'; title.textContent = 'Recent notes'; section.append(title);
-    readRecent().forEach(item => { const button = document.createElement('button'); button.type = 'button'; button.className = 'recent-notes__item'; button.title = item.title; button.textContent = item.title; button.addEventListener('click', () => { const matches = [...document.querySelectorAll('.compact-note')]; const target = matches.find(note => note.querySelector('strong')?.textContent?.trim() === item.title); target?.click(); }); section.append(button); });
+    readRecent().forEach(item => { const button = document.createElement('button'); button.type = 'button'; button.className = 'recent-notes__item'; button.title = item.title; button.textContent = item.title; button.addEventListener('click', () => { const data = noteState(); const note = (data.notes || []).find(entry => entry.id === item.id) || (data.notes || []).find(entry => entry.title === item.title); const course = (data.courses || []).find(entry => entry.id === note?.courseId); const courseButton = [...document.querySelectorAll('.course-button')].find(entry => entry.textContent.trim() === course?.name); const changedCourse = courseButton && courseButton !== document.querySelector('.course-button.active'); if (changedCourse) courseButton.click(); let tries = 0; const open = () => { const target = [...document.querySelectorAll('.compact-note')].find(entry => entry.querySelector('strong')?.textContent?.trim() === item.title); if (target) { target.click(); window.setTimeout(() => { const list = document.querySelector('.note-list'); if (list?.getAttribute('aria-hidden') === 'false') courseButton?.click(); }, 120); return; } if (++tries < 18) window.setTimeout(open, 60); }; window.setTimeout(open, 0); }); section.append(button); });
   }
   let previous = '';
-  const sync = () => { const note = selectedNote(); const token = note ? `${note.title}|${note.subtitle}` : ''; if (token && token !== previous) { previous = token; remember(); } render(); window.requestAnimationFrame(sync); };
-  window.addEventListener('load', () => window.requestAnimationFrame(sync));
+  const sync = () => { const note = selectedNote(); const token = note ? `${note.id}|${note.title}|${note.subtitle}` : ''; if (token && token !== previous) { previous = token; remember(); render(); } if (!document.querySelector('.recent-notes')) render(); window.requestAnimationFrame(sync); };
+  window.addEventListener('load', () => { render(); window.requestAnimationFrame(sync); });
+})();
+</script>
+<style>
+.reader-header .crumb { white-space: nowrap; }
+.reader-current-note { color: #303d42; font-weight: 600; }
+</style>
+<script>
+(() => {
+  const stateKey = 'chengmo-notes-v1';
+  const state = () => { try { return JSON.parse(localStorage.getItem(stateKey) || '{}'); } catch { return {}; } };
+  function selectedTitle() { return document.querySelector('.compact-note.selected strong')?.textContent?.trim() || ''; }
+  function syncHeaderAndOrder() {
+    const title = selectedTitle();
+    const crumb = document.querySelector('.reader-header .crumb');
+    if (crumb) {
+      let suffix = crumb.querySelector('.reader-current-note');
+      if (!suffix) { suffix = document.createElement('span'); suffix.className = 'reader-current-note'; crumb.append(suffix); }
+      suffix.textContent = title ? ` / ${title}` : '';
+    }
+    const notes = state().notes || [];
+    const list = document.querySelector('.note-index-scroll');
+    if (!list || !notes.length) return;
+    const currentItems = [...list.querySelectorAll('.compact-note')];
+    const sortedItems = [...currentItems].sort((a, b) => {
+      const aTitle = a.querySelector('strong')?.textContent?.trim() || '';
+      const bTitle = b.querySelector('strong')?.textContent?.trim() || '';
+      return aTitle.localeCompare(bTitle, 'zh-Hans-CN');
+    });
+    // Only move nodes when React has rendered a genuinely out-of-order list.
+    if (sortedItems.some((item, index) => item !== currentItems[index])) sortedItems.forEach(note => list.append(note));
+  }
+  window.addEventListener('load', () => {
+    syncHeaderAndOrder();
+    window.setInterval(syncHeaderAndOrder, 800);
+  });
+  document.addEventListener('keydown', event => {
+    if (event.key !== 'Enter' || !event.target.matches('.title-input')) return;
+    event.preventDefault();
+    event.target.blur();
+  }, true);
 })();
 </script>
 </body></html>
