@@ -688,20 +688,38 @@ mark.selection-annotation--underline { background: transparent; text-decoration:
 .reader-header .crumb { padding-left: 48px; }
 .annotation-shelf { position: fixed; z-index: 10020; width: 300px; max-height: calc(100vh - 112px); box-sizing: border-box; display: flex; flex-direction: column; overflow: hidden; border: 1px solid #cbd2d6; border-radius: 0 0 7px 7px; background: #f3f4f4; box-shadow: 0 8px 24px rgba(29, 39, 44, .24); font-family: Arial, "Microsoft YaHei", sans-serif; }
 .annotation-shelf.is-hidden { display: none; }
-.annotation-shelf__bar { display: flex; align-items: center; height: 46px; flex: 0 0 46px; padding: 0 13px; border-bottom: 1px solid #d7dcdf; background: #fafbfb; color: #677077; }
-.annotation-shelf__tabs { display: flex; gap: 13px; align-items: center; }
+.annotation-shelf__bar { display: flex; align-items: center; height: 46px; flex: 0 0 46px; padding: 0 13px; border-bottom: 1px solid #d7dcdf; background: #fafbfb; color: #677077; cursor: grab; user-select: none; }
+.annotation-shelf__bar:active { cursor: grabbing; }
+.annotation-shelf__bar button, .annotation-shelf__bar input { cursor: auto; }
+.annotation-shelf__close { margin-left: 10px; width: 24px; height: 24px; padding: 0; border: 0; border-radius: 4px; background: transparent; color: #7b858a; font: 21px/22px Arial, sans-serif; cursor: pointer !important; }
+.annotation-shelf__close:hover { color: #33464d; background: #e8ecec; border-radius: 4px; }
+.annotation-shelf__tabs { display: flex; gap: 8px; align-items: center; padding-right: 8px; border-right: 1px solid #e0e4e5; }
 .annotation-shelf__tab { width: 18px; height: 18px; box-sizing: border-box; border: 0; padding: 0; background: transparent; color: #6b747a; cursor: pointer; }
 .annotation-shelf__tab--grid { background: linear-gradient(currentColor 0 0) 0 0/5px 5px, linear-gradient(currentColor 0 0) 100% 0/5px 5px, linear-gradient(currentColor 0 0) 0 100%/5px 5px, linear-gradient(currentColor 0 0) 100% 100%/5px 5px; background-repeat: no-repeat; opacity: .75; }
 .annotation-shelf__tab--note { position: relative; border: 1.5px solid currentColor; border-radius: 2px; }
 .annotation-shelf__tab--note:before { content: ''; position: absolute; left: -5px; top: -5px; width: 13px; height: 13px; border: 1.5px solid currentColor; border-radius: 2px; background: #fafbfb; }
 .annotation-shelf__tab--note:after { content: ''; position: absolute; z-index: 1; left: 3px; top: 3px; width: 9px; height: 1.5px; background: currentColor; box-shadow: 0 4px 0 currentColor; }
 .annotation-shelf__tab--active { color: #57636c; background-color: #dce2e5; border-radius: 4px; }
-.annotation-shelf__outline { position: relative; width: 27px; height: 28px; padding: 0; border: 0; border-radius: 4px; background: transparent; color: #657077; cursor: pointer; }
+.annotation-shelf__outline { position: relative; width: 27px; height: 28px; margin-left: 8px; padding: 0; border: 0; border-radius: 4px; background: transparent; color: #657077; cursor: pointer; }
 .annotation-shelf__outline::before { content: ''; position: absolute; left: 6px; top: 7px; width: 3px; height: 3px; background: currentColor; box-shadow: 0 5px 0 currentColor, 0 10px 0 currentColor; }
 .annotation-shelf__outline::after { content: ''; position: absolute; left: 12px; top: 7px; width: 9px; height: 2px; background: currentColor; box-shadow: 0 5px 0 currentColor, 0 10px 0 currentColor; }
 .annotation-shelf__outline:hover, .annotation-shelf__outline.is-active { background: #dfe5e8; color: #304b47; }
-.annotation-shelf__search { width: 98px; height: 32px; box-sizing: border-box; margin-left: auto; padding: 0 7px 0 28px; border: 2px solid #6f95fa; border-radius: 7px; outline: 0; background: linear-gradient(45deg, transparent 0 46%, #627077 47% 53%, transparent 54%) 19px 20px / 9px 2px no-repeat, #fff; color: #283238; font: 13px Arial, "Microsoft YaHei", sans-serif; }
+.annotation-shelf__outline-list { display: flex; flex-direction: column; gap: 3px; padding: 2px 1px; }
+.annotation-shelf__outline-item { width: 100%; padding: 7px 8px; border: 0; border-radius: 4px; background: transparent; color: #40504d; text-align: left; font: 13px/1.42 Arial, "Microsoft YaHei", sans-serif; cursor: pointer; }
+.annotation-shelf__outline-item:hover { background: #e4ebe6; color: #244f46; }
+.annotation-shelf__outline-item.level-3 { padding-left: 20px; font-size: 12px; }
+.annotation-shelf__outline-empty { padding: 20px 8px; color: #7c858a; text-align: center; font-size: 13px; }
+.annotation-shelf__search { width: 112px; height: 32px; box-sizing: border-box; margin-left: auto; padding: 0 7px 0 28px; border: 2px solid #6f95fa; border-radius: 7px; outline: 0; background: linear-gradient(45deg, transparent 0 46%, #627077 47% 53%, transparent 54%) 19px 20px / 9px 2px no-repeat, #fff; color: #283238; font: 13px Arial, "Microsoft YaHei", sans-serif; }
 .annotation-shelf__search::placeholder { color: #6d757b; }
+.annotation-shelf__filters[hidden], .annotation-shelf__tag-summary[hidden] { display: none !important; }
+.annotation-shelf__outline-list { gap: 5px; padding: 10px 7px 14px; }
+.annotation-shelf__outline-item { position: relative; padding: 8px 10px; border: 1px solid transparent; border-radius: 6px; color: #40504d; font: 13px/1.5 Arial, "Microsoft YaHei", sans-serif; transition: background .14s ease, border-color .14s ease, color .14s ease; }
+.annotation-shelf__outline-item.level-2 { margin-top: 6px; padding: 9px 10px; border-color: #e2e7e5; background: #fafcfb; color: #334b47; font-weight: 600; }
+.annotation-shelf__outline-item.level-2:first-child { margin-top: 0; }
+.annotation-shelf__outline-item.level-3 { margin-left: 14px; padding: 6px 10px 6px 14px; border-left: 2px solid #d9e4df; border-radius: 0 6px 6px 0; color: #65726f; font-size: 12px; }
+.annotation-shelf__outline-item.level-3::before { content: ''; position: absolute; left: -2px; top: 50%; width: 7px; border-top: 1px solid #cfdad5; }
+.annotation-shelf__outline-item:hover { border-color: #cedbd6; background: #e9f1ed; color: #24574e; }
+.annotation-shelf__outline-item.level-3:hover { border-left-color: #548a7c; }
 .annotation-shelf__list { min-height: 110px; padding: 9px 8px; overflow: auto; }
 .annotation-shelf__card { width: 100%; box-sizing: border-box; margin: 0 0 8px; padding: 8px 10px 9px; border: 1px solid #dfe3e5; border-radius: 8px; background: #fff; color: #20262a; text-align: left; cursor: pointer; box-shadow: 0 1px 0 rgba(0,0,0,.025); }
 .annotation-shelf__card:hover { border-color: #bac4cb; }
@@ -745,6 +763,7 @@ mark.selection-annotation--underline { background: transparent; text-decoration:
   let filter = null;
   let tagFilter = null;
   let searchFilter = '';
+  let activeView = 'annotations';
   let current = null;
   const read = () => { try { return JSON.parse(localStorage.getItem(key) || '[]'); } catch { return []; } };
   const activeIds = () => new Set([...document.querySelectorAll('mark.selection-annotation[data-annotation-id]')].map(mark => mark.dataset.annotationId));
@@ -773,10 +792,11 @@ mark.selection-annotation--underline { background: transparent; text-decoration:
     const shelf = document.createElement('aside'); shelf.className = 'annotation-shelf is-hidden'; shelf.setAttribute('aria-label', 'Annotations');
     const bar = document.createElement('div'); bar.className = 'annotation-shelf__bar';
     const tabs = document.createElement('div'); tabs.className = 'annotation-shelf__tabs';
-    const grid = document.createElement('button'); grid.className = 'annotation-shelf__tab annotation-shelf__tab--grid'; grid.type = 'button'; grid.title = 'Annotations';
-    const note = document.createElement('button'); note.className = 'annotation-shelf__tab annotation-shelf__tab--note annotation-shelf__tab--active'; note.type = 'button'; note.title = 'Notes';
-    const outline = document.createElement('button'); outline.type = 'button'; outline.className = 'annotation-shelf__outline'; outline.title = 'Table of contents'; outline.setAttribute('aria-label', 'Table of contents'); outline.addEventListener('click', () => { const original = document.querySelector('.outline-header-toggle'); original?.click(); outline.classList.toggle('is-active'); });
-    const search = document.createElement('input'); search.type = 'search'; search.className = 'annotation-shelf__search'; search.placeholder = 'Search notes'; search.setAttribute('aria-label', 'Search annotations'); search.addEventListener('input', () => { searchFilter = search.value.trim().toLowerCase(); render(); }); tabs.append(grid, note); bar.append(tabs, outline, search);
+    const grid = document.createElement('button'); grid.className = 'annotation-shelf__tab annotation-shelf__tab--grid annotation-shelf__tab--active'; grid.type = 'button'; grid.title = 'Annotations'; grid.addEventListener('click', () => { activeView = 'annotations'; grid.classList.add('annotation-shelf__tab--active'); outline.classList.remove('is-active'); search.style.display = ''; render(); });
+    const outline = document.createElement('button'); outline.type = 'button'; outline.className = 'annotation-shelf__outline'; outline.title = 'Table of contents'; outline.setAttribute('aria-label', 'Table of contents'); outline.addEventListener('click', () => { activeView = 'outline'; outline.classList.add('is-active'); grid.classList.remove('annotation-shelf__tab--active'); search.style.display = 'none'; render(); });
+    const search = document.createElement('input'); search.type = 'search'; search.className = 'annotation-shelf__search'; search.placeholder = 'Search notes'; search.setAttribute('aria-label', 'Search annotations'); search.addEventListener('input', () => { searchFilter = search.value.trim().toLowerCase(); render(); });
+    const close = document.createElement('button'); close.type = 'button'; close.className = 'annotation-shelf__close'; close.title = 'Close'; close.setAttribute('aria-label', 'Close annotations'); close.textContent = '×'; close.addEventListener('click', () => { shelf.classList.add('is-hidden'); toggle.classList.remove('is-open'); toggle.title = 'Show annotations'; });
+    tabs.append(grid); bar.append(tabs, outline, search, close);
     const list = document.createElement('div'); list.className = 'annotation-shelf__list';
     const filters = document.createElement('div'); filters.className = 'annotation-shelf__filters';
     palette.forEach(color => { const button = document.createElement('button'); button.type = 'button'; button.className = 'annotation-shelf__filter'; button.style.background = color; button.title = 'Filter by color'; button.addEventListener('click', () => { filter = filter === color ? null : color; filters.querySelectorAll('button').forEach(item => item.classList.toggle('is-active', item === button && filter === color)); render(); }); filters.append(button); });
@@ -784,6 +804,15 @@ mark.selection-annotation--underline { background: transparent; text-decoration:
     document.body.append(toggle, shelf);
     const positionToggle = () => { const header = document.querySelector('.reader-header'); if (!header) return; const rect = header.getBoundingClientRect(); toggle.style.left = `${Math.max(8, rect.left + 13)}px`; toggle.style.top = `${rect.top + Math.max(5, (rect.height - 30) / 2)}px`; };
     const positionShelf = () => { positionToggle(); const rect = toggle.getBoundingClientRect(); shelf.style.left = `${Math.max(8, rect.left)}px`; shelf.style.top = `${Math.min(window.innerHeight - 54, rect.bottom + 1)}px`; };
+    let shelfWasDragged = false;
+    bar.addEventListener('pointerdown', event => {
+      if (event.target.closest('button, input')) return;
+      const rect = shelf.getBoundingClientRect(); const offsetX = event.clientX - rect.left; const offsetY = event.clientY - rect.top;
+      shelfWasDragged = false; bar.setPointerCapture(event.pointerId);
+      const move = moveEvent => { shelfWasDragged = true; shelf.style.left = `${Math.max(8, Math.min(window.innerWidth - rect.width - 8, moveEvent.clientX - offsetX))}px`; shelf.style.top = `${Math.max(8, Math.min(window.innerHeight - rect.height - 8, moveEvent.clientY - offsetY))}px`; };
+      const end = endEvent => { bar.releasePointerCapture?.(endEvent.pointerId); bar.removeEventListener('pointermove', move); bar.removeEventListener('pointerup', end); bar.removeEventListener('pointercancel', end); };
+      bar.addEventListener('pointermove', move); bar.addEventListener('pointerup', end); bar.addEventListener('pointercancel', end);
+    });
     // Keep the marker button available for every note; empty notes show an
     // empty shelf rather than making the entry point disappear.
     const syncAvailability = () => { toggle.hidden = false; };
@@ -793,10 +822,19 @@ mark.selection-annotation--underline { background: transparent; text-decoration:
     const trackToggle = () => { const header = document.querySelector('.reader-header'); if (header) { const rect = header.getBoundingClientRect(); const left = `${Math.max(8, rect.left + 13)}px`; const top = `${rect.top + Math.max(5, (rect.height - 30) / 2)}px`; if (left !== lastLeft) { toggle.style.left = left; lastLeft = left; } if (top !== lastTop) { toggle.style.top = top; lastTop = top; } } syncAvailability(); window.requestAnimationFrame(trackToggle); };
     window.requestAnimationFrame(trackToggle);
     toggle.addEventListener('click', () => { const hidden = shelf.classList.toggle('is-hidden'); toggle.classList.toggle('is-open', !hidden); toggle.title = hidden ? 'Show annotations' : 'Hide annotations'; if (!hidden) { positionShelf(); render(); } });
-    window.addEventListener('resize', () => { positionToggle(); if (!shelf.classList.contains('is-hidden')) positionShelf(); });
+    window.addEventListener('resize', () => { positionToggle(); if (!shelf.classList.contains('is-hidden') && !shelfWasDragged) positionShelf(); });
   }
   function render() {
-    const list = document.querySelector('.annotation-shelf__list'); const summary = document.querySelector('.annotation-shelf__tag-summary'); if (!list || !summary) return;
+    const list = document.querySelector('.annotation-shelf__list'); const summary = document.querySelector('.annotation-shelf__tag-summary'); const filters = document.querySelector('.annotation-shelf__filters'); if (!list || !summary || !filters) return;
+    if (activeView === 'outline') {
+      filters.hidden = true; summary.hidden = true;
+      list.replaceChildren(); summary.replaceChildren();
+      const sourceItems = [...document.querySelectorAll('.outline-content button.level-2, .outline-content button.level-3')];
+      if (!sourceItems.length) { const empty = document.createElement('div'); empty.className = 'annotation-shelf__outline-empty'; empty.textContent = 'No table of contents'; list.append(empty); return; }
+      const outlineList = document.createElement('div'); outlineList.className = 'annotation-shelf__outline-list';
+      sourceItems.forEach(source => { const item = document.createElement('button'); item.type = 'button'; item.className = `annotation-shelf__outline-item ${source.className}`; item.textContent = source.textContent; item.addEventListener('click', () => source.click()); outlineList.append(item); }); list.append(outlineList); return;
+    }
+    filters.hidden = false; summary.hidden = false;
     const ids = activeIds();
     const allItems = read().filter(item => ids.has(item.id)).sort((a, b) => a.start - b.start);
     const items = allItems.filter(item => {
@@ -907,5 +945,8 @@ mark.selection-annotation--underline { background: transparent; text-decoration:
 <style>
 /* The table-of-contents control lives in the annotation shelf toolbar. */
 .reader-actions .outline-header-toggle { display: none; }
+/* Keep one table of contents: it is available from the annotation shelf toolbar. */
+.reading-layout > .outline { display: none !important; }
+.reading-layout { grid-template-columns: minmax(0, 1fr) !important; }
 </style>
 </body></html>
