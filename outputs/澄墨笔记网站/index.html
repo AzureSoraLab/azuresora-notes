@@ -1008,6 +1008,15 @@ M834 80h400000v40h-400000z"></path></svg></span></span></span><span class="vlist
 mark.selection-annotation { padding: 0 1px; color: inherit; }
 mark.selection-annotation--highlight { background: color-mix(in srgb, var(--selection-annotation-color) 55%, transparent); box-decoration-break: clone; -webkit-box-decoration-break: clone; }
 mark.selection-annotation--underline { background: transparent; text-decoration: underline 3px var(--selection-annotation-color); text-underline-offset: 3px; }
+.selection-annotation-menu--card { width: 292px; transform: none; border-radius: 0; box-shadow: 0 3px 12px rgba(27,33,30,.18); }
+.selection-annotation-card__header { display: flex; align-items: center; gap: 8px; padding: 8px 10px; border-bottom: 1px solid #e7e6e2; color: #242925; font: 13px/1.2 Arial, sans-serif; }
+.selection-annotation-card__header b { color: var(--selection-annotation-color); font-family: Georgia, serif; font-size: 21px; line-height: 14px; }
+.selection-annotation-card__header button { margin-left: auto; border: 0; background: transparent; color: #333; font-size: 18px; cursor: pointer; }
+.selection-annotation-card__comment { display: block; width: 100%; min-height: 88px; resize: vertical; border: 0; border-bottom: 1px solid #e7e6e2; outline: 0; padding: 10px; background: #fff; color: #303530; font: 13px/1.55 Arial, sans-serif; }
+.selection-annotation-card__tags { display: flex; gap: 5px; flex-wrap: wrap; padding: 6px 10px 2px; }
+.selection-annotation-card__tag-chip { border: 0; border-radius: 3px; padding: 3px 5px; background: #f0f1ed; color: #56625c; font-size: 11px; cursor: pointer; }
+.selection-annotation-card__tag { width: 100%; border: 0; outline: 0; padding: 8px 10px; background: #fff; color: #303530; font: 13px/1.3 Arial, sans-serif; }
+.selection-annotation-selection-box { position: fixed; z-index: 9999; border: 2px dashed #6f9df5; pointer-events: none; }
 </style>
 <script>
 (() => {
@@ -1016,11 +1025,13 @@ mark.selection-annotation--underline { background: transparent; text-decoration:
   let selected = null;
   let kind = 'highlight';
   let menu = null;
+  let selectionBox = null;
   let observer = null;
   let applyTimer = 0;
   let longPressTimer = 0;
   let longPressTarget = null;
   let longPressOpened = false;
+  let consumeAnnotationClick = false;
 
   const reader = () => document.querySelector('.reader-body');
   const read = () => { try { return JSON.parse(localStorage.getItem(storageKey) || '[]'); } catch { return []; } };
@@ -1081,7 +1092,7 @@ mark.selection-annotation--underline { background: transparent; text-decoration:
     });
     observer.observe(root, { childList: true, subtree: true });
   }
-  function removeMenu() { menu?.remove(); menu = null; selected = null; }
+  function removeMenu() { menu?.remove(); menu = null; selected = null; selectionBox?.remove(); selectionBox = null; }
   function updateAnnotation(id, changes) {
     write(read().map(item => item.id === id ? { ...item, ...changes } : item));
     removeMenu();
@@ -1091,6 +1102,27 @@ mark.selection-annotation--underline { background: transparent; text-decoration:
     write(read().filter(item => item.id !== id));
     removeMenu();
     renderAnnotations();
+  }
+  function showCommentCard(mark) {
+    const id = mark.dataset.annotationId;
+    const item = read().find(annotation => annotation.id === id);
+    if (!item) return;
+    removeMenu();
+    const parts = [...document.querySelectorAll(`mark.selection-annotation[data-annotation-id="${id}"]`)];
+    const rects = parts.flatMap(part => [...part.getClientRects()]);
+    const left = Math.min(...rects.map(part => part.left)); const right = Math.max(...rects.map(part => part.right));
+    const top = Math.min(...rects.map(part => part.top)); const bottom = Math.max(...rects.map(part => part.bottom));
+    selectionBox = document.createElement('div'); selectionBox.className = 'selection-annotation-selection-box';
+    selectionBox.style.left = `${left - 4}px`; selectionBox.style.top = `${top - 4}px`; selectionBox.style.width = `${right - left + 8}px`; selectionBox.style.height = `${bottom - top + 8}px`; document.body.append(selectionBox);
+    menu = document.createElement('div'); menu.className = 'selection-annotation-menu selection-annotation-menu--card';
+    menu.style.left = `${Math.min(window.innerWidth - 302, Math.max(8, left))}px`; menu.style.top = `${Math.min(window.innerHeight - 220, Math.max(8, bottom + 10))}px`; menu.style.setProperty('--selection-annotation-color', item.color);
+    const header = document.createElement('div'); header.className = 'selection-annotation-card__header';
+    const icon = document.createElement('b'); icon.textContent = 'A'; const page = document.createElement('span'); page.textContent = 'Page 194'; const close = document.createElement('button'); close.textContent = '...'; close.addEventListener('click', removeMenu); header.append(icon, page, close);
+    const comment = document.createElement('textarea'); comment.className = 'selection-annotation-card__comment'; comment.placeholder = 'Add comment'; comment.value = item.comment || ''; comment.addEventListener('input', () => write(read().map(annotation => annotation.id === id ? { ...annotation, comment: comment.value } : annotation)));
+    const tags = document.createElement('div'); tags.className = 'selection-annotation-card__tags'; const tagInput = document.createElement('input'); tagInput.className = 'selection-annotation-card__tag'; tagInput.placeholder = 'Add tag...';
+    const renderTags = () => { tags.replaceChildren(...(item.tags || []).map(tag => { const chip = document.createElement('button'); chip.className = 'selection-annotation-card__tag-chip'; chip.textContent = `#${tag} x`; chip.addEventListener('click', () => { item.tags = (item.tags || []).filter(value => value !== tag); write(read().map(annotation => annotation.id === id ? { ...annotation, tags: item.tags } : annotation)); renderTags(); }); return chip; })); };
+    tagInput.addEventListener('keydown', event => { if (event.key !== 'Enter') return; const tag = tagInput.value.trim(); if (!tag) return; event.preventDefault(); item.tags = [...new Set([...(item.tags || []), tag])]; write(read().map(annotation => annotation.id === id ? { ...annotation, tags: item.tags } : annotation)); tagInput.value = ''; renderTags(); });
+    renderTags(); menu.append(header, comment, tags, tagInput); document.body.append(menu);
   }
   function showManageMenu(mark) {
     const id = mark.dataset.annotationId;
@@ -1104,7 +1136,7 @@ mark.selection-annotation--underline { background: transparent; text-decoration:
     menu.style.top = `${Math.max(8, rect.top)}px`;
     const title = document.createElement('div');
     title.className = 'selection-annotation-menu__title';
-    title.textContent = '添加至笔记';
+    title.textContent = 'Add to note';
     menu.append(title);
     colors.forEach((color, index) => {
       const button = document.createElement('button');
@@ -1117,11 +1149,11 @@ mark.selection-annotation--underline { background: transparent; text-decoration:
     });
     const convert = document.createElement('button');
     convert.className = 'selection-annotation-menu__item';
-    convert.textContent = item.kind === 'highlight' ? '转换为下划线' : '转换为高亮';
+    convert.textContent = item.kind === 'highlight' ? 'Convert to underline' : 'Convert to highlight';
     convert.addEventListener('click', () => updateAnnotation(id, { kind: item.kind === 'highlight' ? 'underline' : 'highlight' }));
     const remove = document.createElement('button');
     remove.className = 'selection-annotation-menu__item selection-annotation-menu__item--danger';
-    remove.textContent = '删除';
+    remove.textContent = 'Delete';
     remove.addEventListener('click', () => deleteAnnotation(id));
     menu.append(convert, remove);
     document.body.append(menu);
@@ -1156,14 +1188,14 @@ mark.selection-annotation--underline { background: transparent; text-decoration:
       const button = document.createElement('button');
       button.className = 'selection-annotation-menu__color';
       button.style.backgroundColor = color;
-      button.title = '应用此颜色';
+      button.title = 'Apply color';
       button.addEventListener('mousedown', event => event.preventDefault());
       button.addEventListener('click', () => choose(color));
       colorRow.append(button);
     });
     const actionRow = document.createElement('div');
     actionRow.className = 'selection-annotation-menu__actions';
-    [['highlight', 'A', '高亮文本'], ['underline', 'A', '下划线文本']].forEach(([value, label, title]) => {
+    [['highlight', 'A', 'Highlight'], ['underline', 'A', 'Underline']].forEach(([value, label, title]) => {
       const button = document.createElement('button');
       button.className = `selection-annotation-menu__action ${value === 'underline' ? 'selection-annotation-menu__action--underline' : ''} ${kind === value ? 'is-active' : ''}`;
       button.textContent = label;
@@ -1177,6 +1209,7 @@ mark.selection-annotation--underline { background: transparent; text-decoration:
   }
   document.addEventListener('mouseup', event => {
     if (longPressOpened) { longPressOpened = false; return; }
+    if (event.target.closest('mark.selection-annotation')) return;
     if (menu?.contains(event.target)) return;
     window.setTimeout(showMenu, 0);
   });
@@ -1187,7 +1220,7 @@ mark.selection-annotation--underline { background: transparent; text-decoration:
     if (!mark) return;
     longPressTarget = mark;
     longPressTimer = window.setTimeout(() => {
-      if (longPressTarget === mark) { longPressOpened = true; showManageMenu(mark); }
+      if (longPressTarget === mark) { longPressOpened = true; consumeAnnotationClick = true; showManageMenu(mark); }
       longPressTimer = 0;
     }, 500);
   });
@@ -1195,6 +1228,12 @@ mark.selection-annotation--underline { background: transparent; text-decoration:
   document.addEventListener('pointerup', cancelLongPress);
   document.addEventListener('pointercancel', cancelLongPress);
   document.addEventListener('pointermove', cancelLongPress);
+  document.addEventListener('click', event => {
+    const mark = event.target.closest('mark.selection-annotation');
+    if (!mark) return;
+    if (consumeAnnotationClick) { consumeAnnotationClick = false; return; }
+    event.preventDefault(); event.stopPropagation(); showCommentCard(mark);
+  });
   window.addEventListener('resize', removeMenu);
   window.addEventListener('load', () => window.setTimeout(renderAnnotations, 100));
 })();
