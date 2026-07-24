@@ -502,10 +502,11 @@ mark.selection-annotation--underline { background: transparent; text-decoration:
   ];
   const defaultState = { color: palette[0][0], size: 2, eraserSize: 14, eraser: false, drawing: false, selecting: false };
   let state = { ...defaultState };
-  let canvas = null, context = null, activeStroke = null, selectedStroke = -1, dragStart = null, saveTimer = 0, redrawFrame = 0, resizeObserver = null, selectionDelete = null;
+  let canvas = null, context = null, activeStroke = null, selectedStroke = -1, dragStart = null, saveTimer = 0, redrawFrame = 0, eraseFrame = 0, pendingErasePoints = [], resizeObserver = null, selectionDelete = null;
   let menu = null;
-  const read = () => { try { return JSON.parse(localStorage.getItem(storageKey) || '{}'); } catch { return {}; } };
-  const write = value => localStorage.setItem(storageKey, JSON.stringify(value));
+  let drawingStore = null;
+  const read = () => drawingStore || (drawingStore = (() => { try { return JSON.parse(localStorage.getItem(storageKey) || '{}'); } catch { return {}; } })());
+  const write = value => { drawingStore = value; localStorage.setItem(storageKey, JSON.stringify(value)); };
   const loadPreferences = () => { try { state = { ...defaultState, ...JSON.parse(localStorage.getItem(preferencesKey) || '{}'), drawing: false, selecting: false }; } catch {} };
   const savePreferences = () => localStorage.setItem(preferencesKey, JSON.stringify({ color: state.color, size: state.size, eraserSize: state.eraserSize }));
   loadPreferences();
@@ -526,7 +527,11 @@ mark.selection-annotation--underline { background: transparent; text-decoration:
   let drawingsCache = [];
   let loadedNoteId = '', renderedNoteId = '', lastCanvasGeometry = '', drawingRevision = 0, renderedRevision = -1;
   const markDrawingChanged = () => { drawingRevision += 1; };
-  const loadDrawing = () => { loadedNoteId = noteId(); drawingsCache = read()[loadedNoteId] || []; selectedStroke = -1; markDrawingChanged(); };
+  const loadDrawing = () => {
+    // Only materialize the selected note's strokes. Other notes remain compact
+    // JSON data until the user actually opens them.
+    loadedNoteId = noteId(); drawingsCache = read()[loadedNoteId] || []; selectedStroke = -1; markDrawingChanged();
+  };
   const scheduleRedraw = () => {
     if (redrawFrame) return;
     redrawFrame = requestAnimationFrame(() => { redrawFrame = 0; redraw(); });
@@ -663,6 +668,17 @@ mark.selection-annotation--underline { background: transparent; text-decoration:
     if (changed) markDrawingChanged();
     return changed;
   };
+  const queueErase = point => {
+    pendingErasePoints.push(point);
+    if (eraseFrame) return;
+    eraseFrame = requestAnimationFrame(() => {
+      eraseFrame = 0;
+      const points = pendingErasePoints; pendingErasePoints = [];
+      let changed = false;
+      points.forEach(next => { changed = eraseAt(next, state.eraserSize / 2) || changed; });
+      if (changed) { queueSave(); scheduleRedraw(); }
+    });
+  };
   const begin = event => {
     if ((!state.drawing && !state.selecting) || event.button !== 0) return;
     event.preventDefault(); event.stopPropagation();
@@ -673,7 +689,7 @@ mark.selection-annotation--underline { background: transparent; text-decoration:
       scheduleRedraw(); return;
     }
     if (state.eraser) {
-      if (eraseAt(pointFor(event), state.eraserSize / 2)) { queueSave(); scheduleRedraw(); }
+      queueErase(pointFor(event));
       canvas.setPointerCapture?.(event.pointerId); return;
     }
     activeStroke = { color: state.color, size: state.size, eraser: false, points: [pointFor(event)] };
@@ -688,9 +704,7 @@ mark.selection-annotation--underline { background: transparent; text-decoration:
     }
     if (state.eraser) {
       const samples = event.getCoalescedEvents ? event.getCoalescedEvents() : [event];
-      let changed = false;
-      samples.forEach(sample => { changed = eraseAt(pointFor(sample), state.eraserSize / 2) || changed; });
-      if (changed) { queueSave(); scheduleRedraw(); }
+      samples.forEach(sample => queueErase(pointFor(sample)));
       return;
     }
     if (!activeStroke) return;
@@ -701,7 +715,11 @@ mark.selection-annotation--underline { background: transparent; text-decoration:
   };
   const end = event => {
     if (state.selecting && dragStart) { event.preventDefault(); dragStart = null; canvas.classList.remove('is-dragging'); queueSave(); return; }
-    if (state.eraser) { event.preventDefault(); return; }
+    if (state.eraser) {
+      event.preventDefault();
+      if (eraseFrame) { cancelAnimationFrame(eraseFrame); eraseFrame = 0; const points = pendingErasePoints; pendingErasePoints = []; let changed = false; points.forEach(point => { changed = eraseAt(point, state.eraserSize / 2) || changed; }); if (changed) { queueSave(); scheduleRedraw(); } }
+      return;
+    }
     if (!activeStroke) return;
     event.preventDefault();
     if (activeStroke.points.length) { drawingsCache.push(activeStroke); markDrawingChanged(); queueSave(); }
@@ -763,6 +781,7 @@ mark.selection-annotation--underline { background: transparent; text-decoration:
     if ((event.key === 'Delete' || event.key === 'Backspace') && state.selecting && selectedStroke >= 0 && !event.target.matches('input, textarea, [contenteditable="true"]')) { event.preventDefault(); deleteSelectedStroke(); }
   });
   document.addEventListener('chengmo:ui-mounted', () => { requestAnimationFrame(() => { mount(); syncCanvas(); }); });
+  window.addEventListener('storage', event => { if (event.key === storageKey) { drawingStore = null; if (!activeStroke) loadDrawing(); scheduleRedraw(); } });
   window.addEventListener('resize', () => { closeMenu(); scheduleRedraw(); });
   window.addEventListener('load', () => { window.setTimeout(() => { mount(); syncCanvas(); }, 80); });
 })();
@@ -783,17 +802,68 @@ mark.selection-annotation--underline { background: transparent; text-decoration:
   let longPressOpened = false;
   let consumeAnnotationClick = false;
   let commentSaveTimer = 0;
+  let cachedItems = null;
+  let renderFrame = 0;
+  let lastRoot = null;
+  let lastSourceText = '';
+  let renderedSignature = '';
+  let annotationsByNote = null;
 
   const reader = () => document.querySelector('.reader-body');
   const readerContent = () => reader()?.firstElementChild || null;
   const currentNoteId = () => document.querySelector('.compact-note.selected')?.dataset.noteId || '';
-  const read = () => { try { return JSON.parse(localStorage.getItem(storageKey) || '[]'); } catch { return []; } };
-  const write = (items) => localStorage.setItem(storageKey, JSON.stringify(items));
+  const read = () => cachedItems || (cachedItems = (() => { try { return JSON.parse(localStorage.getItem(storageKey) || '[]'); } catch { return []; } })());
+  const noteAnnotations = noteId => {
+    if (!annotationsByNote) {
+      annotationsByNote = new Map();
+      read().forEach(item => { const items = annotationsByNote.get(item.noteId) || []; items.push(item); annotationsByNote.set(item.noteId, items); });
+    }
+    return annotationsByNote.get(noteId) || [];
+  };
+  // This is the single persistence gateway for text annotations. Every consumer
+  // (the reader, detail card and annotation shelf) receives the same change signal.
+  const write = (items, detail = {}) => {
+    cachedItems = items;
+    annotationsByNote = null;
+    localStorage.setItem(storageKey, JSON.stringify(items));
+    document.dispatchEvent(new CustomEvent('chengmo:annotations-changed', { detail }));
+  };
   const offsetOf = (root, container, offset) => {
     const range = document.createRange();
     range.selectNodeContents(root);
     range.setEnd(container, offset);
     return range.toString().length;
+  };
+  const rootText = root => root === lastRoot ? lastSourceText : (root?.textContent || '');
+  const makeAnchor = (root, start, end) => {
+    const text = rootText(root);
+    return {
+      quote: text.slice(start, end),
+      prefix: text.slice(Math.max(0, start - 48), start),
+      suffix: text.slice(end, Math.min(text.length, end + 48))
+    };
+  };
+  const resolveAnchor = (root, item, sourceText = rootText(root)) => {
+    const text = sourceText;
+    const quote = item.quote || item.text || '';
+    if (!quote) return null;
+    // Fast path: retain the original offsets when the surrounding source agrees.
+    if (text.slice(item.start, item.end) === quote) return { start: item.start, end: item.end, migrated: !item.quote };
+    let best = null, from = 0;
+    while (from <= text.length) {
+      const start = text.indexOf(quote, from);
+      if (start < 0) break;
+      const end = start + quote.length;
+      const prefix = item.prefix || '', suffix = item.suffix || '';
+      let score = 0;
+      if (prefix) { const available = text.slice(Math.max(0, start - prefix.length), start); score += available === prefix ? prefix.length * 2 : 0; }
+      if (suffix) { const available = text.slice(end, end + suffix.length); score += available === suffix ? suffix.length * 2 : 0; }
+      // When context has been edited, retain the candidate nearest its original location.
+      score -= Math.min(80, Math.abs(start - (item.start || 0)) / 12);
+      if (!best || score > best.score) best = { start, end, score };
+      from = start + Math.max(1, quote.length);
+    }
+    return best ? { start: best.start, end: best.end, migrated: true } : null;
   };
   const annotationId = () => `${Date.now()}-${Math.random().toString(16).slice(2)}`;
 
@@ -829,21 +899,46 @@ mark.selection-annotation--underline { background: transparent; text-decoration:
       textNode.parentNode.replaceChild(fragment, textNode);
     });
   }
+  function scheduleAnnotationRender() {
+    if (renderFrame) return;
+    renderFrame = requestAnimationFrame(() => { renderFrame = 0; renderAnnotations(); });
+  }
   function renderAnnotations() {
     const root = readerContent();
     if (!root) return;
     observer && observer.disconnect();
-    clearMarks(root);
     const noteId = currentNoteId();
-    const items = read().filter(item => item.noteId === noteId);
+    const allItems = read();
+    const currentText = root.textContent || '';
+    const noteItems = noteAnnotations(noteId);
+    const signature = `${noteId}\u0000${currentText}\u0000${noteItems.map(item => `${item.id}:${item.start}:${item.end}:${item.color}:${item.kind}`).join('|')}`;
+    // React can announce a UI mount without replacing the article. Avoid tearing
+    // down every mark when both the text and its visual annotation state match.
+    if (root === lastRoot && signature === renderedSignature && (!noteItems.length || root.querySelector('mark.selection-annotation'))) { watch(root); return; }
+    clearMarks(root);
+    // Read source once; resolving anchors no longer repeatedly walks the long note.
+    lastRoot = root; lastSourceText = currentText;
+    let migrated = false;
+    const items = noteItems.map(item => {
+      const anchor = resolveAnchor(root, item, lastSourceText);
+      if (!anchor) return null;
+      const next = { ...item, start: anchor.start, end: anchor.end, ...(item.quote ? {} : makeAnchor(root, anchor.start, anchor.end)) };
+      migrated ||= anchor.migrated || next.start !== item.start || next.end !== item.end;
+      return next;
+    }).filter(Boolean);
+    if (migrated) {
+      const resolved = new Map(items.map(item => [item.id, item]));
+      write(allItems.map(item => resolved.get(item.id) || item), { type: 'reanchor', noteId });
+    }
     items.sort((a, b) => b.start - a.start).forEach(item => applyOne(root, item));
+    renderedSignature = `${noteId}\u0000${lastSourceText}\u0000${items.map(item => `${item.id}:${item.start}:${item.end}:${item.color}:${item.kind}`).join('|')}`;
     watch(root);
   }
   function watch(root) {
     if (!window.MutationObserver) return;
     observer = new MutationObserver(() => {
       window.clearTimeout(applyTimer);
-      applyTimer = window.setTimeout(renderAnnotations, 80);
+      applyTimer = window.setTimeout(scheduleAnnotationRender, 80);
     });
     observer.observe(root, { childList: true, subtree: true });
   }
@@ -869,12 +964,12 @@ mark.selection-annotation--underline { background: transparent; text-decoration:
     menu.style.top = `${menuTop}px`;
   }
   function updateAnnotation(id, changes) {
-    write(read().map(item => item.id === id ? { ...item, ...changes } : item));
+    write(read().map(item => item.id === id ? { ...item, ...changes } : item), { type: 'update', id, changes });
     removeMenu();
     renderAnnotations();
   }
   function deleteAnnotation(id) {
-    write(read().filter(item => item.id !== id));
+    write(read().filter(item => item.id !== id), { type: 'delete', id });
     removeMenu();
     renderAnnotations();
   }
@@ -889,11 +984,11 @@ mark.selection-annotation--underline { background: transparent; text-decoration:
     menu.dataset.annotationId = id; menu.style.setProperty('--selection-annotation-color', item.color);
     const header = document.createElement('div'); header.className = 'selection-annotation-card__header';
     const icon = document.createElement('b'); icon.textContent = 'A'; const page = document.createElement('span'); page.textContent = '标注详情'; const close = document.createElement('button'); close.textContent = '×'; close.title = '关闭'; close.addEventListener('click', removeMenu); header.append(icon, page, close);
-    const saveComment = () => { window.clearTimeout(commentSaveTimer); commentSaveTimer = 0; write(read().map(annotation => annotation.id === id ? { ...annotation, comment: item.comment || '' } : annotation)); };
+    const saveComment = () => { window.clearTimeout(commentSaveTimer); commentSaveTimer = 0; write(read().map(annotation => annotation.id === id ? { ...annotation, comment: item.comment || '' } : annotation), { type: 'update', id, changes: { comment: item.comment || '' } }); };
     const comment = document.createElement('textarea'); comment.className = 'selection-annotation-card__comment'; comment.placeholder = '添加评论'; comment.value = item.comment || ''; comment.addEventListener('input', () => { item.comment = comment.value; window.clearTimeout(commentSaveTimer); commentSaveTimer = window.setTimeout(saveComment, 260); }); comment.addEventListener('blur', saveComment);
     const tags = document.createElement('div'); tags.className = 'selection-annotation-card__tags'; const tagInput = document.createElement('input'); tagInput.className = 'selection-annotation-card__tag'; tagInput.placeholder = '添加标签…';
-    const renderTags = () => { tags.replaceChildren(...(item.tags || []).map(tag => { const chip = document.createElement('button'); chip.className = 'selection-annotation-card__tag-chip'; chip.textContent = `#${tag} ×`; chip.title = `删除标签 ${tag}`; chip.setAttribute('aria-label', `删除标签 ${tag}`); chip.addEventListener('click', () => { item.tags = (item.tags || []).filter(value => value !== tag); write(read().map(annotation => annotation.id === id ? { ...annotation, tags: item.tags } : annotation)); renderTags(); }); return chip; })); };
-    tagInput.addEventListener('keydown', event => { if (event.key !== 'Enter') return; const tag = tagInput.value.trim().replace(/^#/, ''); if (!tag) return; event.preventDefault(); item.tags = [...new Set([...(item.tags || []), tag])]; write(read().map(annotation => annotation.id === id ? { ...annotation, tags: item.tags } : annotation)); tagInput.value = ''; renderTags(); });
+    const renderTags = () => { tags.replaceChildren(...(item.tags || []).map(tag => { const chip = document.createElement('button'); chip.className = 'selection-annotation-card__tag-chip'; chip.textContent = `#${tag} ×`; chip.title = `删除标签 ${tag}`; chip.setAttribute('aria-label', `删除标签 ${tag}`); chip.addEventListener('click', () => { item.tags = (item.tags || []).filter(value => value !== tag); write(read().map(annotation => annotation.id === id ? { ...annotation, tags: item.tags } : annotation), { type: 'update', id, changes: { tags: item.tags } }); renderTags(); }); return chip; })); };
+    tagInput.addEventListener('keydown', event => { if (event.key !== 'Enter') return; const tag = tagInput.value.trim().replace(/^#/, ''); if (!tag) return; event.preventDefault(); item.tags = [...new Set([...(item.tags || []), tag])]; write(read().map(annotation => annotation.id === id ? { ...annotation, tags: item.tags } : annotation), { type: 'update', id, changes: { tags: item.tags } }); tagInput.value = ''; renderTags(); });
     renderTags(); menu.append(header, comment, tags, tagInput); document.body.append(menu); positionCommentCard(id);
   }
   function positionManageMenu(id) {
@@ -961,14 +1056,16 @@ mark.selection-annotation--underline { background: transparent; text-decoration:
   function choose(color) {
     if (!selected) return;
     const items = read();
-    items.push({ id: annotationId(), noteId: currentNoteId(), start: selected.start, end: selected.end, color, kind });
-    write(items);
+    const anchor = makeAnchor(readerContent(), selected.start, selected.end);
+    const item = { id: annotationId(), noteId: currentNoteId(), start: selected.start, end: selected.end, color, kind, text: anchor.quote, quote: anchor.quote, prefix: anchor.prefix, suffix: anchor.suffix, comment: '', tags: [] };
+    items.push(item);
+    write(items, { type: 'create', id: item.id });
     window.getSelection()?.removeAllRanges();
     removeMenu();
     renderAnnotations();
   }
   function showMenu() {
-    const root = reader();
+    const root = readerContent();
     const selection = window.getSelection();
     const range = selection?.rangeCount ? selection.getRangeAt(0) : null;
     const text = selection?.toString().trim();
@@ -1049,10 +1146,11 @@ mark.selection-annotation--underline { background: transparent; text-decoration:
       else positionCommentCard(id);
     });
   }, true);
-  window.addEventListener('load', () => window.setTimeout(renderAnnotations, 100));
+  window.addEventListener('load', () => window.setTimeout(scheduleAnnotationRender, 100));
   // React may replace the reader body during a note switch; redraw only once
   // after the existing UI lifecycle event instead of retaining a stale observer.
-  document.addEventListener('chengmo:ui-mounted', () => { removeMenu(); window.setTimeout(renderAnnotations, 0); });
+  document.addEventListener('chengmo:ui-mounted', () => { removeMenu(); scheduleAnnotationRender(); });
+  window.addEventListener('storage', event => { if (event.key === storageKey) { cachedItems = null; annotationsByNote = null; scheduleAnnotationRender(); } });
 })();
 </script>
 <style>
@@ -1165,9 +1263,10 @@ mark.selection-annotation--underline { background: transparent; text-decoration:
     shelfIndex = { items, tags: [...new Set(items.flatMap(entry => entry.item.tags || []))] };
     return shelfIndex;
   };
-  const saveItem = (id, changes) => { const items = read(); const item = items.find(entry => entry.id === id); if (item) Object.assign(item, changes); invalidateShelfIndex(); localStorage.setItem(key, JSON.stringify(items)); };
-  const flushCommentSave = () => { if (!commentSaveTimer) return; window.clearTimeout(commentSaveTimer); commentSaveTimer = 0; invalidateShelfIndex(); localStorage.setItem(key, JSON.stringify(read())); };
-  const scheduleCommentSave = () => { invalidateShelfIndex(); window.clearTimeout(commentSaveTimer); commentSaveTimer = window.setTimeout(() => { commentSaveTimer = 0; localStorage.setItem(key, JSON.stringify(read())); }, 260); };
+  const commit = (detail = {}) => { invalidateShelfIndex(); localStorage.setItem(key, JSON.stringify(read())); document.dispatchEvent(new CustomEvent('chengmo:annotations-changed', { detail })); };
+  const saveItem = (id, changes) => { const items = read(); const item = items.find(entry => entry.id === id); if (item) Object.assign(item, changes); commit({ type: 'update', id, changes }); };
+  const flushCommentSave = () => { if (!commentSaveTimer) return; window.clearTimeout(commentSaveTimer); commentSaveTimer = 0; commit({ type: 'update', id: current, changes: { comment: read().find(item => item.id === current)?.comment || '' } }); };
+  const scheduleCommentSave = () => { invalidateShelfIndex(); window.clearTimeout(commentSaveTimer); commentSaveTimer = window.setTimeout(() => { commentSaveTimer = 0; commit({ type: 'update', id: current, changes: { comment: read().find(item => item.id === current)?.comment || '' } }); }, 260); };
   const scheduleRender = () => {
     const shelf = shelfNodes?.shelf || document.querySelector('.annotation-shelf');
     if (!shelf || shelf.classList.contains('is-hidden') || renderFrame) return;
@@ -1225,7 +1324,12 @@ mark.selection-annotation--underline { background: transparent; text-decoration:
     // Align only after actual layout changes; a permanent animation frame loop
     // needlessly used CPU while the reader was idle.
     let positionFrame = 0;
-    const schedulePosition = () => { if (positionFrame) return; positionFrame = window.requestAnimationFrame(() => { positionFrame = 0; positionToggle(); if (!shelf.classList.contains('is-hidden') && !shelfWasDragged) positionShelf(); }); };
+    const schedulePosition = (force = false) => {
+      // A hidden shelf has no visible geometry to maintain during reader scroll.
+      if (!force && shelf.classList.contains('is-hidden')) return;
+      if (positionFrame) return;
+      positionFrame = window.requestAnimationFrame(() => { positionFrame = 0; positionToggle(); if (!shelf.classList.contains('is-hidden') && !shelfWasDragged) positionShelf(); });
+    };
     const headerResizeObserver = window.ResizeObserver ? new ResizeObserver(schedulePosition) : null;
     let observedHeader = null;
     const watchHeader = () => {
@@ -1235,15 +1339,15 @@ mark.selection-annotation--underline { background: transparent; text-decoration:
         if (headerResizeObserver && header) headerResizeObserver.observe(header);
         observedHeader = header;
       }
-      schedulePosition();
+      schedulePosition(true);
     };
     // The data-tools module emits this only when React replaces a major UI region.
     // Rebinding the header is enough; observing the entire root caused needless work.
     document.addEventListener('chengmo:ui-mounted', watchHeader);
     watchHeader();
     toggle.addEventListener('click', () => { const hidden = shelf.classList.toggle('is-hidden'); toggle.classList.toggle('is-open', !hidden); toggle.title = hidden ? '\u663e\u793a\u6807\u6ce8' : '\u9690\u85cf\u6807\u6ce8'; if (!hidden) { positionToggle(); positionShelf(); render(); } });
-    window.addEventListener('resize', schedulePosition, { passive: true });
-    document.addEventListener('scroll', schedulePosition, { capture: true, passive: true });
+    window.addEventListener('resize', () => schedulePosition(true), { passive: true });
+    document.addEventListener('scroll', () => schedulePosition(false), { capture: true, passive: true });
   }
   function render() {
     const { list, summary, filters } = shelfNodes || {}; if (!list || !summary || !filters) return;
@@ -1277,12 +1381,22 @@ mark.selection-annotation--underline { background: transparent; text-decoration:
   }
   window.addEventListener('load', () => { build(); render(); });
   document.addEventListener('chengmo:ui-mounted', () => { closeTagPopover(); invalidateShelfIndex(true); scheduleRender(); });
+  document.addEventListener('chengmo:annotations-changed', event => {
+    cachedItems = null;
+    const detail = event.detail || {};
+    const changes = detail.changes || {};
+    // Comments and tags change card data only; they do not alter marked text.
+    // Avoid another full document scan for those inexpensive metadata edits.
+    const marksChanged = ['create', 'delete', 'reanchor'].includes(detail.type) || 'color' in changes || 'kind' in changes;
+    invalidateShelfIndex(marksChanged);
+    scheduleRender();
+  });
   document.addEventListener('pointerup', event => {
     // Do not rebuild the panel for ordinary navigation clicks. Text-annotation
     // changes happen through these marked controls and still refresh the shelf.
     if (!event.target.closest('.selection-annotation, .selection-annotation-menu')) return;
     cachedItems = null;
-    invalidateShelfIndex(true);
+    invalidateShelfIndex(false);
     window.setTimeout(scheduleRender, 120);
   });
   window.addEventListener('storage', event => { if (event.key === key) { cachedItems = null; invalidateShelfIndex(true); scheduleRender(); } });
