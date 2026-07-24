@@ -169,7 +169,6 @@
     }
     if (drawingStateCache) {
       bootCache.set(KEYS.drawings, JSON.stringify(drawingStateCache));
-      drawingStateCache = null;
     }
     bootCache.forEach((value, key) => nativeSetItem.call(local, key, value));
     bootCache.clear();
@@ -209,6 +208,10 @@
     if (!id) return;
     const current = drawingStateCache || readJson(KEYS.drawings, {});
     current[id] = strokes;
+    // Retain the updated compatibility snapshot in memory until it is flushed.
+    // Without this assignment, every completed stroke reparses the complete
+    // drawing JSON while the deferred cache write is still pending.
+    drawingStateCache = current;
     queueDrawingsCache(current);
     queueDrawing(id, strokes);
   };
@@ -313,6 +316,10 @@
       }
       if (key === KEYS.drawings) {
         const drawings = toJson(value);
+        // Keep the in-memory compatibility snapshot aligned with explicit
+        // imports and deletions. This avoids reparsing all drawing JSON on the
+        // next stroke without allowing an older snapshot to overwrite data.
+        drawingStateCache = drawings && typeof drawings === 'object' ? drawings : {};
         if (drawings && typeof drawings === 'object') Object.entries(drawings).forEach(([id, strokes]) => Array.isArray(strokes) && queueDrawing(id, strokes));
         queueBootCache(key, value);
         return;
@@ -321,7 +328,10 @@
       if (SNAPSHOT_KEYS.includes(key)) queueMeta(key, toJson(value));
     };
     storagePrototype.removeItem = function patchedRemoveItem(key) {
-      if (this === local) bootCache.delete(key);
+      if (this === local) {
+        bootCache.delete(key);
+        if (key === KEYS.drawings) drawingStateCache = {};
+      }
       nativeRemoveItem.call(this, key);
     };
   };
