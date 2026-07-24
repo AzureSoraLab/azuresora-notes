@@ -1,0 +1,233 @@
+
+(() => {
+  const stateKey = 'chengmo-notes-v1';
+  const recentKey = 'chengmo-recent-notes-v1';
+  const annotationKey = 'chengmo-text-selection-annotations-v1';
+  const drawingKey = 'chengmo-freehand-annotations-v1';
+  const keepListOpenKey = 'chengmo-keep-note-list-open';
+  const readingSessionKey = 'chengmo-reading-session-v1';
+  const readState = () => { try { return JSON.parse(localStorage.getItem(stateKey) || '{}'); } catch { return {}; } };
+  const readArray = key => { try { const value = JSON.parse(localStorage.getItem(key) || '[]'); return Array.isArray(value) ? value : null; } catch { return null; } };
+  const readRecord = key => { try { const value = JSON.parse(localStorage.getItem(key) || '{}'); return value && typeof value === 'object' && !Array.isArray(value) ? value : null; } catch { return null; } };
+  const noteTitle = note => note?.title?.trim() || '\u672a\u547d\u540d\u7b14\u8bb0';
+  const noteSubtitle = note => (Array.isArray(note?.tags) ? note.tags.slice(0, 2).map(tag => `#${tag}`).join('  ') : '') || '\u672a\u6dfb\u52a0\u6807\u7b7e';
+  const reactKey = (node, ids) => {
+    const fiberKey = Object.keys(node).find(key => key.startsWith('__reactFiber$'));
+    const fiber = fiberKey && node[fiberKey];
+    const id = fiber?.key ?? fiber?.alternate?.key;
+    return typeof id === 'string' && ids.has(id) ? id : '';
+  };
+  const cardForId = id => [...document.querySelectorAll('.compact-note')].find(card => card.dataset.noteId === id) || null;
+  const courseButtonForId = (courseId, state = readState()) => {
+    const keyed = [...document.querySelectorAll('.course-button')].find(button => reactKey(button, new Set((state.courses || []).map(course => course.id))) === courseId);
+    if (keyed) return keyed;
+    const index = (state.courses || []).findIndex(course => course.id === courseId);
+    return index < 0 ? null : document.querySelectorAll('.course-button')[index] || null;
+  };
+  const activeCourseId = (state = readState()) => {
+    const active = document.querySelector('.course-button.active');
+    const keyedId = active && reactKey(active, new Set((state.courses || []).map(course => course.id)));
+    if (keyedId) return keyedId;
+    const index = [...document.querySelectorAll('.course-button')].indexOf(active);
+    return index < 0 ? '' : state.courses?.[index]?.id || '';
+  };
+  const readSession = () => { try { return JSON.parse(localStorage.getItem(readingSessionKey) || 'null'); } catch { return null; } };
+  const saveSession = () => {
+    const state = readState();
+    const selected = document.querySelector('.compact-note.selected');
+    const noteId = selected?.dataset.noteId;
+    if (!noteId || !(state.notes || []).some(note => note.id === noteId)) return;
+    localStorage.setItem(readingSessionKey, JSON.stringify({ noteId, courseId: activeCourseId(state), listOpen: document.querySelector('.app-shell')?.classList.contains('note-list-open') === true }));
+  };
+  const visibleNotes = (state, courseId, query) => (state.notes || []).filter(note => {
+    const tags = Array.isArray(note.tags) ? note.tags : [];
+    const haystack = `${note.title || ''} ${note.content || ''} ${tags.join(' ')}`.toLowerCase();
+    return (query ? true : note.courseId === courseId) && haystack.includes(query);
+  });
+  const fallbackCardIds = (cards, notes) => {
+    // Use DOM order only when it matches all visible note metadata exactly.
+    // A renderer change can then disable deletion, but never delete a wrong note.
+    if (cards.length !== notes.length) return new Map();
+    const resolved = new Map();
+    for (let index = 0; index < cards.length; index += 1) {
+      const card = cards[index]; const note = notes[index];
+      const title = card.querySelector('strong')?.textContent?.trim() || '';
+      const subtitle = card.querySelector('small')?.textContent?.trim() || '';
+      if (title !== noteTitle(note) || subtitle !== noteSubtitle(note)) return new Map();
+      resolved.set(card, note.id);
+    }
+    return resolved;
+  };
+  const applyDeleteControls = () => {
+    const state = readState();
+    const courseId = activeCourseId(state);
+    const query = document.querySelector('.search input')?.value?.toLowerCase() || '';
+    const matchingNotes = visibleNotes(state, courseId, query);
+    const cards = [...document.querySelectorAll('.compact-note')];
+    const knownIds = new Set((state.notes || []).map(note => note.id));
+    const fallbackIds = fallbackCardIds(cards, matchingNotes);
+    cards.forEach(noteButton => {
+      const noteId = reactKey(noteButton, knownIds) || fallbackIds.get(noteButton) || '';
+      if (noteId) noteButton.dataset.noteId = noteId;
+      else delete noteButton.dataset.noteId;
+      const existing = noteButton.querySelector('.compact-note__delete');
+      if (!noteId) { existing?.remove(); return; }
+      if (existing) return;
+      const close = document.createElement('span'); close.className = 'compact-note__delete'; close.textContent = '\u00d7'; close.title = '\u5220\u9664\u7b14\u8bb0'; close.setAttribute('role', 'button'); close.setAttribute('aria-label', '\u5220\u9664\u7b14\u8bb0'); close.tabIndex = 0;
+      close.addEventListener('pointerdown', event => event.stopPropagation()); close.addEventListener('keydown', event => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); event.currentTarget.click(); } }); noteButton.append(close);
+    });
+  };
+  const writeDeletion = ({ state, targetId, nextId, courseId }) => {
+    const notes = Array.isArray(state.notes) ? state.notes : [];
+    const annotations = readArray(annotationKey);
+    const recent = readArray(recentKey);
+    const drawings = readRecord(drawingKey);
+    const snapshot = new Map([stateKey, annotationKey, recentKey, drawingKey, readingSessionKey].map(key => [key, localStorage.getItem(key)]));
+    const restoreSnapshot = () => snapshot.forEach((value, key) => value === null ? localStorage.removeItem(key) : localStorage.setItem(key, value));
+    try {
+      if (annotations) localStorage.setItem(annotationKey, JSON.stringify(annotations.filter(item => item?.noteId !== targetId)));
+      if (recent) localStorage.setItem(recentKey, JSON.stringify(recent.filter(item => item?.id !== targetId)));
+      if (drawings && Object.prototype.hasOwnProperty.call(drawings, targetId)) { delete drawings[targetId]; localStorage.setItem(drawingKey, JSON.stringify(drawings)); }
+      window.chengmoStorage?.removeDrawing(targetId);
+      localStorage.setItem(stateKey, JSON.stringify({ ...state, notes: notes.filter(note => note.id !== targetId) }));
+      if (nextId) localStorage.setItem(readingSessionKey, JSON.stringify({ noteId: nextId, courseId, listOpen: true }));
+      else localStorage.removeItem(readingSessionKey);
+      return true;
+    } catch {
+      try { restoreSnapshot(); } catch {}
+      return false;
+    }
+  };
+  const start = () => {
+    // Never leave the reader hidden if a saved session becomes unavailable mid-load.
+    window.setTimeout(() => document.documentElement.classList.remove('chengmo-restoring-session'), 1800);
+    let queued = false;
+    let listObserver = null;
+    let hostObserver = null;
+    let observedList = null;
+    let restoreScheduled = false;
+    let sessionRestoreScheduled = false;
+    const watchList = () => {
+      const list = document.querySelector('.note-index-scroll');
+      if (!list) return false;
+      if (list === observedList) return true;
+      listObserver?.disconnect();
+      listObserver = new MutationObserver(records => {
+        // Inserting the local delete affordance should not cause the full list
+        // binding pass to run a second time.
+        const changedByReact = records.some(record => [...record.addedNodes, ...record.removedNodes].some(node => node.nodeType !== 1 || !node.matches?.('.compact-note__delete')));
+        if (changedByReact) sync();
+      });
+      listObserver.observe(list, { childList: true, subtree: true });
+      observedList = list;
+      return true;
+    };
+    const sync = () => {
+      if (queued) return;
+      queued = true;
+      const run = () => {
+        queued = false;
+        applyDeleteControls();
+        watchList();
+        document.dispatchEvent(new CustomEvent('chengmo:note-list-ready'));
+        if (!sessionRestoreScheduled && !sessionStorage.getItem(keepListOpenKey)) {
+          const session = readSession(); const state = readState();
+          const savedNote = session?.noteId && (state.notes || []).find(note => note.id === session.noteId);
+          if (savedNote) {
+            sessionRestoreScheduled = true;
+            window.setTimeout(() => {
+              const latest = readSession(); const saved = readState(); const note = latest?.noteId && (saved.notes || []).find(item => item.id === latest.noteId);
+              const courseButton = note && courseButtonForId(note.courseId, saved);
+              if (!note || !courseButton) return;
+              const needsCourse = activeCourseId(saved) !== note.courseId;
+              const listOpen = document.querySelector('.app-shell')?.classList.contains('note-list-open') === true;
+              if (needsCourse || Boolean(latest.listOpen) !== listOpen) courseButton.click();
+              window.setTimeout(() => {
+                applyDeleteControls(); cardForId(note.id)?.click();
+                window.setTimeout(() => {
+                  if (!latest.listOpen && document.querySelector('.app-shell')?.classList.contains('note-list-open')) courseButton.click();
+                  document.documentElement.classList.remove('chengmo-restoring-session');
+                }, 80);
+              }, 140);
+            }, 360);
+          }
+        }
+        const pending = (() => { try { return JSON.parse(sessionStorage.getItem(keepListOpenKey) || 'null'); } catch { return null; } })();
+        if (!pending || restoreScheduled) return;
+        restoreScheduled = true; sessionRestoreScheduled = true;
+        // The bundled React app attaches handlers after initial parsing. Wait
+        // until it has rendered once, then restore the list exactly once.
+        window.setTimeout(() => {
+          const restore = (() => { try { return JSON.parse(sessionStorage.getItem(keepListOpenKey) || 'null'); } catch { return null; } })();
+          if (!restore) return;
+          const saved = readState(); const courseButton = courseButtonForId(restore.courseId, saved);
+          if (!courseButton) { sessionStorage.removeItem(keepListOpenKey); return; }
+          const listOpen = document.querySelector('.app-shell')?.classList.contains('note-list-open');
+          if (activeCourseId(saved) !== restore.courseId || !listOpen) courseButton.click();
+          sessionStorage.removeItem(keepListOpenKey);
+          if (restore.nextId) window.setTimeout(() => {
+            const input = document.querySelector('.search input');
+            if (input && typeof restore.query === 'string' && input.value !== restore.query) {
+              const setValue = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set;
+              setValue?.call(input, restore.query); input.dispatchEvent(new Event('input', { bubbles: true }));
+            }
+            window.setTimeout(() => { applyDeleteControls(); cardForId(restore.nextId)?.click(); }, 100);
+          }, 120);
+        }, 300);
+      };
+      window.chengmoSchedule ? window.chengmoSchedule('note-delete-controls', run) : requestAnimationFrame(run);
+    };
+    sync();
+    const watchHost = () => {
+      const listHost = document.querySelector('.note-list');
+      if (!listHost || listHost === watchHost.current) return;
+      hostObserver?.disconnect();
+      hostObserver = new MutationObserver(() => {
+        if (document.querySelector('.note-index-scroll') !== observedList) sync();
+      });
+      hostObserver.observe(listHost, { childList: true });
+      watchHost.current = listHost;
+    };
+    document.addEventListener('chengmo:ui-mounted', () => { watchHost(); sync(); });
+    watchHost();
+    window.addEventListener('pagehide', saveSession);
+    document.addEventListener('click', event => {
+      const close = event.target.closest?.('.compact-note__delete');
+      if (!close) {
+        if (event.target.closest?.('.compact-note, .course-button')) window.setTimeout(saveSession, 0);
+        return;
+      }
+      event.preventDefault(); event.stopPropagation();
+      const noteButton = close.closest('.compact-note');
+      if (!noteButton) return;
+      const state = readState(); const notes = state.notes || [];
+      const knownIds = new Set(notes.map(note => note.id));
+      const targetId = reactKey(noteButton, knownIds) || noteButton.dataset.noteId || '';
+      const target = notes.find(item => item.id === targetId);
+      if (!target) { alert('\u65e0\u6cd5\u786e\u8ba4\u8fd9\u7bc7\u7b14\u8bb0\u3002\u8bf7\u5237\u65b0\u540e\u91cd\u8bd5\u3002'); return; }
+      const annotations = readArray(annotationKey) || [];
+      const drawings = readRecord(drawingKey) || {};
+      const annotationCount = annotations.filter(item => item?.noteId === target.id).length;
+      const drawingCount = Array.isArray(drawings[target.id]) ? drawings[target.id].length : 0;
+      const related = [annotationCount && `${annotationCount} \u6761\u6587\u672c\u6807\u6ce8`, drawingCount && `${drawingCount} \u6761\u7ed8\u56fe\u7b14\u8ff9`].filter(Boolean).join('\u3001');
+      const relatedHint = related ? `\n\n\u540c\u65f6\u4f1a\u5220\u9664\uff1a${related}\u3002` : '';
+      if (!confirm(`\u786e\u5b9a\u5220\u9664\u300c${noteTitle(target)}\u300d\uff1f${relatedHint}`)) return;
+      if (!confirm('\u8bf7\u518d\u6b21\u786e\u8ba4\uff1a\u5220\u9664\u540e\u65e0\u6cd5\u64a4\u9500\u3002')) return;
+      applyDeleteControls();
+      const visibleIds = [...document.querySelectorAll('.compact-note')].map(card => card.dataset.noteId).filter(id => knownIds.has(id));
+      const selectedId = document.querySelector('.compact-note.selected')?.dataset.noteId || readSession()?.noteId || '';
+      const selectedIndex = visibleIds.indexOf(target.id);
+      const successorId = selectedIndex < 0 ? '' : visibleIds.slice(selectedIndex + 1).concat(visibleIds.slice(0, selectedIndex)).find(id => id !== target.id) || '';
+      const nextId = selectedId === target.id ? successorId : (notes.some(note => note.id === selectedId && note.id !== target.id) ? selectedId : '');
+      const courseId = activeCourseId(state) || target.courseId || '';
+      const query = document.querySelector('.search input')?.value || '';
+      if (!writeDeletion({ state, targetId: target.id, nextId, courseId })) { alert('\u5220\u9664\u5931\u8d25\uff0c\u8bf7\u68c0\u67e5\u6d4f\u89c8\u5668\u7684\u672c\u5730\u5b58\u50a8\u7a7a\u95f4\u540e\u91cd\u8bd5\u3002'); return; }
+      // Reloading lets React load the changed note data cleanly. Preserve the
+      // current list and reader target, then restore them exactly once.
+      sessionStorage.setItem(keepListOpenKey, JSON.stringify({ courseId, nextId, query }));
+      sessionStorage.setItem('chengmo-pending-notice', JSON.stringify({ message: `\u5df2\u5220\u9664\u300c${noteTitle(target)}\u300d\u3002` }));
+      window.location.reload();
+    }, true);
+  };
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start, { once: true }); else start();
+})();
