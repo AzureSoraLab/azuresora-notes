@@ -417,10 +417,44 @@ $$f_s \\geq 2f_m$$
 
 <style>
 /* Text-selection annotations, styled after the Zotero reader toolbar. */
-.drawing-canvas { pointer-events: none !important; }
-/* The legacy freehand-ink controls are intentionally retired. Text annotations
-   remain available from selected text and the separate annotation shelf. */
-.reader-actions .annotate, .annotation-toolbar { display: none !important; }
+.reader-body .drawing-canvas { position: absolute; z-index: 18; inset: 0 auto auto 0; display: block; width: var(--draw-page-width, 100%) !important; height: var(--draw-page-height, 100%) !important; max-width: none !important; pointer-events: none; touch-action: none; }
+.drawing-canvas.is-drawing { pointer-events: auto; cursor: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='19' height='19' viewBox='0 0 19 19'%3E%3Cpath d='M9.5 1v17M1 9.5h17' stroke='%23fff' stroke-width='2.8'/%3E%3Cpath d='M9.5 1v17M1 9.5h17' stroke='%23000' stroke-width='1'/%3E%3C/svg%3E") 9 9, crosshair; }
+.drawing-canvas.is-drawing.is-erasing { cursor: var(--draw-eraser-cursor, crosshair); }
+/* The old ink toolbar is replaced with one compact, functional Zotero-style control. */
+.annotation-toolbar { display: none !important; }
+/* This bundled reader's legacy “标注” button has no usable action. Drawing and text
+   annotations each have their own working entry, so keep this obsolete control hidden. */
+.reader-actions .annotate { display: none !important; }
+.zotero-draw-control { position: relative; display: inline-flex; align-items: center; height: 30px; margin-right: 4px; border-right: 1px solid #e1e5e1; padding-right: 7px; font-family: Arial, "Microsoft YaHei", sans-serif; }
+.zotero-draw-control__button { width: 31px; height: 30px; padding: 0; border: 0; border-radius: 6px; background: transparent; color: #61706a; cursor: pointer; }
+.zotero-draw-control__button:hover, .zotero-draw-control.is-active .zotero-draw-control__button { background: #e6ece8; color: #365f53; }
+.zotero-draw-control__button svg { width: 19px; height: 19px; vertical-align: middle; }
+.zotero-draw-control__select { width: 28px; height: 30px; margin-left: 2px; padding: 0; border: 0; border-radius: 6px; background: transparent; color: #687570; cursor: pointer; }
+.zotero-draw-control__select:hover, .zotero-draw-control__select.is-active { background: #e6ece8; color: #365f53; }
+.zotero-draw-control__select svg { width: 17px; height: 17px; vertical-align: middle; }
+.drawing-canvas.is-selecting { pointer-events: auto; cursor: default; }
+.drawing-canvas.is-selecting.is-dragging { cursor: grabbing; }
+.drawing-selection-delete { position: fixed; z-index: 10036; height: 26px; padding: 0 8px; border: 1px solid #d6ded9; border-radius: 5px; background: #fffefa; box-shadow: 0 3px 10px rgba(37,58,50,.14); color: #5c6862; font: 12px/24px Arial, "Microsoft YaHei", sans-serif; cursor: pointer; }
+.drawing-selection-delete:hover { border-color: #c9a7a0; background: #faf3f1; color: #9b5147; }
+.drawing-selection-delete[hidden] { display: none; }
+.zotero-draw-control__color { display: inline-flex; align-items: center; gap: 4px; height: 28px; margin-left: 5px; padding: 0 4px 0 5px; border: 0; border-radius: 5px; background: transparent; color: #69736f; cursor: pointer; }
+.zotero-draw-control__color:hover, .zotero-draw-control__color[aria-expanded="true"] { background: #eef1ef; }
+.zotero-draw-control__swatch { width: 17px; height: 17px; border-radius: 3px; box-shadow: inset 0 0 0 1px rgba(0,0,0,.08); }
+.zotero-draw-control__chevron { width: 7px; height: 7px; border-right: 1.5px solid currentColor; border-bottom: 1.5px solid currentColor; transform: rotate(45deg) translateY(-2px); }
+.zotero-draw-menu { position: fixed; z-index: 10035; width: 236px; padding: 7px 0 8px; border: 1px solid #d7ded9; border-radius: 8px; background: #fffefa; box-shadow: 0 7px 20px rgba(37,58,50,.18); color: #34433e; font: 13px/1.25 Arial, "Microsoft YaHei", sans-serif; }
+.zotero-draw-menu[hidden] { display: none; }
+.zotero-draw-menu__color { display: flex; align-items: center; width: 100%; min-height: 35px; box-sizing: border-box; padding: 0 16px; border: 0; background: transparent; color: inherit; text-align: left; cursor: pointer; }
+.zotero-draw-menu__color:hover, .zotero-draw-menu__color.is-selected { background: #eef2ee; }
+.zotero-draw-menu__color b { width: 8px; margin-right: 8px; opacity: 0; font-size: 14px; }
+.zotero-draw-menu__color.is-selected b { opacity: 1; }
+.zotero-draw-menu__color i { width: 17px; height: 17px; margin-right: 10px; border-radius: 3px; box-shadow: inset 0 0 0 1px rgba(0,0,0,.08); }
+.zotero-draw-menu__divider { height: 1px; margin: 7px 0; background: #e5e9e5; }
+.zotero-draw-menu__eraser { display: flex; align-items: center; gap: 10px; width: 100%; min-height: 35px; box-sizing: border-box; padding: 0 17px; border: 0; background: transparent; color: #3e4c47; text-align: left; cursor: pointer; }
+.zotero-draw-menu__eraser:hover, .zotero-draw-menu__eraser.is-active { background: #eef2ee; color: #315f52; }
+.zotero-draw-menu__eraser svg { width: 19px; height: 19px; }
+.zotero-draw-menu__size { display: flex; align-items: center; gap: 9px; padding: 8px 17px 0; border-top: 1px solid #e5e9e5; }
+.zotero-draw-menu__size input { width: 103px; accent-color: #5d8d7c; }
+.zotero-draw-menu__value { min-width: 27px; text-align: right; color: #52615b; }
 .selection-annotation-menu { position: fixed; z-index: 10000; width: 238px; overflow: hidden; border: 1px solid #d7d7d3; border-radius: 8px; background: #fff; box-shadow: 0 5px 18px rgba(27, 33, 30, .24); transform: translateX(-50%); user-select: none; }
 .selection-annotation-menu__colors { display: grid; grid-template-columns: repeat(8, 1fr); gap: 10px; padding: 10px 12px 9px; }
 .selection-annotation-menu__color { width: 18px; height: 18px; border: 0; border-radius: 3px; box-shadow: inset 0 0 0 1px rgba(0,0,0,.08); cursor: pointer; }
@@ -457,6 +491,282 @@ mark.selection-annotation--underline { background: transparent; text-decoration:
 .selection-annotation-card__tag:focus, .selection-annotation-card__tag:focus-visible { outline: 0 !important; background: #fbfcf9; color: #3f7465; }
 .selection-annotation-selection-box { position: fixed; z-index: 9999; border: 2px dashed #6f9df5; pointer-events: none; }
 </style>
+<script>
+/* Freehand annotations: a small, persistent drawing layer modelled on Zotero's reader controls. */
+(() => {
+  const storageKey = 'chengmo-freehand-annotations-v1';
+  const preferencesKey = 'chengmo-freehand-drawing-preferences-v1';
+  const palette = [
+    ['#f8d84b', '黄色'], ['#ff6b6b', '红色'], ['#72b64a', '绿色'], ['#3ca8df', '蓝色'],
+    ['#a687e8', '紫色'], ['#d86ee8', '洋红'], ['#f39a3e', '橙色'], ['#a7aaa5', '灰色']
+  ];
+  const defaultState = { color: palette[0][0], size: 2, eraserSize: 14, eraser: false, drawing: false, selecting: false };
+  let state = { ...defaultState };
+  let canvas = null, context = null, activeStroke = null, selectedStroke = -1, dragStart = null, saveTimer = 0, redrawFrame = 0, resizeObserver = null, selectionDelete = null;
+  let menu = null;
+  const read = () => { try { return JSON.parse(localStorage.getItem(storageKey) || '{}'); } catch { return {}; } };
+  const write = value => localStorage.setItem(storageKey, JSON.stringify(value));
+  const loadPreferences = () => { try { state = { ...defaultState, ...JSON.parse(localStorage.getItem(preferencesKey) || '{}'), drawing: false, selecting: false }; } catch {} };
+  const savePreferences = () => localStorage.setItem(preferencesKey, JSON.stringify({ color: state.color, size: state.size, eraserSize: state.eraserSize }));
+  loadPreferences();
+  const reader = () => document.querySelector('.reader-body');
+  const noteId = () => document.querySelector('.compact-note.selected')?.dataset.noteId || document.querySelector('.compact-note.selected')?.getAttribute('data-note-id') || 'default';
+  // Zotero treats the complete reading page (including its side whitespace) as
+  // drawable, rather than restricting ink to the text column alone.
+  const drawingRoot = () => reader() || null;
+  const saveDrawing = (id, strokes) => { const data = read(); data[id] = strokes; write(data); };
+  const queueSave = () => {
+    const id = loadedNoteId;
+    const strokes = drawingsCache;
+    window.clearTimeout(saveTimer);
+    saveTimer = window.setTimeout(() => {
+      saveDrawing(id, strokes); saveTimer = 0;
+    }, 160);
+  };
+  let drawingsCache = [];
+  let loadedNoteId = '', renderedNoteId = '', lastCanvasGeometry = '', drawingRevision = 0, renderedRevision = -1;
+  const markDrawingChanged = () => { drawingRevision += 1; };
+  const loadDrawing = () => { loadedNoteId = noteId(); drawingsCache = read()[loadedNoteId] || []; selectedStroke = -1; markDrawingChanged(); };
+  const scheduleRedraw = () => {
+    if (redrawFrame) return;
+    redrawFrame = requestAnimationFrame(() => { redrawFrame = 0; redraw(); });
+  };
+  const redraw = () => {
+    if (!canvas || !context) return;
+    const root = canvas.parentElement;
+    if (root) {
+      // An absolutely positioned child otherwise stays only viewport-high inside
+      // the scrolling reader, leaving lower parts of a long note non-drawable.
+      const pageHeight = Math.max(root.clientHeight, root.scrollHeight);
+      const pageWidth = root.clientWidth;
+      canvas.style.setProperty('--draw-page-width', `${pageWidth}px`);
+      canvas.style.setProperty('--draw-page-height', `${pageHeight}px`);
+    }
+    const rect = canvas.getBoundingClientRect();
+    const ratio = window.devicePixelRatio || 1;
+    const width = Math.max(1, Math.round(rect.width * ratio));
+    const height = Math.max(1, Math.round(rect.height * ratio));
+    const geometry = `${width}x${height}@${ratio}`;
+    // ResizeObserver can fire for harmless layout changes. Repaint the long page
+    // only when its bitmap geometry or its source note actually changed.
+    if (geometry === lastCanvasGeometry && renderedNoteId === loadedNoteId && renderedRevision === drawingRevision && !activeStroke && selectedStroke < 0) return;
+    if (canvas.width !== width || canvas.height !== height) { canvas.width = width; canvas.height = height; }
+    context.setTransform(ratio, 0, 0, ratio, 0, 0);
+    context.clearRect(0, 0, rect.width, rect.height);
+    drawingsCache.forEach((stroke, index) => { paintStroke(stroke, rect); if (index === selectedStroke) paintSelection(stroke, rect); });
+    if (activeStroke) paintStroke(activeStroke, rect);
+    updateSelectionDelete(rect);
+    lastCanvasGeometry = geometry; renderedNoteId = loadedNoteId; renderedRevision = drawingRevision;
+  };
+  const paintStroke = (stroke, rect) => {
+    if (!stroke.points?.length || !context) return;
+    context.save(); context.lineCap = 'round'; context.lineJoin = 'round';
+    context.lineWidth = stroke.size || 2;
+    context.strokeStyle = stroke.color || palette[0][0];
+    context.globalCompositeOperation = stroke.eraser ? 'destination-out' : 'source-over';
+    context.beginPath();
+    stroke.points.forEach((point, index) => {
+      const x = point[0] * rect.width, y = point[1] * rect.height;
+      if (index === 0) context.moveTo(x, y); else context.lineTo(x, y);
+    });
+    if (stroke.points.length === 1) { const p = stroke.points[0]; context.arc(p[0] * rect.width, p[1] * rect.height, (stroke.size || 2) / 2, 0, Math.PI * 2); context.fillStyle = context.strokeStyle; context.fill(); }
+    else context.stroke();
+    context.restore();
+  };
+  const paintSelection = (stroke, rect) => {
+    if (!stroke.points?.length || !context) return;
+    // Follow the ink itself instead of drawing a large bounding box around it.
+    // This stays understandable for long handwriting strokes and nearby marks.
+    context.save(); context.setLineDash([4, 3]); context.lineCap = 'round'; context.lineJoin = 'round';
+    context.lineWidth = Math.max(2, (stroke.size || 2) + 3); context.strokeStyle = '#5d8dea'; context.globalAlpha = .9; context.beginPath();
+    stroke.points.forEach((point, index) => { const x = point[0] * rect.width, y = point[1] * rect.height; if (index === 0) context.moveTo(x, y); else context.lineTo(x, y); });
+    if (stroke.points.length === 1) { const p = stroke.points[0]; context.arc(p[0] * rect.width, p[1] * rect.height, Math.max(5, (stroke.size || 2) + 3), 0, Math.PI * 2); }
+    context.stroke(); context.restore();
+  };
+  const updateSelectionDelete = rect => {
+    if (!selectionDelete) {
+      selectionDelete = document.createElement('button'); selectionDelete.type = 'button'; selectionDelete.className = 'drawing-selection-delete'; selectionDelete.textContent = '删除笔迹'; selectionDelete.hidden = true;
+      selectionDelete.addEventListener('click', deleteSelectedStroke); document.body.append(selectionDelete);
+    }
+    const stroke = drawingsCache[selectedStroke];
+    if (!state.selecting || !stroke?.points?.length) { selectionDelete.hidden = true; return; }
+    const point = stroke.points[stroke.points.length - 1];
+    selectionDelete.style.left = `${Math.max(8, Math.min(window.innerWidth - 80, rect.left + point[0] * rect.width + 8))}px`;
+    selectionDelete.style.top = `${Math.max(8, rect.top + point[1] * rect.height - 30)}px`;
+    selectionDelete.hidden = false;
+  };
+  const paintSegment = (stroke, previous, current, rect) => {
+    if (!context || !previous || !current) return;
+    context.save(); context.lineCap = 'round'; context.lineJoin = 'round';
+    context.lineWidth = stroke.size || 2;
+    context.strokeStyle = stroke.color || palette[0][0];
+    context.globalCompositeOperation = stroke.eraser ? 'destination-out' : 'source-over';
+    context.beginPath();
+    context.moveTo(previous[0] * rect.width, previous[1] * rect.height);
+    context.lineTo(current[0] * rect.width, current[1] * rect.height);
+    context.stroke(); context.restore();
+  };
+  const pointFor = event => {
+    const rect = canvas.getBoundingClientRect();
+    return [Math.max(0, Math.min(1, (event.clientX - rect.left) / rect.width)), Math.max(0, Math.min(1, (event.clientY - rect.top) / rect.height))];
+  };
+  const nearestStroke = point => {
+    const rect = canvas.getBoundingClientRect();
+    const px = point[0] * rect.width, py = point[1] * rect.height;
+    let index = -1, distance = Infinity, threshold = 10;
+    const segmentDistance = (x, y, ax, ay, bx, by) => {
+      const dx = bx - ax, dy = by - ay;
+      const length = dx * dx + dy * dy;
+      const t = length ? Math.max(0, Math.min(1, ((x - ax) * dx + (y - ay) * dy) / length)) : 0;
+      return Math.hypot(x - (ax + t * dx), y - (ay + t * dy));
+    };
+    drawingsCache.forEach((stroke, strokeIndex) => {
+      if (stroke.eraser) return;
+      const points = stroke.points || [];
+      const hitRadius = Math.max(8, (stroke.size || 2) / 2 + 6);
+      points.forEach((p, pointIndex) => {
+        const a = points[Math.max(0, pointIndex - 1)] || p;
+        const d = segmentDistance(px, py, a[0] * rect.width, a[1] * rect.height, p[0] * rect.width, p[1] * rect.height);
+        if (d < distance) { distance = d; threshold = hitRadius; index = strokeIndex; }
+      });
+    });
+    return distance <= threshold ? index : -1;
+  };
+  const deleteSelectedStroke = () => {
+    if (selectedStroke < 0) return;
+    drawingsCache.splice(selectedStroke, 1); selectedStroke = -1; markDrawingChanged();
+    if (selectionDelete) selectionDelete.hidden = true;
+    // Deletion must be immediate: do not leave the old canvas pixels visible
+    // while a debounced persistence/update cycle is waiting to run.
+    window.clearTimeout(saveTimer); saveTimer = 0;
+    saveDrawing(loadedNoteId, drawingsCache);
+    lastCanvasGeometry = ''; renderedRevision = -1;
+    redraw();
+  };
+  const eraseAt = (point, radius) => {
+    const root = canvas.getBoundingClientRect();
+    const px = point[0] * root.width, py = point[1] * root.height;
+    let changed = false;
+    // Erasing edits the affected ink object instead of recording a second,
+    // destructive canvas stroke. Subsequent redraws therefore stay deterministic.
+    drawingsCache = drawingsCache.flatMap(stroke => {
+      if (stroke.eraser || !stroke.points?.length) return [stroke];
+      const segments = [], current = [];
+      stroke.points.forEach(p => {
+        const keep = Math.hypot(p[0] * root.width - px, p[1] * root.height - py) > radius + (stroke.size || 2) / 2;
+        if (keep) current.push(p);
+        else { if (current.length) segments.push(current.splice(0)); changed = true; }
+      });
+      if (current.length) segments.push(current);
+      return segments.map(points => ({ ...stroke, points }));
+    });
+    if (changed) markDrawingChanged();
+    return changed;
+  };
+  const begin = event => {
+    if ((!state.drawing && !state.selecting) || event.button !== 0) return;
+    event.preventDefault(); event.stopPropagation();
+    if (state.selecting) {
+      selectedStroke = nearestStroke(pointFor(event));
+      if (selectedStroke < 0 && selectionDelete) selectionDelete.hidden = true;
+      if (selectedStroke >= 0) { dragStart = { point: pointFor(event), strokes: drawingsCache[selectedStroke].points.map(p => [...p]) }; canvas.classList.add('is-dragging'); canvas.setPointerCapture?.(event.pointerId); }
+      scheduleRedraw(); return;
+    }
+    if (state.eraser) {
+      if (eraseAt(pointFor(event), state.eraserSize / 2)) { queueSave(); scheduleRedraw(); }
+      canvas.setPointerCapture?.(event.pointerId); return;
+    }
+    activeStroke = { color: state.color, size: state.size, eraser: false, points: [pointFor(event)] };
+    // Start a continuous path immediately; subsequent moves paint only one segment.
+    paintStroke(activeStroke, canvas.getBoundingClientRect());
+    canvas.setPointerCapture?.(event.pointerId);
+  };
+  const move = event => {
+    if (state.selecting && dragStart && selectedStroke >= 0) {
+      event.preventDefault(); const point = pointFor(event); const dx = point[0] - dragStart.point[0], dy = point[1] - dragStart.point[1];
+      drawingsCache[selectedStroke].points = dragStart.strokes.map(p => [Math.max(0, Math.min(1, p[0] + dx)), Math.max(0, Math.min(1, p[1] + dy))]); markDrawingChanged(); scheduleRedraw(); return;
+    }
+    if (state.eraser) {
+      const samples = event.getCoalescedEvents ? event.getCoalescedEvents() : [event];
+      let changed = false;
+      samples.forEach(sample => { changed = eraseAt(pointFor(sample), state.eraserSize / 2) || changed; });
+      if (changed) { queueSave(); scheduleRedraw(); }
+      return;
+    }
+    if (!activeStroke) return;
+    event.preventDefault();
+    const samples = event.getCoalescedEvents ? event.getCoalescedEvents() : [event];
+    const rect = canvas.getBoundingClientRect();
+    samples.forEach(sample => { const previous = activeStroke.points[activeStroke.points.length - 1]; const current = pointFor(sample); activeStroke.points.push(current); paintSegment(activeStroke, previous, current, rect); });
+  };
+  const end = event => {
+    if (state.selecting && dragStart) { event.preventDefault(); dragStart = null; canvas.classList.remove('is-dragging'); queueSave(); return; }
+    if (state.eraser) { event.preventDefault(); return; }
+    if (!activeStroke) return;
+    event.preventDefault();
+    if (activeStroke.points.length) { drawingsCache.push(activeStroke); markDrawingChanged(); queueSave(); }
+    activeStroke = null;
+  };
+  const syncCanvas = () => {
+    const root = drawingRoot(); if (!root) return;
+    if (loadedNoteId !== noteId()) loadDrawing();
+    if (getComputedStyle(root).position === 'static') root.style.position = 'relative';
+    let next = root.querySelector(':scope > .drawing-canvas');
+    if (!next) { next = document.createElement('canvas'); next.className = 'drawing-canvas'; root.append(next); }
+    if (next !== canvas) {
+      canvas = next; context = canvas.getContext('2d');
+      canvas.addEventListener('pointerdown', begin); canvas.addEventListener('pointermove', move);
+      canvas.addEventListener('pointerup', end); canvas.addEventListener('pointercancel', end);
+      resizeObserver?.disconnect();
+      resizeObserver = new ResizeObserver(scheduleRedraw); resizeObserver.observe(root);
+    }
+    canvas.classList.toggle('is-drawing', state.drawing); canvas.classList.toggle('is-selecting', state.selecting); canvas.classList.toggle('is-erasing', state.eraser); scheduleRedraw();
+  };
+  const closeMenu = () => { if (menu) menu.hidden = true; const color = document.querySelector('.zotero-draw-control__color'); if (color) color.setAttribute('aria-expanded', 'false'); };
+  const icon = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5.4 18.7 4 22l3.4-1.4L18 10a3.1 3.1 0 0 0-4.4-4.4L3 16.2l2.4 2.5Z" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/><path d="m12.2 7 4.7 4.7" fill="none" stroke="currentColor" stroke-width="1.7"/></svg>';
+  const selectIcon = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 4v5M5 5h5M19 4v5m0-4h-5M5 20v-5m0 4h5m9 1v-5m0 4h-5" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="m10 9 5 4-2.8.5L11 16z" fill="currentColor"/></svg>';
+  const eraserIcon = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m7 18 7.6-10.1a2.1 2.1 0 0 1 3.3 2.6L11.8 18H7Z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/><path d="M4 18h16" fill="none" stroke="currentColor" stroke-width="1.6"/></svg>';
+  const mount = () => {
+    const actions = document.querySelector('.reader-actions'); if (!actions || actions.querySelector('.zotero-draw-control')) return;
+    const control = document.createElement('div'); control.className = 'zotero-draw-control';
+    control.innerHTML = `<button type="button" class="zotero-draw-control__button" title="绘图" aria-label="绘图">${icon}</button><button type="button" class="zotero-draw-control__select" title="选择笔迹" aria-label="选择笔迹">${selectIcon}</button><button type="button" class="zotero-draw-control__color" title="选择绘图颜色" aria-label="选择绘图颜色" aria-expanded="false"><span class="zotero-draw-control__swatch"></span><span class="zotero-draw-control__chevron"></span></button>`;
+    const drawButton = control.querySelector('.zotero-draw-control__button'); const selectButton = control.querySelector('.zotero-draw-control__select'); const colorButton = control.querySelector('.zotero-draw-control__color'); const swatch = control.querySelector('.zotero-draw-control__swatch');
+    const update = () => {
+      swatch.style.background = state.color; control.classList.toggle('is-active', state.drawing); selectButton.classList.toggle('is-active', state.selecting);
+      if (canvas) {
+        const diameter = Math.max(12, Math.min(35, state.eraserSize));
+        const center = Math.round(diameter / 2);
+        const circle = `<svg xmlns="http://www.w3.org/2000/svg" width="${diameter}" height="${diameter}" viewBox="0 0 ${diameter} ${diameter}"><circle cx="${center}" cy="${center}" r="${Math.max(4, center - 1)}" fill="none" stroke="#000" stroke-width="1.25"/></svg>`;
+        canvas.style.setProperty('--draw-eraser-cursor', `url("data:image/svg+xml,${encodeURIComponent(circle)}") ${center} ${center}, crosshair`);
+        canvas.classList.toggle('is-erasing', state.eraser);
+      }
+    };
+    drawButton.addEventListener('click', () => { state.drawing = !state.drawing; state.selecting = false; selectedStroke = -1; dragStart = null; if (selectionDelete) selectionDelete.hidden = true; closeMenu(); syncCanvas(); update(); });
+    selectButton.addEventListener('click', () => { state.selecting = !state.selecting; state.drawing = false; selectedStroke = -1; dragStart = null; if (selectionDelete) selectionDelete.hidden = true; closeMenu(); syncCanvas(); update(); });
+    colorButton.addEventListener('click', event => { event.stopPropagation(); buildMenu(colorButton, update); });
+    actions.prepend(control); update();
+  };
+  const buildMenu = (anchor, update) => {
+    if (!menu) { menu = document.createElement('div'); menu.className = 'zotero-draw-menu'; menu.setAttribute('role', 'menu'); document.body.append(menu); }
+    const wasOpen = !menu.hidden; closeMenu(); if (wasOpen) return;
+    const activeSize = state.eraser ? state.eraserSize : state.size;
+    const maxSize = state.eraser ? 35 : 12;
+    const minSize = state.eraser ? 8 : 1;
+    menu.innerHTML = palette.map(([color, name]) => `<button type="button" class="zotero-draw-menu__color ${!state.eraser && state.color === color ? 'is-selected' : ''}" data-color="${color}"><b>✓</b><i style="background:${color}"></i>${name}</button>`).join('') + `<div class="zotero-draw-menu__divider"></div><button type="button" class="zotero-draw-menu__eraser ${state.eraser ? 'is-active' : ''}">${eraserIcon}<span>橡皮擦</span></button><div class="zotero-draw-menu__size"><span>大小:</span><input type="range" min="${minSize}" max="${maxSize}" step=".5" value="${activeSize}"><span class="zotero-draw-menu__value">${activeSize.toFixed(1)}</span></div>`;
+    const rect = anchor.getBoundingClientRect(); menu.style.left = `${Math.max(8, Math.min(window.innerWidth - 244, rect.left))}px`; menu.style.top = `${Math.min(window.innerHeight - 335, rect.bottom + 6)}px`; menu.hidden = false; anchor.setAttribute('aria-expanded', 'true');
+    menu.querySelectorAll('[data-color]').forEach(button => button.addEventListener('click', () => { state.color = button.dataset.color; state.eraser = false; savePreferences(); update(); buildMenu(anchor, update); }));
+    menu.querySelector('.zotero-draw-menu__eraser').addEventListener('click', () => { state.eraser = !state.eraser; update(); buildMenu(anchor, update); });
+    const range = menu.querySelector('input'); range.addEventListener('input', () => { if (state.eraser) state.eraserSize = Number(range.value); else state.size = Number(range.value); savePreferences(); menu.querySelector('.zotero-draw-menu__value').textContent = Number(range.value).toFixed(1); update(); });
+  };
+  document.addEventListener('click', event => { if (!event.target.closest('.zotero-draw-control, .zotero-draw-menu')) closeMenu(); });
+  document.addEventListener('keydown', event => {
+    if ((event.key === 'Delete' || event.key === 'Backspace') && state.selecting && selectedStroke >= 0 && !event.target.matches('input, textarea, [contenteditable="true"]')) { event.preventDefault(); deleteSelectedStroke(); }
+  });
+  document.addEventListener('chengmo:ui-mounted', () => { requestAnimationFrame(() => { mount(); syncCanvas(); }); });
+  window.addEventListener('resize', () => { closeMenu(); scheduleRedraw(); });
+  window.addEventListener('load', () => { window.setTimeout(() => { mount(); syncCanvas(); }, 80); });
+})();
+</script>
 <script>
 (() => {
   const storageKey = 'chengmo-text-selection-annotations-v1';
