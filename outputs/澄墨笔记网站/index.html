@@ -435,22 +435,22 @@ $$f_s \\geq 2f_m$$
 .selection-annotation-menu__item i { display: inline-block; width: 16px; height: 16px; margin-right: 8px; border-radius: 3px; vertical-align: -3px; }
 .selection-annotation-menu__item.is-current:before { position: absolute; left: 8px; content: '✓'; }
 .selection-annotation-menu__item--danger { border-top: 1px solid #e7e6e2; border-bottom: 0; color: #4e5350; }
-mark.selection-annotation { padding: 0 1px; color: inherit; }
+mark.selection-annotation { padding: 0; color: inherit; }
 mark.selection-annotation--highlight { background: color-mix(in srgb, var(--selection-annotation-color) 55%, transparent); box-decoration-break: clone; -webkit-box-decoration-break: clone; }
-mark.selection-annotation--underline { background: transparent; text-decoration: underline 3px var(--selection-annotation-color); text-underline-offset: 3px; }
-.selection-annotation-menu--card { width: 300px; transform: none; border: 1px solid #d9e1db; border-radius: 8px; background: #fffefa; box-shadow: 0 8px 22px rgba(37, 58, 50, .16); }
-.selection-annotation-card__header { display: flex; align-items: center; gap: 7px; padding: 9px 11px; border-bottom: 1px solid #e4e9e4; color: #43584f; font: 13px/1.2 "Microsoft YaHei", Arial, sans-serif; }
-.selection-annotation-card__header b { color: var(--selection-annotation-color); font-family: Georgia, serif; font-size: 20px; line-height: 14px; }
-.selection-annotation-card__header button { width: 23px; height: 23px; margin-left: auto; border: 0; border-radius: 5px; background: transparent; color: #7a8780; font-size: 18px; cursor: pointer; }
+mark.selection-annotation--underline { background: transparent; text-decoration: underline 3px var(--selection-annotation-color); text-decoration-skip-ink: none; text-underline-offset: 3px; }
+.selection-annotation-menu--card { width: 254px; transform: none; border: 1px solid #d9e1db; border-radius: 8px; background: #fffefa; box-shadow: 0 8px 22px rgba(37, 58, 50, .16); }
+.selection-annotation-card__header { display: flex; align-items: center; gap: 6px; height: 32px; box-sizing: border-box; padding: 0 10px; border-bottom: 1px solid #e4e9e4; color: #43584f; font: 13px/1.2 "Microsoft YaHei", Arial, sans-serif; }
+.selection-annotation-card__header b { color: var(--selection-annotation-color); font-family: Georgia, serif; font-size: 17px; line-height: 14px; }
+.selection-annotation-card__header button { width: 20px; height: 20px; margin-left: auto; border: 0; border-radius: 4px; background: transparent; color: #7a8780; font-size: 17px; cursor: pointer; }
 .selection-annotation-card__header button:hover { background: #f0e7e5; color: #98544c; }
-.selection-annotation-card__comment { display: block; width: 100%; min-height: 64px; resize: vertical; border: 0; outline: 0; padding: 10px 11px; background: #fffefa; color: #506259; font: 13px/1.55 "Microsoft YaHei", Arial, sans-serif; }
+.selection-annotation-card__comment { display: block; width: 100%; height: 54px; min-height: 54px; box-sizing: border-box; resize: vertical; border: 0; outline: 0; padding: 9px 10px; background: #fffefa; color: #506259; font: 13px/1.55 "Microsoft YaHei", Arial, sans-serif; }
 .selection-annotation-card__comment:focus, .selection-annotation-card__comment:focus-visible { outline: 0 !important; background: #fffefa; }
 .selection-annotation-card__comment::placeholder { color: #98a39d; }
-.selection-annotation-card__tags { display: flex; gap: 5px; flex-wrap: wrap; padding: 8px 11px; border-top: 1px solid #edf0ec; background: #fbfcf9; }
+.selection-annotation-card__tags { display: flex; gap: 5px; flex-wrap: wrap; padding: 7px 10px; border-top: 1px solid #edf0ec; background: #fbfcf9; }
 .selection-annotation-card__tags:empty { display: none; }
 .selection-annotation-card__tag-chip { border: 0; border-radius: 999px; padding: 3px 7px; background: #edf3ee; color: #557367; font-size: 11px; cursor: pointer; }
 .selection-annotation-card__tag-chip:hover { background: #e0ece3; }
-.selection-annotation-card__tag { width: 100%; border: 0; outline: 0; padding: 8px 11px; background: #fbfcf9; color: #66786f; font: 12px/1.3 "Microsoft YaHei", Arial, sans-serif; }
+.selection-annotation-card__tag { width: 100%; box-sizing: border-box; border: 0; outline: 0; padding: 8px 10px; background: #fbfcf9; color: #66786f; font: 12px/1.3 "Microsoft YaHei", Arial, sans-serif; }
 .selection-annotation-card__tag:focus, .selection-annotation-card__tag:focus-visible { outline: 0 !important; background: #fbfcf9; color: #3f7465; }
 .selection-annotation-selection-box { position: fixed; z-index: 9999; border: 2px dashed #6f9df5; pointer-events: none; }
 </style>
@@ -466,6 +466,7 @@ mark.selection-annotation--underline { background: transparent; text-decoration:
   let applyTimer = 0;
   let longPressTimer = 0;
   let longPressTarget = null;
+  let longPressPoint = null;
   let longPressOpened = false;
   let consumeAnnotationClick = false;
   let commentSaveTimer = 0;
@@ -546,7 +547,13 @@ mark.selection-annotation--underline { background: transparent; text-decoration:
     menu.style.display = outOfView ? 'none' : '';
     if (outOfView) return;
     selectionBox.style.left = `${left - 4}px`; selectionBox.style.top = `${top - 4}px`; selectionBox.style.width = `${right - left + 8}px`; selectionBox.style.height = `${bottom - top + 8}px`;
-    menu.style.left = `${Math.min(window.innerWidth - 302, Math.max(8, left))}px`; menu.style.top = `${bottom + 10}px`;
+    const menuHeight = menu.offsetHeight || 164;
+    const menuWidth = menu.offsetWidth || 254;
+    const menuTop = bottom + menuHeight + 4 <= window.innerHeight
+      ? bottom + 4
+      : Math.max(8, top - menuHeight - 4);
+    menu.style.left = `${Math.min(window.innerWidth - menuWidth - 8, Math.max(8, left + (right - left - menuWidth) / 2))}px`;
+    menu.style.top = `${menuTop}px`;
   }
   function updateAnnotation(id, changes) {
     write(read().map(item => item.id === id ? { ...item, ...changes } : item));
@@ -576,16 +583,43 @@ mark.selection-annotation--underline { background: transparent; text-decoration:
     tagInput.addEventListener('keydown', event => { if (event.key !== 'Enter') return; const tag = tagInput.value.trim().replace(/^#/, ''); if (!tag) return; event.preventDefault(); item.tags = [...new Set([...(item.tags || []), tag])]; write(read().map(annotation => annotation.id === id ? { ...annotation, tags: item.tags } : annotation)); tagInput.value = ''; renderTags(); });
     renderTags(); menu.append(header, comment, tags, tagInput); document.body.append(menu); positionCommentCard(id);
   }
-  function showManageMenu(mark) {
+  function positionManageMenu(id) {
+    if (!menu?.classList.contains('selection-annotation-menu--manage')) return;
+    const parts = [...document.querySelectorAll(`mark.selection-annotation[data-annotation-id="${id}"]`)];
+    const anchor = parts[Number(menu.dataset.anchorPart || 0)] || parts[0];
+    const rect = anchor?.getBoundingClientRect();
+    if (!rect) return removeMenu();
+    const outOfView = rect.bottom < 0 || rect.top > window.innerHeight || rect.right < 0 || rect.left > window.innerWidth;
+    menu.style.display = outOfView ? 'none' : '';
+    if (outOfView) return;
+    // Use the actual long-press point when available, so a wrapped annotation
+    // opens its menu beside the text segment the user pressed.
+    const menuWidth = 220;
+    const menuHeight = menu.offsetHeight || 360;
+    const point = menu._anchorPoint;
+    const anchorLeft = point ? rect.left + point.offsetX : rect.left;
+    const anchorBottom = point ? rect.top + point.offsetY : rect.bottom;
+    const left = Math.min(window.innerWidth - menuWidth - 8, Math.max(8, anchorLeft));
+    const top = anchorBottom + menuHeight + 8 <= window.innerHeight
+      ? anchorBottom + 8
+      : Math.max(8, (point ? rect.top + point.offsetY : rect.top) - menuHeight - 8);
+    menu.style.left = `${left}px`;
+    menu.style.top = `${top}px`;
+  }
+  function showManageMenu(mark, point) {
     const id = mark.dataset.annotationId;
     const item = read().find(annotation => annotation.id === id);
     if (!item) return;
     removeMenu();
-    const rect = mark.getBoundingClientRect();
     menu = document.createElement('div');
     menu.className = 'selection-annotation-menu selection-annotation-menu--manage';
-    menu.style.left = `${Math.min(window.innerWidth - 230, Math.max(8, rect.right + 10))}px`;
-    menu.style.top = `${Math.max(8, rect.top)}px`;
+    menu.dataset.annotationId = id;
+    menu.dataset.anchorPart = String([...document.querySelectorAll(`mark.selection-annotation[data-annotation-id="${id}"]`)].indexOf(mark));
+    const markRect = mark.getBoundingClientRect();
+    menu._anchorPoint = point ? {
+      offsetX: point.x - markRect.left,
+      offsetY: point.y - markRect.top
+    } : null;
     const title = document.createElement('div');
     title.className = 'selection-annotation-menu__title';
     title.textContent = '\u6807\u6ce8\u7ba1\u7406';
@@ -609,6 +643,7 @@ mark.selection-annotation--underline { background: transparent; text-decoration:
     remove.addEventListener('click', () => deleteAnnotation(id));
     menu.append(convert, remove);
     document.body.append(menu);
+    positionManageMenu(id);
   }
   function choose(color) {
     if (!selected) return;
@@ -671,12 +706,13 @@ mark.selection-annotation--underline { background: transparent; text-decoration:
     const mark = event.target.closest('mark.selection-annotation');
     if (!mark) return;
     longPressTarget = mark;
+    longPressPoint = { x: event.clientX, y: event.clientY };
     longPressTimer = window.setTimeout(() => {
-      if (longPressTarget === mark) { longPressOpened = true; consumeAnnotationClick = true; showManageMenu(mark); }
+      if (longPressTarget === mark) { longPressOpened = true; consumeAnnotationClick = true; showManageMenu(mark, longPressPoint); }
       longPressTimer = 0;
     }, 500);
   });
-  const cancelLongPress = () => { window.clearTimeout(longPressTimer); longPressTimer = 0; longPressTarget = null; };
+  const cancelLongPress = () => { window.clearTimeout(longPressTimer); longPressTimer = 0; longPressTarget = null; longPressPoint = null; };
   document.addEventListener('pointerup', cancelLongPress);
   document.addEventListener('pointercancel', cancelLongPress);
   document.addEventListener('pointermove', cancelLongPress);
@@ -695,7 +731,9 @@ mark.selection-annotation--underline { background: transparent; text-decoration:
     scrollPositionFrame = window.requestAnimationFrame(() => {
       scrollPositionFrame = 0;
       const id = menu?.dataset.annotationId;
-      if (id) positionCommentCard(id);
+      if (!id) return;
+      if (menu.classList.contains('selection-annotation-menu--manage')) positionManageMenu(id);
+      else positionCommentCard(id);
     });
   }, true);
   window.addEventListener('load', () => window.setTimeout(renderAnnotations, 100));
@@ -1353,17 +1391,17 @@ mark.selection-annotation--underline { background: transparent; text-decoration:
 .annotation-shelf__list { min-height: 92px; padding: 8px; background: #fbfcf9; }
 .annotation-shelf__list::-webkit-scrollbar { width: 7px; }
 .annotation-shelf__list::-webkit-scrollbar-thumb { border: 2px solid transparent; border-radius: 99px; background: #c6d1c8; background-clip: padding-box; }
-.annotation-shelf__card { margin-bottom: 6px; padding: 9px 10px 10px; border-color: #e2e8e3; border-radius: 7px; background: #fff; box-shadow: none; transition: border-color .14s ease, background .14s ease; }
+.annotation-shelf__card { margin-bottom: 6px; padding: 10px 11px 9px; border-color: #e2e8e3; border-radius: 7px; background: #fff; box-shadow: none; transition: border-color .14s ease, background .14s ease; }
 .annotation-shelf__card:hover { border-color: #c5d7cc; background: #fdfefd; box-shadow: none; transform: none; }
-.annotation-shelf__card.is-current { border-color: #91b3a4; padding: 9px 10px 10px; background: #f2f7f3; box-shadow: inset 2px 0 0 var(--annotation-color); }
-.annotation-shelf__card-head { gap: 6px; color: #40554d; font-size: 13px; }
-.annotation-shelf__letter { font-size: 20px; }
+.annotation-shelf__card.is-current { border-color: #91b3a4; padding: 10px 11px 9px; background: #f4f8f5; box-shadow: inset 2px 0 0 var(--annotation-color); }
+.annotation-shelf__card-head { gap: 6px; color: #40554d; font-size: 13px; line-height: 20px; }
+.annotation-shelf__letter { font-size: 19px; }
 .annotation-shelf__more { color: #8b9991; }
-.annotation-shelf__excerpt { margin-top: 7px; color: #5d7068; font: 13px/1.5 "Microsoft YaHei", Arial, sans-serif; }
-.annotation-shelf__comment { margin-top: 8px; color: #65736c; font-size: 12px; }
-.annotation-shelf__inline-comment { margin-top: 8px; border-radius: 5px; color: #457e70; }
+.annotation-shelf__excerpt { margin: 6px 0 0; padding: 0 0 0 8px; color: #5d7068; font: 13px/1.52 "Microsoft YaHei", Arial, sans-serif; }
+.annotation-shelf__comment { margin: 7px 0 0; color: #65736c; font-size: 12px; }
+.annotation-shelf__inline-comment { display: block; width: 100%; height: 28px; margin: 7px 0 0; padding: 0; border: 0; border-top: 1px solid #e6ece7; border-radius: 0; color: #5d746a; font: 12px/28px "Microsoft YaHei", Arial, sans-serif; }
 .annotation-shelf__inline-comment:focus, .annotation-shelf__inline-comment:focus-visible { outline: 0 !important; border-color: transparent; box-shadow: none; background: #f4f8f4; }
-.annotation-shelf__add-tag { display: block; width: calc(100% + 20px); height: 28px; margin: 3px -10px 0; padding: 0 10px; border: 0; border-top: 1px solid #e4eae5; border-radius: 0; background: transparent; color: #66796f; text-align: left; font: 12px/28px "Microsoft YaHei", Arial, sans-serif; overflow: visible; }
+.annotation-shelf__add-tag { display: block; width: 100%; height: 28px; margin: 0; padding: 0; border: 0; border-top: 1px solid #e6ece7; border-radius: 0; background: transparent; color: #5d746a; text-align: left; font: 12px/28px "Microsoft YaHei", Arial, sans-serif; overflow: visible; }
 .annotation-shelf__add-tag:hover, .annotation-shelf__add-tag:focus-visible { background: #eef5f0; color: #3f7465; outline: 0; }
 .annotation-shelf__add-tag::before, .annotation-shelf__add-tag::after { content: none; }
 .annotation-shelf__tag-chip, .annotation-shelf__tag-summary button { border-radius: 999px; }
