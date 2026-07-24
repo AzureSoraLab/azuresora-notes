@@ -157,8 +157,11 @@
     // supplies an immediate first paint, then a note-scoped read upgrades it
     // without scanning every other note's ink.
     const requestedId = loadedNoteId;
+    const requestedRevision = drawingRevision;
     window.chengmoStorage?.getDrawing(requestedId).then(strokes => {
-      if (!Array.isArray(strokes) || requestedId !== loadedNoteId || activeStroke) return;
+      // An asynchronous old-record read must never overwrite ink created
+      // immediately after switching into this note.
+      if (!Array.isArray(strokes) || requestedId !== loadedNoteId || activeStroke || drawingRevision !== requestedRevision) return;
       drawingsCache = strokes; selectedStroke = -1;
       const data = read(); data[requestedId] = strokes;
       markDrawingChanged(); scheduleRedraw();
