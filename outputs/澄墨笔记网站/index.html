@@ -834,15 +834,35 @@ mark.selection-annotation--underline { background: transparent; text-decoration:
   let searchFilter = '';
   let activeView = 'annotations';
   let current = null;
-  let cachedItems = null; let markCache = new Map(); let renderFrame = 0; let commentSaveTimer = 0;
+  let cachedItems = null; let markCache = new Map(); let shelfIndex = null; let markCacheDirty = true; let renderFrame = 0; let commentSaveTimer = 0;
+  let shelfNodes = null;
   const read = () => cachedItems || (cachedItems = (() => { try { return JSON.parse(localStorage.getItem(key) || '[]'); } catch { return []; } })());
-  const refreshMarkCache = () => { markCache = new Map(); document.querySelectorAll('mark.selection-annotation[data-annotation-id]').forEach(mark => { const id = mark.dataset.annotationId; const entry = markCache.get(id) || []; entry.push(mark.textContent || ''); markCache.set(id, entry); }); };
-  const activeIds = () => new Set(markCache.keys());
-  const excerptFor = item => markCache.get(item.id)?.join(' ') || item.text || 'Annotation';
-  const saveItem = (id, changes) => { const items = read(); const item = items.find(entry => entry.id === id); if (item) Object.assign(item, changes); localStorage.setItem(key, JSON.stringify(items)); };
-  const flushCommentSave = () => { if (!commentSaveTimer) return; window.clearTimeout(commentSaveTimer); commentSaveTimer = 0; localStorage.setItem(key, JSON.stringify(read())); };
-  const scheduleCommentSave = () => { window.clearTimeout(commentSaveTimer); commentSaveTimer = window.setTimeout(() => { commentSaveTimer = 0; localStorage.setItem(key, JSON.stringify(read())); }, 260); };
-  const scheduleRender = () => { if (renderFrame) return; renderFrame = window.requestAnimationFrame(() => { renderFrame = 0; render(); }); };
+  const invalidateShelfIndex = (marks = false) => { shelfIndex = null; markCacheDirty ||= marks; };
+  const refreshMarkCache = () => {
+    if (!markCacheDirty) return;
+    markCache = new Map();
+    document.querySelectorAll('mark.selection-annotation[data-annotation-id]').forEach(mark => { const id = mark.dataset.annotationId; const entry = markCache.get(id) || []; entry.push(mark.textContent || ''); markCache.set(id, entry); });
+    markCacheDirty = false;
+  };
+  const annotationIndex = () => {
+    if (shelfIndex) return shelfIndex;
+    refreshMarkCache();
+    const activeIds = new Set(markCache.keys());
+    const items = read().filter(item => activeIds.has(item.id)).sort((a, b) => a.start - b.start).map(item => {
+      const excerpt = markCache.get(item.id)?.join(' ') || item.text || 'Annotation';
+      return { item, excerpt, searchable: `${excerpt} ${item.comment || ''} ${(item.tags || []).join(' ')}`.toLowerCase() };
+    });
+    shelfIndex = { items, tags: [...new Set(items.flatMap(entry => entry.item.tags || []))] };
+    return shelfIndex;
+  };
+  const saveItem = (id, changes) => { const items = read(); const item = items.find(entry => entry.id === id); if (item) Object.assign(item, changes); invalidateShelfIndex(); localStorage.setItem(key, JSON.stringify(items)); };
+  const flushCommentSave = () => { if (!commentSaveTimer) return; window.clearTimeout(commentSaveTimer); commentSaveTimer = 0; invalidateShelfIndex(); localStorage.setItem(key, JSON.stringify(read())); };
+  const scheduleCommentSave = () => { invalidateShelfIndex(); window.clearTimeout(commentSaveTimer); commentSaveTimer = window.setTimeout(() => { commentSaveTimer = 0; localStorage.setItem(key, JSON.stringify(read())); }, 260); };
+  const scheduleRender = () => {
+    const shelf = shelfNodes?.shelf || document.querySelector('.annotation-shelf');
+    if (!shelf || shelf.classList.contains('is-hidden') || renderFrame) return;
+    renderFrame = window.requestAnimationFrame(() => { renderFrame = 0; render(); });
+  };
   function closeTagPopover() { document.querySelector('.annotation-tag-popover')?.remove(); }
   function showTagPopover(item, anchor) {
     closeTagPopover();
@@ -880,8 +900,9 @@ mark.selection-annotation--underline { background: transparent; text-decoration:
     palette.forEach(color => { const button = document.createElement('button'); button.type = 'button'; button.className = 'annotation-shelf__filter'; button.style.background = color; button.title = '\u6309\u989c\u8272\u7b5b\u9009'; button.addEventListener('click', () => { filter = filter === color ? null : color; filters.querySelectorAll('button').forEach(item => item.classList.toggle('is-active', item === button && filter === color)); scheduleRender(); }); filters.append(button); });
     const summary = document.createElement('div'); summary.className = 'annotation-shelf__tag-summary'; shelf.append(bar, list, filters, summary);
     document.body.append(toggle, shelf);
+    shelfNodes = { shelf, list, filters, summary };
     const positionToggle = () => { const header = document.querySelector('.reader-header'); if (!header) return; const rect = header.getBoundingClientRect(); toggle.style.left = `${Math.max(8, rect.left + 13)}px`; toggle.style.top = `${rect.top + Math.max(5, (rect.height - 30) / 2)}px`; };
-    const positionShelf = () => { positionToggle(); const rect = toggle.getBoundingClientRect(); shelf.style.left = `${Math.max(8, rect.left)}px`; shelf.style.top = `${Math.min(window.innerHeight - 54, rect.bottom + 1)}px`; };
+    const positionShelf = () => { const rect = toggle.getBoundingClientRect(); shelf.style.left = `${Math.max(8, rect.left)}px`; shelf.style.top = `${Math.min(window.innerHeight - 54, rect.bottom + 1)}px`; };
     let shelfWasDragged = false;
     bar.addEventListener('pointerdown', event => {
       if (event.target.closest('button, input')) return;
@@ -910,13 +931,12 @@ mark.selection-annotation--underline { background: transparent; text-decoration:
     // Rebinding the header is enough; observing the entire root caused needless work.
     document.addEventListener('chengmo:ui-mounted', watchHeader);
     watchHeader();
-    toggle.addEventListener('click', () => { const hidden = shelf.classList.toggle('is-hidden'); toggle.classList.toggle('is-open', !hidden); toggle.title = hidden ? '\u663e\u793a\u6807\u6ce8' : '\u9690\u85cf\u6807\u6ce8'; if (!hidden) { positionShelf(); render(); } });
+    toggle.addEventListener('click', () => { const hidden = shelf.classList.toggle('is-hidden'); toggle.classList.toggle('is-open', !hidden); toggle.title = hidden ? '\u663e\u793a\u6807\u6ce8' : '\u9690\u85cf\u6807\u6ce8'; if (!hidden) { positionToggle(); positionShelf(); render(); } });
     window.addEventListener('resize', schedulePosition, { passive: true });
     document.addEventListener('scroll', schedulePosition, { capture: true, passive: true });
   }
   function render() {
-    const list = document.querySelector('.annotation-shelf__list'); const summary = document.querySelector('.annotation-shelf__tag-summary'); const filters = document.querySelector('.annotation-shelf__filters'); if (!list || !summary || !filters) return;
-    refreshMarkCache();
+    const { list, summary, filters } = shelfNodes || {}; if (!list || !summary || !filters) return;
     if (activeView === 'outline') {
       filters.hidden = true; summary.hidden = true;
       list.replaceChildren(); summary.replaceChildren();
@@ -926,36 +946,36 @@ mark.selection-annotation--underline { background: transparent; text-decoration:
       sourceItems.forEach(source => { const item = document.createElement('button'); item.type = 'button'; item.className = `annotation-shelf__outline-item ${source.className}`; item.textContent = source.textContent; item.addEventListener('click', () => source.click()); outlineList.append(item); }); list.append(outlineList); return;
     }
     filters.hidden = false; summary.hidden = false;
-    const ids = activeIds();
-    const allItems = read().filter(item => ids.has(item.id)).sort((a, b) => a.start - b.start);
-    const items = allItems.filter(item => {
-      const searchable = `${excerptFor(item)} ${item.comment || ''} ${(item.tags || []).join(' ')}`.toLowerCase();
-      return (!filter || item.color === filter) && (!tagFilter || (item.tags || []).includes(tagFilter)) && (!searchFilter || searchable.includes(searchFilter));
+    const index = annotationIndex();
+    const items = index.items.filter(entry => {
+      const item = entry.item;
+      return (!filter || item.color === filter) && (!tagFilter || (item.tags || []).includes(tagFilter)) && (!searchFilter || entry.searchable.includes(searchFilter));
     });
     list.replaceChildren();
-    const allTags = [...new Set(allItems.flatMap(item => item.tags || []))]; summary.replaceChildren(...allTags.map(tag => { const button = document.createElement('button'); button.type = 'button'; button.textContent = tag; button.classList.toggle('is-active', tagFilter === tag); button.addEventListener('click', () => { tagFilter = tagFilter === tag ? null : tag; scheduleRender(); }); return button; }));
+    summary.replaceChildren(...index.tags.map(tag => { const button = document.createElement('button'); button.type = 'button'; button.textContent = tag; button.classList.toggle('is-active', tagFilter === tag); button.addEventListener('click', () => { tagFilter = tagFilter === tag ? null : tag; scheduleRender(); }); return button; }));
     if (!items.length) { const empty = document.createElement('div'); empty.className = 'annotation-shelf__empty'; empty.textContent = searchFilter ? '\u6ca1\u6709\u5339\u914d\u7684\u6807\u6ce8' : filter ? '\u6ca1\u6709\u8be5\u989c\u8272\u7684\u6807\u6ce8' : '\u6682\u65e0\u6807\u6ce8'; list.append(empty); return; }
-    items.forEach(item => {
+    items.forEach(({ item, excerpt }) => {
       const card = document.createElement('div'); card.className = `annotation-shelf__card ${current === item.id ? 'is-current' : ''}`; card.style.setProperty('--annotation-color', item.color);
       const head = document.createElement('div'); head.className = 'annotation-shelf__card-head';
       const letter = document.createElement('span'); letter.className = 'annotation-shelf__letter'; letter.textContent = 'A';
       const page = document.createElement('span'); page.textContent = '\u6807\u6ce8';
       const more = document.createElement('span'); more.className = 'annotation-shelf__more'; more.textContent = '...'; head.append(letter, page, more);
-      const excerpt = document.createElement('div'); excerpt.className = 'annotation-shelf__excerpt'; excerpt.textContent = excerptFor(item); card.append(head, excerpt);
+      const excerptNode = document.createElement('div'); excerptNode.className = 'annotation-shelf__excerpt'; excerptNode.textContent = excerpt; card.append(head, excerptNode);
       if (current === item.id) { const commentInput = document.createElement('input'); commentInput.className = 'annotation-shelf__inline-comment'; commentInput.placeholder = '\u6dfb\u52a0\u8bc4\u8bba'; commentInput.value = item.comment || ''; commentInput.addEventListener('pointerdown', event => event.stopPropagation()); commentInput.addEventListener('click', event => event.stopPropagation()); commentInput.addEventListener('input', () => { item.comment = commentInput.value; scheduleCommentSave(); }); commentInput.addEventListener('blur', flushCommentSave); commentInput.addEventListener('keydown', event => { if (event.key !== 'Enter') return; event.preventDefault(); event.stopPropagation(); flushCommentSave(); commentInput.blur(); scheduleRender(); }); card.append(commentInput); const addTag = document.createElement('button'); addTag.type = 'button'; addTag.className = 'annotation-shelf__add-tag'; addTag.textContent = (item.tags || []).length ? `\u6807\u7b7e\uff1a${(item.tags || []).join(', ')}` : '\u6dfb\u52a0\u6807\u7b7e...'; addTag.addEventListener('pointerdown', event => event.stopPropagation()); addTag.addEventListener('click', event => { event.stopPropagation(); showTagPopover(item, addTag); }); card.append(addTag); } else if (item.comment?.trim()) { const comment = document.createElement('div'); comment.className = 'annotation-shelf__comment'; comment.textContent = item.comment; card.append(comment); }
       card.addEventListener('click', () => { if (current === item.id) { card.classList.toggle('is-expanded'); return; } current = item.id; scheduleRender(); const mark = document.querySelector(`mark.selection-annotation[data-annotation-id="${item.id}"]`); mark?.scrollIntoView({ behavior: 'smooth', block: 'center' }); }); list.append(card);
     });
   }
   window.addEventListener('load', () => { build(); render(); });
-  document.addEventListener('chengmo:ui-mounted', closeTagPopover);
+  document.addEventListener('chengmo:ui-mounted', () => { closeTagPopover(); invalidateShelfIndex(true); scheduleRender(); });
   document.addEventListener('pointerup', event => {
     // Do not rebuild the panel for ordinary navigation clicks. Text-annotation
     // changes happen through these marked controls and still refresh the shelf.
     if (!event.target.closest('.selection-annotation, .selection-annotation-menu')) return;
     cachedItems = null;
+    invalidateShelfIndex(true);
     window.setTimeout(scheduleRender, 120);
   });
-  window.addEventListener('storage', event => { if (event.key === key) { cachedItems = null; scheduleRender(); } });
+  window.addEventListener('storage', event => { if (event.key === key) { cachedItems = null; invalidateShelfIndex(true); scheduleRender(); } });
 })();
 </script>
 
