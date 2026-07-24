@@ -418,6 +418,9 @@ $$f_s \\geq 2f_m$$
 <style>
 /* Text-selection annotations, styled after the Zotero reader toolbar. */
 .drawing-canvas { pointer-events: none !important; }
+/* The legacy freehand-ink controls are intentionally retired. Text annotations
+   remain available from selected text and the separate annotation shelf. */
+.reader-actions .annotate, .annotation-toolbar { display: none !important; }
 .selection-annotation-menu { position: fixed; z-index: 10000; width: 238px; overflow: hidden; border: 1px solid #d7d7d3; border-radius: 8px; background: #fff; box-shadow: 0 5px 18px rgba(27, 33, 30, .24); transform: translateX(-50%); user-select: none; }
 .selection-annotation-menu__colors { display: grid; grid-template-columns: repeat(8, 1fr); gap: 10px; padding: 10px 12px 9px; }
 .selection-annotation-menu__color { width: 18px; height: 18px; border: 0; border-radius: 3px; box-shadow: inset 0 0 0 1px rgba(0,0,0,.08); cursor: pointer; }
@@ -443,7 +446,7 @@ mark.selection-annotation--underline { background: transparent; text-decoration:
 .selection-annotation-card__header b { color: var(--selection-annotation-color); font-family: Georgia, serif; font-size: 17px; line-height: 14px; }
 .selection-annotation-card__header button { width: 20px; height: 20px; margin-left: auto; border: 0; border-radius: 4px; background: transparent; color: #7a8780; font-size: 17px; cursor: pointer; }
 .selection-annotation-card__header button:hover { background: #f0e7e5; color: #98544c; }
-.selection-annotation-card__comment { display: block; width: 100%; height: 54px; min-height: 54px; box-sizing: border-box; resize: vertical; border: 0; outline: 0; padding: 9px 10px; background: #fffefa; color: #506259; font: 13px/1.55 "Microsoft YaHei", Arial, sans-serif; }
+.selection-annotation-card__comment { display: block; width: 100%; min-height: 70px; box-sizing: border-box; resize: vertical; border: 0; outline: 0; padding: 10px; background: #fffefa; color: #506259; font: 13px/1.55 "Microsoft YaHei", Arial, sans-serif; }
 .selection-annotation-card__comment:focus, .selection-annotation-card__comment:focus-visible { outline: 0 !important; background: #fffefa; }
 .selection-annotation-card__comment::placeholder { color: #98a39d; }
 .selection-annotation-card__tags { display: flex; gap: 5px; flex-wrap: wrap; padding: 7px 10px; border-top: 1px solid #edf0ec; background: #fbfcf9; }
@@ -757,10 +760,10 @@ mark.selection-annotation--underline { background: transparent; text-decoration:
 .annotation-shelf__close:hover { color: #33464d; background: #e8ecec; border-radius: 4px; }
 .annotation-shelf__tabs { display: flex; gap: 8px; align-items: center; padding-right: 8px; border-right: 1px solid #e0e4e5; }
 .annotation-shelf__tab { width: 18px; height: 18px; box-sizing: border-box; border: 0; padding: 0; background: transparent; color: #6b747a; cursor: pointer; }
-.annotation-shelf__tab--grid { position: relative; background: transparent; color: #628579; opacity: 1; }
-.annotation-shelf__tab--grid::before { content: ''; position: absolute; left: 6px; top: 5px; width: 11px; height: 11px; box-sizing: border-box; border: 1px solid #628579; background: linear-gradient(135deg, transparent 0 70%, #dceae3 71% 100%), #edf5f0; }
-.annotation-shelf__tab--grid::after { content: ''; position: absolute; left: 8px; top: 8px; width: 6px; height: 1px; background: #628579; box-shadow: 0 3px 0 #628579; }
-.annotation-shelf__tab--grid.annotation-shelf__tab--active { color: #416b5d; background: #e6f0e9; }
+.annotation-shelf__tab--grid { position: relative; width: 24px; height: 24px; background: transparent; color: #526b62; opacity: 1; }
+.annotation-shelf__tab--grid::before { content: ''; position: absolute; inset: 2px; background: center / contain no-repeat url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'%3E%3Cpath d='M2.5 2.5h15v15H9L2.5 11z' fill='%23b9d0c3' stroke='%23465f56' stroke-width='1.5' stroke-linejoin='round'/%3E%3Cpath d='M2.5 11H9v6.5z' fill='%23fafbf8' stroke='%23465f56' stroke-width='1.5' stroke-linejoin='round'/%3E%3C/svg%3E"); }
+.annotation-shelf__tab--grid::after { content: none; }
+.annotation-shelf__tab--grid.annotation-shelf__tab--active { color: #355d50; background: #e6f0e9; border-radius: 4px; }
 .annotation-shelf__tab--note { position: relative; border: 1.5px solid currentColor; border-radius: 2px; }
 .annotation-shelf__tab--note:before { content: ''; position: absolute; left: -5px; top: -5px; width: 13px; height: 13px; border: 1.5px solid currentColor; border-radius: 2px; background: #fafbfb; }
 .annotation-shelf__tab--note:after { content: ''; position: absolute; z-index: 1; left: 3px; top: 3px; width: 9px; height: 1.5px; background: currentColor; box-shadow: 0 4px 0 currentColor; }
