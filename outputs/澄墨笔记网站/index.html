@@ -694,7 +694,7 @@ mark.selection-annotation--underline { background: transparent; text-decoration:
 .annotation-shelf-toggle:hover, .annotation-shelf-toggle.is-open { background: #e9edef; color: #39434a; }
 .annotation-shelf-toggle span { display: block; width: 15px; height: 15px; margin: auto; border: 1.5px solid currentColor; border-radius: 1px; box-shadow: -4px -4px 0 -2.5px #fff, -4px -4px 0 -1px currentColor; }
 .reader-header .crumb { padding-left: 48px; }
-.annotation-shelf { position: fixed; z-index: 10020; width: 300px; max-height: calc(100vh - 112px); box-sizing: border-box; display: flex; flex-direction: column; overflow: hidden; border: 1px solid #cbd2d6; border-radius: 0 0 7px 7px; background: #f3f4f4; box-shadow: 0 8px 24px rgba(29, 39, 44, .24); font-family: Arial, "Microsoft YaHei", sans-serif; }
+.annotation-shelf { position: fixed; z-index: 10020; width: 276px; max-height: calc(100vh - 112px); box-sizing: border-box; display: flex; flex-direction: column; overflow: hidden; border: 1px solid #cbd2d6; border-radius: 0 0 7px 7px; background: #f3f4f4; box-shadow: 0 8px 24px rgba(29, 39, 44, .24); font-family: Arial, "Microsoft YaHei", sans-serif; }
 .annotation-shelf.is-hidden { display: none; }
 .annotation-shelf__bar { display: flex; align-items: center; height: 46px; flex: 0 0 46px; padding: 0 13px; border-bottom: 1px solid #d7dcdf; background: #fafbfb; color: #677077; cursor: grab; user-select: none; }
 .annotation-shelf__bar:active { cursor: grabbing; }
@@ -703,7 +703,10 @@ mark.selection-annotation--underline { background: transparent; text-decoration:
 .annotation-shelf__close:hover { color: #33464d; background: #e8ecec; border-radius: 4px; }
 .annotation-shelf__tabs { display: flex; gap: 8px; align-items: center; padding-right: 8px; border-right: 1px solid #e0e4e5; }
 .annotation-shelf__tab { width: 18px; height: 18px; box-sizing: border-box; border: 0; padding: 0; background: transparent; color: #6b747a; cursor: pointer; }
-.annotation-shelf__tab--grid { background: linear-gradient(currentColor 0 0) 0 0/5px 5px, linear-gradient(currentColor 0 0) 100% 0/5px 5px, linear-gradient(currentColor 0 0) 0 100%/5px 5px, linear-gradient(currentColor 0 0) 100% 100%/5px 5px; background-repeat: no-repeat; opacity: .75; }
+.annotation-shelf__tab--grid { position: relative; background: transparent; color: #628579; opacity: 1; }
+.annotation-shelf__tab--grid::before { content: ''; position: absolute; left: 6px; top: 5px; width: 11px; height: 11px; box-sizing: border-box; border: 1px solid #628579; background: linear-gradient(135deg, transparent 0 70%, #dceae3 71% 100%), #edf5f0; }
+.annotation-shelf__tab--grid::after { content: ''; position: absolute; left: 8px; top: 8px; width: 6px; height: 1px; background: #628579; box-shadow: 0 3px 0 #628579; }
+.annotation-shelf__tab--grid.annotation-shelf__tab--active { color: #416b5d; background: #e6f0e9; }
 .annotation-shelf__tab--note { position: relative; border: 1.5px solid currentColor; border-radius: 2px; }
 .annotation-shelf__tab--note:before { content: ''; position: absolute; left: -5px; top: -5px; width: 13px; height: 13px; border: 1.5px solid currentColor; border-radius: 2px; background: #fafbfb; }
 .annotation-shelf__tab--note:after { content: ''; position: absolute; z-index: 1; left: 3px; top: 3px; width: 9px; height: 1.5px; background: currentColor; box-shadow: 0 4px 0 currentColor; }
@@ -717,7 +720,7 @@ mark.selection-annotation--underline { background: transparent; text-decoration:
 .annotation-shelf__outline-item:hover { background: #e4ebe6; color: #244f46; }
 .annotation-shelf__outline-item.level-3 { padding-left: 20px; font-size: 12px; }
 .annotation-shelf__outline-empty { padding: 20px 8px; color: #7c858a; text-align: center; font-size: 13px; }
-.annotation-shelf__search { width: 112px; height: 32px; box-sizing: border-box; margin-left: auto; padding: 0 7px 0 28px; border: 2px solid #6f95fa; border-radius: 7px; outline: 0; background: linear-gradient(45deg, transparent 0 46%, #627077 47% 53%, transparent 54%) 19px 20px / 9px 2px no-repeat, #fff; color: #283238; font: 13px Arial, "Microsoft YaHei", sans-serif; }
+.annotation-shelf__search { width: 96px; height: 32px; box-sizing: border-box; margin-left: auto; padding: 0 7px 0 28px; border: 2px solid #6f95fa; border-radius: 7px; outline: 0; background: linear-gradient(45deg, transparent 0 46%, #627077 47% 53%, transparent 54%) 19px 20px / 9px 2px no-repeat, #fff; color: #283238; font: 13px Arial, "Microsoft YaHei", sans-serif; }
 .annotation-shelf__search::placeholder { color: #6d757b; }
 .annotation-shelf__filters[hidden], .annotation-shelf__tag-summary[hidden] { display: none !important; }
 .annotation-shelf__outline-list { gap: 5px; padding: 10px 7px 14px; }
@@ -1114,10 +1117,11 @@ mark.selection-annotation--underline { background: transparent; text-decoration:
 .annotation-shelf__filters { gap: 10px; padding-left: 15px; }
 .annotation-shelf__filter { width: 19px; height: 19px; }
 .annotation-shelf__tag-summary { padding-left: 15px; color: #68756f; }
-.compact-note { position: relative; padding-right: 34px !important; }
-.compact-note__delete { position: absolute; z-index: 2; top: 50%; right: 7px; display: grid; width: 22px; height: 22px; place-items: center; border: 1px solid #ead7d4; border-radius: 50%; background: #fffafa; color: #a16b65; cursor: pointer; font: 18px/1 Arial, sans-serif; opacity: .9; transform: translateY(-50%); transition: opacity .14s ease, background .14s ease, color .14s ease; user-select: none; }
-.compact-note:hover .compact-note__delete, .compact-note.selected .compact-note__delete { opacity: 1; }
-.compact-note__delete:hover { background: #f6e7e4; color: #833f38; }
+.compact-note { position: relative; padding-right: 39px !important; }
+.compact-note__delete { position: absolute; z-index: 2; top: 50%; right: 8px; display: grid; width: 24px; height: 24px; place-items: center; border: 1px solid transparent; border-radius: 7px; background: transparent; color: #bd918a; cursor: pointer; font: 19px/1 Arial, sans-serif; opacity: 0; transform: translateY(-50%); transition: opacity .16s ease, color .16s ease, background .16s ease, border-color .16s ease; user-select: none; }
+.compact-note:hover .compact-note__delete, .compact-note.selected .compact-note__delete, .compact-note__delete:focus-visible { opacity: 1; }
+.compact-note__delete:hover, .compact-note__delete:focus-visible { border-color: #efd8d3; outline: 0; background: #fff7f5; color: #9d5148; }
+.compact-note.selected .compact-note__delete { color: #a46b63; }
 </style>
 <script>
 (() => {
@@ -1157,6 +1161,7 @@ mark.selection-annotation--underline { background: transparent; text-decoration:
     let listObserver = null;
     let hostObserver = null;
     let observedList = null;
+    let restoreScheduled = false;
     const watchList = () => {
       const list = document.querySelector('.note-index-scroll');
       if (!list) return false;
@@ -1176,30 +1181,24 @@ mark.selection-annotation--underline { background: transparent; text-decoration:
         watchList();
         document.dispatchEvent(new CustomEvent('chengmo:note-list-ready'));
         const pending = (() => { try { return JSON.parse(sessionStorage.getItem(keepListOpenKey) || 'null'); } catch { return null; } })();
-        if (pending && document.querySelector('.note-index-scroll')) {
-          const saved = readState();
-          const courseButton = courseButtonForId(pending.courseId, saved);
+        if (!pending || restoreScheduled) return;
+        restoreScheduled = true;
+        // The bundled React app attaches handlers after initial parsing. Wait
+        // until it has rendered once, then restore the list exactly once.
+        window.setTimeout(() => {
+          const restore = (() => { try { return JSON.parse(sessionStorage.getItem(keepListOpenKey) || 'null'); } catch { return null; } })();
+          if (!restore) return;
+          const saved = readState(); const courseButton = courseButtonForId(restore.courseId, saved);
           if (!courseButton) { sessionStorage.removeItem(keepListOpenKey); return; }
-          // Visibility is controlled by this class in the React layout.  The
-          // ARIA value can lag one render behind it during a reload.
-          const listOpen = document.querySelector('.app-shell')?.classList.contains('note-list-open') || false;
+          const listOpen = document.querySelector('.app-shell')?.classList.contains('note-list-open');
+          if (activeCourseId(saved) !== restore.courseId || !listOpen) courseButton.click();
           sessionStorage.removeItem(keepListOpenKey);
-          // A reload starts with the list closed. Open it once, then select
-          // the next note. The class supplies an immediate visual fallback
-          // while the click updates React's own open-list state.
-          if (activeCourseId(saved) !== pending.courseId || !listOpen) {
-            document.querySelector('.app-shell')?.classList.add('note-list-open');
-            courseButton.click();
-          }
-          if (pending.nextId) window.setTimeout(() => document.querySelector(`.compact-note[data-note-id="${pending.nextId}"]`)?.click(), 220);
+          if (restore.nextId) window.setTimeout(() => document.querySelector(`.compact-note[data-note-id="${restore.nextId}"]`)?.click(), 120);
           else window.setTimeout(() => {
-            const list = document.querySelector('.note-index-scroll');
-            if (!list || list.querySelector('.compact-note')) return;
-            const empty = list.querySelector('.empty-index') || document.createElement('p');
-            empty.className = 'empty-index'; empty.textContent = '该分类暂无笔记，可点击右上角 ＋ 新建。';
-            if (!empty.isConnected) list.append(empty);
-          }, 80);
-        }
+            const list = document.querySelector('.note-index-scroll'); if (!list || list.querySelector('.compact-note')) return;
+            const empty = list.querySelector('.empty-index') || document.createElement('p'); empty.className = 'empty-index'; empty.textContent = '该分类暂无笔记，可点击右上角 ＋ 新建。'; if (!empty.isConnected) list.append(empty);
+          }, 120);
+        }, 300);
       });
     };
     sync();
@@ -1248,11 +1247,94 @@ mark.selection-annotation--underline { background: transparent; text-decoration:
 })();
 </script>
 <style>
-.data-tools { position: relative; display: flex; align-items: center; margin-left: 16px; padding-left: 16px; border-left: 1px solid #e1e5df; }
+.data-tools { position: relative; display: flex; align-items: center; margin-left: 14px; padding-left: 14px; border-left: 1px solid #e1e5df; }
 .data-tools__title, .data-tools__notice { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
-.data-tools__actions { display: flex; gap: 5px; }
-.data-tools__actions button { display: grid; min-width: 54px; height: 30px; place-items: center; padding: 0 8px; border: 1px solid #dce3dd; border-radius: 7px; background: #fffefa; color: #5b7169; cursor: pointer; font: 12px/1 Arial, "Microsoft YaHei", sans-serif; }
-.data-tools__actions button:hover { border-color: #9eb8ac; background: #edf4ef; color: #315e52; }
+.data-tools__actions { display: flex; gap: 6px; }
+.data-tools__actions button { display: grid; min-width: 57px; height: 30px; place-items: center; padding: 0 9px; border: 1px solid #dfe6df; border-radius: 7px; background: #fffefa; color: #61766e; cursor: pointer; font: 12px/1 Arial, "Microsoft YaHei", sans-serif; transition: border-color .16s ease, background .16s ease, color .16s ease, box-shadow .16s ease; }
+.data-tools__actions button:hover, .data-tools__actions button:focus-visible { border-color: #a6c0b3; outline: 0; background: #edf5ef; color: #315e52; box-shadow: 0 2px 5px #355b4a12; }
+.section-title { display: flex; align-items: center; justify-content: space-between; padding-bottom: 7px; border-bottom: 1px solid #e7e9e3; }
+.category-add { padding: 3px 1px; border-radius: 4px; font-size: 11px; }
+.category-add:hover, .category-add:focus-visible, .category-edit:hover, .category-edit:focus-visible { outline: 0; color: #315e52; background: #edf4ef; }
+.recent-notes { margin-top: 23px; padding-top: 17px; }
+.recent-notes__title { margin-bottom: 7px; letter-spacing: .04em; }
+.recent-notes__item { padding: 7px 9px; border: 1px solid transparent; }
+.recent-notes__item:hover, .recent-notes__item:focus-visible { border-color: #e0e8e1; outline: 0; background: #edf4ef; }
+.note-list-header { padding-left: 3px; padding-right: 3px; }
+.note-list-header strong { display: block; max-width: 185px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.search span { color: #81918a; }
+.search input::placeholder { color: #a0a9a4; }
+.compact-note { border: 1px solid transparent; }
+.compact-note:hover { border-color: #e1e9e3; }
+.compact-note.selected { border-color: #d8e6dc; }
+.empty-index { margin: 20px 12px; padding: 18px 12px; border: 1px dashed #d7e0d9; border-radius: 9px; background: #f8faf6; color: #819088; text-align: center; font-size: 12px; line-height: 1.6; }
+.reader-header { box-shadow: 0 1px 0 #e4e7e1; }
+.reader-actions .saved, .reader-actions .saving { padding: 3px 7px; border-radius: 999px; background: #f1f5f0; color: #718078; font-size: 11px; }
+.markdown > div { max-width: 860px; margin: 0 auto; padding-bottom: 52px; }
+.markdown, .markdown > div { min-width: 0; }
+/* Keep wide tables, formulas, and media readable inside the reader. */
+.markdown :is(img, svg, canvas, video, iframe) { max-width: 100%; height: auto; }
+.markdown svg { display: block; }
+.markdown :is(pre, .katex-display) { max-width: 100%; overflow-x: auto; overflow-y: hidden; }
+.markdown pre { color: #eaf0ec; background: #2e3938; border: 0; border-radius: 4px; padding: 15px; line-height: 1.6; }
+.markdown pre code { display: block; padding: 0; border: 0; border-radius: 0; background: transparent; color: inherit; font-family: Consolas, "Microsoft YaHei", monospace; font-size: inherit; }
+.markdown table { display: block; max-width: 100%; overflow-x: auto; white-space: nowrap; }
+.markdown table :is(th, td) { white-space: normal; }
+.markdown :is(ul, ol) { padding-left: 1.5em; }
+.markdown code { border: 1px solid #e3e7e0; border-radius: 4px; background: #f2f5f0; color: #3d594f; }
+/* Annotation panel: a compact, calm work surface for review rather than a utility drawer. */
+.annotation-shelf { border-color: #dbe2dc; border-radius: 10px; background: #f8f9f6; box-shadow: 0 10px 26px rgba(37, 58, 50, .14); }
+.annotation-shelf__bar { height: 42px; flex-basis: 42px; padding: 0 9px; border-bottom-color: #e4e9e4; border-radius: 10px 10px 0 0; background: #fcfdf9; }
+.annotation-shelf__tabs { gap: 3px; padding: 3px 6px 3px 2px; border-right-color: #e6ebe6; }
+.annotation-shelf__tab, .annotation-shelf__outline { border-radius: 6px; transition: background .16s ease, color .16s ease; }
+.annotation-shelf__tab { width: 24px; height: 24px; }
+.annotation-shelf__tab--active, .annotation-shelf__outline.is-active { background: #e5efe9; color: #315e52; }
+.annotation-shelf__outline { width: 27px; height: 27px; margin-left: 6px; }
+.annotation-shelf__search { width: 101px; height: 28px; margin-left: auto; padding-left: 25px; border: 1px solid #d9e1da; border-radius: 7px; background-position: 16px 17px; background-color: #fffefa; color: #40544d; transition: border-color .16s ease, box-shadow .16s ease; }
+.annotation-shelf__search:focus { border-color: #6e9889; box-shadow: 0 0 0 3px #6e98891c; }
+.annotation-shelf__close { width: 26px; height: 26px; margin-left: 5px; border-radius: 6px; color: #89928c; font-size: 19px; line-height: 24px; }
+.annotation-shelf__close:hover { background: #f1e7e4; color: #98544c; }
+.annotation-shelf__list { min-height: 92px; padding: 8px; background: #f8f9f6; }
+.annotation-shelf__list::-webkit-scrollbar { width: 7px; }
+.annotation-shelf__list::-webkit-scrollbar-thumb { border: 2px solid transparent; border-radius: 99px; background: #c6d1c8; background-clip: padding-box; }
+.annotation-shelf__card { margin-bottom: 7px; padding: 9px 10px 10px; border-color: #e0e7e1; border-radius: 9px; background: #fffefa; box-shadow: 0 1px 2px rgba(39, 59, 49, .04); transition: border-color .16s ease, box-shadow .16s ease, transform .16s ease; }
+.annotation-shelf__card:hover { border-color: #b8cec2; box-shadow: 0 4px 11px rgba(39, 59, 49, .08); transform: translateY(-1px); }
+.annotation-shelf__card.is-current { border: 1px solid #82aa9b; padding: 9px 10px 10px; background: #edf5ef; box-shadow: inset 3px 0 0 var(--annotation-color); }
+.annotation-shelf__card-head { gap: 6px; color: #40554d; font-size: 13px; }
+.annotation-shelf__letter { font-size: 20px; }
+.annotation-shelf__more { color: #8b9991; }
+.annotation-shelf__excerpt { margin-top: 7px; color: #587068; font: 13px/1.48 "Microsoft YaHei", Arial, sans-serif; }
+.annotation-shelf__comment { margin-top: 8px; color: #58635e; font-size: 12px; }
+.annotation-shelf__inline-comment { margin-top: 8px; border-radius: 5px; color: #457e70; }
+.annotation-shelf__inline-comment:focus { background: #eef5f0; }
+.annotation-shelf__add-tag { position: relative; width: 29px; height: 29px; margin: 5px 0 0; padding: 0; border: 0; border-radius: 6px; background: #e7e9e7; color: transparent; font-size: 0; overflow: hidden; }
+.annotation-shelf__add-tag::before, .annotation-shelf__add-tag::after { content: ''; position: absolute; width: 11px; height: 9px; border: 1.5px solid #747b78; border-radius: 1px; background: #e7e9e7; }
+.annotation-shelf__add-tag::before { left: 7px; top: 8px; }
+.annotation-shelf__add-tag::after { left: 10px; top: 11px; box-shadow: -3px -3px 0 -1.5px #e7e9e7, -3px -3px 0 0 #747b78; }
+.annotation-shelf__add-tag:hover, .annotation-shelf__add-tag:focus-visible { background: #dce6df; outline: 0; }
+.annotation-shelf__add-tag:hover::before, .annotation-shelf__add-tag:hover::after { background: #dce6df; border-color: #466b5d; }
+.annotation-shelf__add-tag:focus-visible { box-shadow: 0 0 0 3px #6e98892b; }
+.annotation-shelf__tag-chip, .annotation-shelf__tag-summary button { border-radius: 999px; }
+.annotation-shelf__tag-chip { padding: 3px 7px; background: #71877c; }
+.annotation-shelf__filters { gap: 8px; flex-basis: 40px; padding: 0 12px; border-top-color: #e2e8e2; background: #fcfdf9; }
+.annotation-shelf__filter { width: 17px; height: 17px; border: 2px solid #fff; border-radius: 50%; box-shadow: 0 0 0 1px rgba(42, 63, 52, .12); transition: transform .14s ease, box-shadow .14s ease; }
+.annotation-shelf__filter:hover { transform: scale(1.12); }
+.annotation-shelf__filter.is-active { outline: 2px solid #5e8879; outline-offset: 2px; }
+.annotation-shelf__tag-summary { min-height: 28px; padding: 7px 12px 9px; border-top-color: #dee6df; background: #fbfcf8; color: #61726a; font-size: 12px; }
+.annotation-shelf__tag-summary button { padding: 3px 7px; color: #527366; }
+.annotation-shelf__tag-summary button.is-active { background: #6f9889; }
+.annotation-shelf__empty, .annotation-shelf__outline-empty { padding: 26px 12px; color: #89958e; font-size: 12px; }
+/* Outline is a continuous reading guide, not a stack of cards. */
+.annotation-shelf__outline-list { gap: 1px; padding: 12px 11px 16px; }
+.annotation-shelf__outline-item { min-height: 30px; padding: 6px 8px; border: 0; border-radius: 5px; background: transparent; color: #53665e; font: 13px/1.45 "Microsoft YaHei", Arial, sans-serif; font-weight: 400; }
+.annotation-shelf__outline-item.level-2 { margin-top: 7px; padding: 8px 8px 5px; border: 0; border-radius: 0; background: transparent; color: #36584d; font-weight: 600; }
+.annotation-shelf__outline-item.level-2:first-child { margin-top: 0; }
+.annotation-shelf__outline-item.level-3 { margin: 0 0 0 9px; padding: 5px 8px 5px 14px; border-left: 1px solid #d7e3db; border-radius: 0; color: #6e7d76; font-size: 12px; }
+.annotation-shelf__outline-item.level-3::before { left: -1px; width: 6px; border-top-color: #d7e3db; }
+.annotation-shelf__outline-item:hover { border: 0; background: #eaf2ed; color: #2f5b4d; }
+.annotation-shelf__outline-item.level-3:hover { border-left-color: #80a796; }
+.library-content::-webkit-scrollbar, .note-index-scroll::-webkit-scrollbar, .reader-body::-webkit-scrollbar { width: 8px; }
+.library-content::-webkit-scrollbar-thumb, .note-index-scroll::-webkit-scrollbar-thumb, .reader-body::-webkit-scrollbar-thumb { border: 2px solid transparent; border-radius: 99px; background: #c4cec6; background-clip: padding-box; }
+.library-content::-webkit-scrollbar-thumb:hover, .note-index-scroll::-webkit-scrollbar-thumb:hover, .reader-body::-webkit-scrollbar-thumb:hover { background-color: #9faf9f; }
 </style>
 <script>
 (() => {
