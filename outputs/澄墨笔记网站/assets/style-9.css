@@ -245,3 +245,69 @@
   display: block;
   flex: 0 0 auto;
 }
+
+/* Reading comfort: preserve the paper character while reducing glare and
+   keeping long Chinese paragraphs easy to track on a desktop display. */
+.reader { background: #fbfbf7; }
+.reader-header { background: rgba(251, 251, 247, .96); }
+.markdown {
+  color: #37423e;
+  font-size: 16.5px;
+  line-height: 1.94;
+  text-rendering: optimizeLegibility;
+  overflow-wrap: break-word;
+}
+.markdown > div { max-width: 800px; padding-top: 44px; padding-bottom: 88px; }
+.markdown h1, .markdown h2, .markdown h3 { color: #2d403a; }
+.markdown h1 { font-size: 2em; line-height: 1.28; letter-spacing: -.016em; }
+.markdown h2 { margin-top: 2.45em; margin-bottom: .9em; border-bottom-color: #e4e8e1; }
+.markdown h3 { margin-top: 1.85em; margin-bottom: .72em; color: #385047; }
+.markdown p { margin: 1.08em 0; }
+.markdown :is(ul, ol) { margin: 1.08em 0; }
+.markdown li + li { margin-top: .34em; }
+.markdown hr { margin: 2.45em 0; border-color: #e4e7e1; }
+.markdown blockquote { border-left-color: #97ada2; background: #f3f6f1; color: #52625c; }
+.markdown code { border-color: #e1e6de; background: #f2f5f0; color: #3d584e; }
+.markdown pre { background: #35413f; box-shadow: inset 0 0 0 1px rgba(255,255,255,.045); }
+.markdown table th { background: #eff3ed; color: #405b51; }
+.markdown table :is(th, td) { border-color: #e0e5de; }
+/* Selection colors should guide the eye rather than dominate the paragraph. */
+mark.selection-annotation--highlight { background: color-mix(in srgb, var(--selection-annotation-color) 42%, transparent); }
+mark.selection-annotation--underline { text-decoration-thickness: 2px; text-underline-offset: 3px; }
+@media (max-width: 1040px) {
+  .markdown > div { padding-top: 38px; padding-bottom: 68px; }
+}
+@media (max-width: 760px) {
+  .markdown { font-size: 16px; line-height: 1.88; }
+  .markdown > div { max-width: none; padding: 30px 22px 50px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .markdown *, .reader * { scroll-behavior: auto !important; transition-duration: .01ms !important; animation-duration: .01ms !important; }
+}
+
+/* Quiet interaction language: surfaces stay flat at rest and respond only
+   when the pointer or keyboard reaches them. */
+:root { --ui-hover: #eef3ef; --ui-active: #e4eee7; --ui-border: #e1e7e1; --ui-muted: #708079; }
+.course-button, .recent-notes__item, .compact-note, .reader-actions button,
+.data-tools__actions button, .zotero-draw-control :is(button, .zotero-draw-control__color) {
+  transition: background-color .14s ease, border-color .14s ease, color .14s ease, box-shadow .14s ease;
+}
+.course-button:not(.active), .recent-notes__item:not(.is-current), .compact-note:not(.selected) { color: #596861; }
+.course-button:hover, .recent-notes__item:hover, .compact-note:hover { background: var(--ui-hover); }
+.compact-note { border-color: transparent; box-shadow: none; }
+.compact-note.selected { border-color: #dce8df; background: var(--ui-active); box-shadow: inset 2px 0 0 #5d897a; }
+.compact-note__delete, .course-group__delete { opacity: 0; color: #a0aaa4; }
+.compact-note:hover .compact-note__delete, .compact-note:focus-within .compact-note__delete,
+.course-group:hover .course-group__delete, .course-group:focus-within .course-group__delete { opacity: 1; }
+.compact-note__delete:hover, .course-group__delete:hover { background: #f7ece9; color: #a15e56; }
+.reader-actions button:not(.edit-switch), .data-tools__actions button {
+  border-color: var(--ui-border); background: rgba(255, 255, 252, .72); color: var(--ui-muted); box-shadow: none;
+}
+.reader-actions button:not(.edit-switch):hover, .data-tools__actions button:hover { border-color: #cbdacf; background: var(--ui-hover); color: #315e52; }
+.reader-actions .edit-switch { border: 1px solid #315e52; box-shadow: none; }
+.reader-actions .saved, .reader-actions .saving { border-color: transparent; background: transparent; color: #8a9690; }
+.search { border-color: #e0e6e0; box-shadow: none; }
+.search:focus-within { border-color: #91ad9f; box-shadow: 0 0 0 2px rgba(103, 145, 127, .12); }
+.annotation-shelf, .annotation-tag-popover, .zotero-draw-menu { box-shadow: 0 10px 24px rgba(43, 61, 53, .11); }
+.annotation-shelf__card { box-shadow: none; }
+.annotation-shelf__card:hover { background: #fcfdfb; box-shadow: none; }

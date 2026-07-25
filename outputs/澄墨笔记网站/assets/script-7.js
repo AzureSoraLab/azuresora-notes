@@ -32,7 +32,17 @@
   const activeCourseId = state => {
     const active = document.querySelector('.course-button.active');
     if (!active) return '';
-    return (state.courses || []).find(course => courseButtonForId(course.id, state) === active)?.id || '';
+    const courses = state.courses || [];
+    // Resolve the selected React key directly. The old implementation called
+    // courseButtonForId once per course, which repeated the same DOM scan when
+    // recent reading navigated across a large category library.
+    const ids = new Set(courses.map(course => course.id));
+    const fiberKey = Object.keys(active).find(key => key.startsWith('__reactFiber$'));
+    const fiber = fiberKey && active[fiberKey];
+    const keyed = fiber?.key ?? fiber?.alternate?.key;
+    if (typeof keyed === 'string' && ids.has(keyed)) return keyed;
+    const index = [...document.querySelectorAll('.course-button')].indexOf(active);
+    return index < 0 ? '' : courses[index]?.id || '';
   };
   const noteButtonForId = (noteId, state) => {
     const direct = [...document.querySelectorAll('.compact-note')].find(button => button.dataset.noteId === noteId);

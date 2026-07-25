@@ -10,7 +10,9 @@
     ['#f8d84b', '黄色'], ['#ff6b6b', '红色'], ['#72b64a', '绿色'], ['#3ca8df', '蓝色'],
     ['#a687e8', '紫色'], ['#d86ee8', '洋红'], ['#f39a3e', '橙色'], ['#a7aaa5', '灰色']
   ];
-  const defaultState = { color: palette[0][0], size: 2, eraserSize: 14, eraser: false, drawing: false, selecting: false, inkVisible: true };
+  // Ink remains stored per note, but starts hidden after every page load so a
+  // reader opens on the clean text. Entering drawing or selection reveals it.
+  const defaultState = { color: palette[0][0], size: 2, eraserSize: 14, eraser: false, drawing: false, selecting: false, inkVisible: false };
   let state = { ...defaultState };
   const chunkHeight = 900;
   let canvas = null, context = null, activeStroke = null, selectedStroke = -1, dragStart = null, selectionAnchor = null, eraserPointerActive = false, eraserDirty = false, saveTimer = 0, saveIdle = 0, pendingDrawingSave = null, redrawFrame = 0, eraseFrame = 0, pendingErasePoints = [], resizeObserver = null, scrollRoot = null, selectionDelete = null, observedDrawContent = null, colorButton = null;
@@ -24,7 +26,7 @@
     // flow; the current note is persisted independently by IndexedDB.
     localStorage.setItem(storageKey, JSON.stringify(value));
   };
-  const loadPreferences = () => { try { state = { ...defaultState, ...JSON.parse(localStorage.getItem(preferencesKey) || '{}'), drawing: false, selecting: false }; } catch {} };
+  const loadPreferences = () => { try { state = { ...defaultState, ...JSON.parse(localStorage.getItem(preferencesKey) || '{}'), drawing: false, selecting: false, inkVisible: false }; } catch {} };
   const savePreferences = () => localStorage.setItem(preferencesKey, JSON.stringify({ color: state.color, size: state.size, eraserSize: state.eraserSize }));
   loadPreferences();
   const reader = () => document.querySelector('.reader-body');
