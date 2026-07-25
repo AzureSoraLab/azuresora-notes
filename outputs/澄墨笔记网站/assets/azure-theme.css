@@ -1361,26 +1361,6 @@ html .reader-header .data-tools__actions button {
 .annotation-shelf__filter { border-color: var(--paper-surface) !important; }
 .annotation-shelf__filter.is-active { outline-color: var(--paper-accent) !important; }
 
-/* Collapsed navigation rails belong to the chosen paper rather than the old blue shell. */
-.app-shell.library-collapsed { background: var(--paper-soft) !important; }
-.library-collapsed .library,
-.note-list {
-  background: var(--paper-surface) !important;
-  border-right-color: var(--paper-line) !important;
-}
-.library-collapsed .sidebar-toggle,
-.note-list__close {
-  border-color: var(--paper-line) !important;
-  background: color-mix(in srgb, var(--paper-surface) 90%, white) !important;
-  color: var(--paper-accent) !important;
-  box-shadow: 0 1px 3px color-mix(in srgb, var(--paper-ink) 6%, transparent) !important;
-}
-.library-collapsed .sidebar-toggle:hover,
-.note-list__close:hover {
-  border-color: color-mix(in srgb, var(--paper-accent) 42%, var(--paper-line)) !important;
-  background: var(--paper-soft) !important;
-  color: var(--paper-accent) !important;
-}
 
 /* The brand signature and browsing rows keep distinct, intentional weights. */
 .library .brand small {
