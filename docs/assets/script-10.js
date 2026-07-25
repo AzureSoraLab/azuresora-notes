@@ -110,6 +110,11 @@
       if (list.parentElement !== except) list.remove();
     });
   };
+  const syncMobileInlineSelection = (list, selectedId) => {
+    list.querySelectorAll('.mobile-course-note').forEach(button => {
+      button.classList.toggle('is-current', button.dataset.noteId === selectedId);
+    });
+  };
   const renderMobileInlineNotes = () => {
     if (!mobileLibraryIsActive() || !mobileInlineCourseId) return;
     const state = readState();
@@ -129,6 +134,13 @@
     list.dataset.courseId = mobileInlineCourseId;
     const notes = visibleNotes(state, mobileInlineCourseId, '');
     const selectedId = document.querySelector('.compact-note.selected')?.dataset.noteId || '';
+    // Most UI lifecycle events do not alter this category. Keep its existing
+    // mobile list and only refresh the selected marker in that common case.
+    const signature = JSON.stringify(notes.map(note => [note.id, note.title || '', note.updatedAt || '', Array.isArray(note.tags) ? note.tags : []]));
+    if (list.dataset.renderSignature === signature) {
+      syncMobileInlineSelection(list, selectedId);
+      return;
+    }
     const fragment = document.createDocumentFragment();
     if (!notes.length) {
       const empty = document.createElement('p');
@@ -159,6 +171,7 @@
       });
     }
     list.replaceChildren(fragment);
+    list.dataset.renderSignature = signature;
   };
   const fallbackCardIds = (cards, notes) => {
     // Each card comes from a keyed React item. Matching its visible metadata is

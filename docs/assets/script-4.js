@@ -39,6 +39,21 @@
 
   const reader = () => document.querySelector('.reader-body');
   const readerContent = () => reader()?.firstElementChild || null;
+  const viewportBounds = () => {
+    const viewport = window.visualViewport;
+    if (!viewport) return { left: 0, top: 0, right: window.innerWidth, bottom: window.innerHeight };
+    return {
+      left: viewport.offsetLeft,
+      top: viewport.offsetTop,
+      right: viewport.offsetLeft + viewport.width,
+      bottom: viewport.offsetTop + viewport.height
+    };
+  };
+  const selectionIsInReader = (selection = window.getSelection()) => {
+    const root = readerContent();
+    const range = selection?.rangeCount ? selection.getRangeAt(0) : null;
+    return Boolean(root && range && root.contains(range.commonAncestorContainer));
+  };
   const currentNoteId = () => document.querySelector('.compact-note.selected')?.dataset.noteId || '';
   const read = () => cachedItems || (cachedItems = (() => {
     try {
@@ -226,18 +241,19 @@
     if (!rects.length) return removeMenu();
     const left = Math.min(...rects.map(part => part.left)); const right = Math.max(...rects.map(part => part.right));
     const top = Math.min(...rects.map(part => part.top)); const bottom = Math.max(...rects.map(part => part.bottom));
-    const outOfView = bottom < 0 || top > window.innerHeight || right < 0 || left > window.innerWidth;
+    const viewport = viewportBounds();
+    const outOfView = bottom < viewport.top || top > viewport.bottom || right < viewport.left || left > viewport.right;
     selectionBox.style.display = outOfView ? 'none' : '';
     menu.style.display = outOfView ? 'none' : '';
     if (outOfView) return;
     selectionBox.style.left = `${left - 4}px`; selectionBox.style.top = `${top - 4}px`; selectionBox.style.width = `${right - left + 8}px`; selectionBox.style.height = `${bottom - top + 8}px`;
     const menuHeight = menu.offsetHeight || 164;
     const menuWidth = menu.offsetWidth || 254;
-    const menuTop = bottom + menuHeight + 4 <= window.innerHeight
+    const menuTop = bottom + menuHeight + 4 <= viewport.bottom
       ? bottom + 4
-      : Math.max(8, top - menuHeight - 4);
-    menu.style.left = `${Math.min(window.innerWidth - menuWidth - 8, Math.max(8, left + (right - left - menuWidth) / 2))}px`;
-    menu.style.top = `${menuTop}px`;
+      : Math.max(viewport.top + 8, top - menuHeight - 4);
+    menu.style.left = `${Math.min(viewport.right - menuWidth - 8, Math.max(viewport.left + 8, left + (right - left - menuWidth) / 2))}px`;
+    menu.style.top = `${Math.min(viewport.bottom - menuHeight - 8, menuTop)}px`;
   }
   function updateAnnotation(id, changes) {
     const item = annotationForId(id);
@@ -279,7 +295,8 @@
     const anchor = parts[Number(menu.dataset.anchorPart || 0)] || parts[0];
     const rect = anchor?.getBoundingClientRect();
     if (!rect) return removeMenu();
-    const outOfView = rect.bottom < 0 || rect.top > window.innerHeight || rect.right < 0 || rect.left > window.innerWidth;
+    const viewport = viewportBounds();
+    const outOfView = rect.bottom < viewport.top || rect.top > viewport.bottom || rect.right < viewport.left || rect.left > viewport.right;
     menu.style.display = outOfView ? 'none' : '';
     if (outOfView) return;
     // Use the actual long-press point when available, so a wrapped annotation
@@ -289,12 +306,12 @@
     const point = menu._anchorPoint;
     const anchorLeft = point ? rect.left + point.offsetX : rect.left;
     const anchorBottom = point ? rect.top + point.offsetY : rect.bottom;
-    const left = Math.min(window.innerWidth - menuWidth - 8, Math.max(8, anchorLeft));
-    const top = anchorBottom + menuHeight + 8 <= window.innerHeight
+    const left = Math.min(viewport.right - menuWidth - 8, Math.max(viewport.left + 8, anchorLeft));
+    const top = anchorBottom + menuHeight + 8 <= viewport.bottom
       ? anchorBottom + 8
-      : Math.max(8, (point ? rect.top + point.offsetY : rect.top) - menuHeight - 8);
+      : Math.max(viewport.top + 8, (point ? rect.top + point.offsetY : rect.top) - menuHeight - 8);
     menu.style.left = `${left}px`;
-    menu.style.top = `${top}px`;
+    menu.style.top = `${Math.min(viewport.bottom - menuHeight - 8, top)}px`;
   }
   function showManageMenu(mark, point) {
     const id = mark.dataset.annotationId;
@@ -352,10 +369,12 @@
     if (!menu || menu.classList.contains('selection-annotation-menu--card') || menu.classList.contains('selection-annotation-menu--manage')) return;
     const menuWidth = menu.offsetWidth || 238;
     const menuHeight = menu.offsetHeight || 88;
-    const left = Math.min(Math.max(rect.left + rect.width / 2, menuWidth / 2 + 8), window.innerWidth - menuWidth / 2 - 8);
+    const viewport = viewportBounds();
+    const left = Math.min(Math.max(rect.left + rect.width / 2, viewport.left + menuWidth / 2 + 8), viewport.right - menuWidth / 2 - 8);
     const below = rect.bottom + 10;
+    const top = below + menuHeight <= viewport.bottom - 8 ? below : Math.max(viewport.top + 8, rect.top - menuHeight - 10);
     menu.style.left = `${left}px`;
-    menu.style.top = `${below + menuHeight <= window.innerHeight - 8 ? below : Math.max(8, rect.top - menuHeight - 10)}px`;
+    menu.style.top = `${Math.min(viewport.bottom - menuHeight - 8, top)}px`;
   }
   function showMenu() {
     const root = readerContent();
@@ -403,6 +422,7 @@
   }
   function scheduleTouchSelectionMenu() {
     if (!isMobileViewport()) return;
+    if (!selectionIsInReader()) return;
     window.clearTimeout(touchSelectionTimer);
     // Mobile browsers finalize a handle drag after touchend. Waiting one short
     // turn reads the completed native selection instead of a partial range.
@@ -425,7 +445,7 @@
   }, true);
   document.addEventListener('selectionchange', () => {
     const selection = window.getSelection();
-    if (isMobileViewport() && selection && !selection.isCollapsed && selection.toString().trim()) scheduleTouchSelectionMenu();
+    if (isMobileViewport() && selection && !selection.isCollapsed && selection.toString().trim() && selectionIsInReader(selection)) scheduleTouchSelectionMenu();
   });
   document.addEventListener('mousedown', event => { if (menu && !menu.contains(event.target)) removeMenu(); });
   const clearAnnotationPointer = () => {
@@ -499,7 +519,25 @@
     if (event.key !== 'Escape' || !menu) return;
     event.preventDefault(); removeMenu();
   }, true);
-  window.addEventListener('resize', removeMenu);
+  let viewportPositionFrame = 0;
+  const repositionForViewport = () => {
+    if (viewportPositionFrame) return;
+    viewportPositionFrame = window.requestAnimationFrame(() => {
+      viewportPositionFrame = 0;
+      const id = menu?.dataset.annotationId;
+      if (id) {
+        if (menu.classList.contains('selection-annotation-menu--manage')) positionManageMenu(id);
+        else positionCommentCard(id);
+        return;
+      }
+      const selection = window.getSelection();
+      if (menu && selectionIsInReader(selection) && selection?.rangeCount) positionSelectionMenu(selection.getRangeAt(0).getBoundingClientRect());
+      else if (menu) removeMenu();
+    });
+  };
+  window.addEventListener('resize', repositionForViewport, { passive: true });
+  window.visualViewport?.addEventListener('resize', repositionForViewport, { passive: true });
+  window.visualViewport?.addEventListener('scroll', repositionForViewport, { passive: true });
   // Scroll events do not bubble. Capture them at document level so the card
   // follows marks even when the reader component swaps its scroll container.
   let scrollPositionFrame = 0;
