@@ -1795,7 +1795,36 @@ html .reader-header .data-tools__actions button {
     margin: 0 !important;
   }
   .library.mobile-active .brand {
-    align-self: center;
+    position: relative !important;
+    align-self: start;
+    width: min(224px, calc(100% - 44px));
+    min-height: 58px;
+    padding: 0 0 0 22px !important;
+    text-align: left;
+    transform: none !important;
+  }
+  .library.mobile-active .brand-mark {
+    top: 6px;
+    left: 0;
+  }
+  .library.mobile-active .brand > span:not(.brand-mark),
+  .library.mobile-active .brand small {
+    position: static;
+    left: auto;
+    top: auto;
+    margin-left: 0 !important;
+    margin-right: 0 !important;
+    text-align: left;
+  }
+  .library.mobile-active .brand > span:not(.brand-mark) {
+    font-size: 22px;
+    line-height: 1.2;
+  }
+  .library.mobile-active .brand small {
+    max-width: none;
+    margin-top: 6px !important;
+    font-size: 10px;
+    line-height: 1.45;
   }
   .library.mobile-active .new-note {
     align-self: center;
@@ -1840,6 +1869,28 @@ html .reader-header .data-tools__actions button {
   .library.mobile-active .course-group:has(.mobile-course-notes) {
     display: grid;
     grid-template-columns: minmax(0, 1fr) auto auto;
+  }
+  .library.mobile-active .course-group:has(.mobile-course-notes) > .course-button {
+    grid-column: 1;
+    grid-row: 1;
+    padding-right: 8px;
+  }
+  .library.mobile-active .course-group:has(.mobile-course-notes) > .category-edit,
+  .library.mobile-active .course-group:has(.mobile-course-notes) > .course-group__delete {
+    position: static;
+    top: auto;
+    right: auto;
+    align-self: center;
+    margin: 0;
+    transform: none;
+  }
+  .library.mobile-active .course-group:has(.mobile-course-notes) > .category-edit {
+    grid-column: 2;
+    grid-row: 1;
+  }
+  .library.mobile-active .course-group:has(.mobile-course-notes) > .course-group__delete {
+    grid-column: 3;
+    grid-row: 1;
   }
   .library.mobile-active .course-group:has(.mobile-course-notes) .mobile-course-notes {
     grid-column: 1 / -1;
