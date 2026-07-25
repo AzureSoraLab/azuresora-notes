@@ -7,9 +7,11 @@
   let root = null;
   let observer = null;
   let resizeObserver = null;
+  let observedContent = null;
   let lastNoteId = '';
-  let lastMetrics = '';
   let settledFrame = 0;
+  let progressFrame = 0;
+  let progressWidth = '';
 
   const noteId = () => document.querySelector('.compact-note.selected')?.dataset.noteId || '';
   const updateProgress = () => {
@@ -18,13 +20,16 @@
     if (!track) return;
     const range = root.scrollHeight - root.clientHeight;
     const percent = range > 0 ? Math.min(100, Math.max(0, root.scrollTop / range * 100)) : 0;
-    track.style.width = `${percent}%`;
+    const width = `${Math.round(percent * 100) / 100}%`;
+    if (progressWidth !== width) { track.style.width = width; progressWidth = width; }
+  };
+  const scheduleProgress = () => {
+    if (progressFrame) return;
+    progressFrame = requestAnimationFrame(() => { progressFrame = 0; updateProgress(); });
   };
   const settle = () => {
     settledFrame = 0;
     if (!root) return;
-    const metrics = `${root.clientWidth}:${root.clientHeight}:${root.scrollHeight}`;
-    if (metrics !== lastMetrics) lastMetrics = metrics;
     updateProgress();
   };
   const scheduleSettle = () => {
@@ -39,19 +44,32 @@
     const changedNote = nextNoteId && nextNoteId !== lastNoteId;
     if (nextRoot !== root) {
       observer?.disconnect(); resizeObserver?.disconnect();
+      if (root) root.removeEventListener('scroll', scheduleProgress);
       root = nextRoot;
-      root.addEventListener('scroll', updateProgress, { passive: true });
+      progressWidth = '';
+      root.addEventListener('scroll', scheduleProgress, { passive: true });
       observer = new MutationObserver(records => {
-        // Chunk canvases are redraw implementation detail, not reader layout.
-        if (records.some(record => !record.target.closest?.('.drawing-layer'))) scheduleSettle();
+        // Ink chunks and annotation cards are overlays. Only content replacement
+        // needs a fresh body observer or a post-layout progress calculation.
+        if (records.some(record => {
+          if (record.target.closest?.('.drawing-layer, .selection-annotation-menu, .annotation-shelf')) return false;
+          return record.type === 'characterData' || record.addedNodes.length || record.removedNodes.length;
+        })) scheduleSettle();
       });
       observer.observe(root, { childList: true, subtree: true, characterData: true });
       if (window.ResizeObserver) {
         resizeObserver = new ResizeObserver(scheduleSettle);
         resizeObserver.observe(root);
-        root.firstElementChild && resizeObserver.observe(root.firstElementChild);
+        observedContent = root.firstElementChild;
+        if (observedContent) resizeObserver.observe(observedContent);
       }
-      lastMetrics = '';
+    }
+    const nextContent = root.firstElementChild;
+    if (nextContent !== observedContent) {
+      if (observedContent) resizeObserver?.unobserve(observedContent);
+      observedContent = nextContent;
+      if (observedContent) resizeObserver?.observe(observedContent);
+      scheduleSettle();
     }
     if (changedNote) {
       root.scrollTop = 0;
@@ -60,6 +78,7 @@
       requestAnimationFrame(() => {
         if (root === nextRoot && noteId() === nextNoteId) {
           root.scrollTop = 0;
+          progressWidth = '';
           updateProgress();
         }
       });
