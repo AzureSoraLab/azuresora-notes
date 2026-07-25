@@ -1743,6 +1743,26 @@ html .reader-header .data-tools__actions button {
   }
 }
 
+/* On narrow phones, preserve every reader tool at a comfortable size by
+   deliberately giving the toolbar a second row instead of squeezing controls. */
+@media (max-width: 360px) {
+  .reader-header {
+    min-height: 100px;
+    height: 100px;
+    align-items: center;
+  }
+  .reader-actions {
+    width: min(220px, calc(100% - 12px));
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    align-content: center;
+    row-gap: 6px;
+  }
+  .progress-track {
+    top: 99px;
+  }
+}
+
 /* The mobile library reserves independent scrolling space for categories and
    recent notes, so either list cannot push the other into an overlap. */
 @media (max-width: 760px) {
