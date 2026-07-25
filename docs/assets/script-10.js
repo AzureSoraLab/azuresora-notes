@@ -54,26 +54,28 @@
   const noteCards = () => [...document.querySelectorAll('.compact-note')];
   const courseButtons = () => [...document.querySelectorAll('.course-button')];
   const cardForId = (id, cards = noteCards()) => cards.find(card => card.dataset.noteId === id) || null;
-  const courseButtonForId = (courseId, state = readState(), buttons = courseButtons()) => {
-    const ids = new Set((state.courses || []).map(course => course.id));
-    const keyed = buttons.find(button => reactKey(button, ids) === courseId);
-    if (keyed) return keyed;
-    const index = (state.courses || []).findIndex(course => course.id === courseId);
-    return index < 0 ? null : buttons[index] || null;
+  const courseContext = (state = readState(), buttons = courseButtons()) => {
+    const courses = Array.isArray(state.courses) ? state.courses : [];
+    const ids = new Set(courses.map(course => course.id));
+    const idByButton = new Map();
+    const buttonById = new Map();
+    buttons.forEach((button, index) => {
+      const id = reactKey(button, ids) || courses[index]?.id || '';
+      if (!id) return;
+      idByButton.set(button, id);
+      buttonById.set(id, button);
+    });
+    return { courses, buttons, idByButton, buttonById };
   };
-  const activeCourseId = (state = readState(), buttons = courseButtons()) => {
+  const courseButtonForId = (courseId, state = readState(), buttons = courseButtons(), context = courseContext(state, buttons)) => {
+    return context.buttonById.get(courseId) || null;
+  };
+  const activeCourseId = (state = readState(), buttons = courseButtons(), context = courseContext(state, buttons)) => {
     const active = document.querySelector('.course-button.active');
-    const keyedId = active && reactKey(active, new Set((state.courses || []).map(course => course.id)));
-    if (keyedId) return keyedId;
-    const index = buttons.indexOf(active);
-    return index < 0 ? '' : state.courses?.[index]?.id || '';
+    return active ? context.idByButton.get(active) || '' : '';
   };
-  const courseIdForButton = (button, state = readState(), buttons = courseButtons()) => {
-    const ids = new Set((state.courses || []).map(course => course.id));
-    const keyed = reactKey(button, ids);
-    if (keyed) return keyed;
-    const index = buttons.indexOf(button);
-    return index < 0 ? '' : state.courses?.[index]?.id || '';
+  const courseIdForButton = (button, state = readState(), buttons = courseButtons(), context = courseContext(state, buttons)) => {
+    return context.idByButton.get(button) || '';
   };
   const readSession = () => { try { return JSON.parse(localStorage.getItem(readingSessionKey) || 'null'); } catch { return null; } };
   const saveSession = () => {
@@ -101,12 +103,12 @@
     });
     return resolved;
   };
-  const applyDeleteControls = (state = readState(), cards = noteCards(), buttons = courseButtons()) => {
+  const applyDeleteControls = (state = readState(), cards = noteCards(), buttons = courseButtons(), context = courseContext(state, buttons)) => {
     // Most observer callbacks are caused by a small React text update. When
     // every rendered card is already bound, avoid rebuilding note metadata and
     // notifying the other reader enhancements again.
     if (!cards.some(card => !card.dataset.noteId || !card.querySelector(':scope > .compact-note__delete'))) return false;
-    const courseId = activeCourseId(state, buttons);
+    const courseId = activeCourseId(state, buttons, context);
     const query = document.querySelector('.search input')?.value?.toLowerCase() || '';
     const matchingNotes = visibleNotes(state, courseId, query);
     const knownIds = new Set((state.notes || []).map(note => note.id));
@@ -126,12 +128,12 @@
     });
     return true;
   };
-  const applyCourseDeleteControls = (state = readState(), buttons = courseButtons()) => {
+  const applyCourseDeleteControls = (state = readState(), buttons = courseButtons(), context = courseContext(state, buttons)) => {
     const groups = [...document.querySelectorAll('.course-group')];
     if (!groups.some(group => !group.dataset.courseId || !group.querySelector(':scope > .course-group__delete'))) return false;
     groups.forEach(group => {
       const button = group.querySelector('.course-button');
-      const courseId = button && courseIdForButton(button, state, buttons);
+      const courseId = button && courseIdForButton(button, state, buttons, context);
       const existing = group.querySelector('.course-group__delete');
       if (!courseId) { existing?.remove(); return; }
       group.dataset.courseId = courseId;
@@ -194,6 +196,27 @@
       return false;
     }
   };
+  const prepareCourseDeletion = (state, courseId) => {
+    const courses = Array.isArray(state.courses) ? state.courses : [];
+    const course = courses.find(item => item?.id === courseId);
+    if (!course || courses.length <= 1) return null;
+    let noteCount = 0;
+    (state.notes || []).forEach(note => { if (note?.courseId === courseId) noteCount += 1; });
+    return { course, courseId, noteCount, nextState: { ...state, courses: courses.filter(item => item.id !== courseId) } };
+  };
+  const writeCourseDeletion = deletion => {
+    const snapshot = new Map([stateKey, readingSessionKey].map(key => [key, localStorage.getItem(key)]));
+    const restoreSnapshot = () => snapshot.forEach((value, key) => value === null ? localStorage.removeItem(key) : localStorage.setItem(key, value));
+    try {
+      localStorage.setItem(stateKey, JSON.stringify(deletion.nextState));
+      const session = readSession();
+      if (session?.courseId === deletion.courseId) localStorage.setItem(readingSessionKey, JSON.stringify({ ...session, courseId: deletion.nextState.courses[0]?.id || '' }));
+      return true;
+    } catch {
+      try { restoreSnapshot(); } catch {}
+      return false;
+    }
+  };
   const start = () => {
     // Never leave the reader hidden if a saved session becomes unavailable mid-load.
     window.setTimeout(() => document.documentElement.classList.remove('chengmo-restoring-session'), 1800);
@@ -226,8 +249,9 @@
         const state = readState();
         const buttons = courseButtons();
         const cards = noteCards();
-        const notesChanged = applyDeleteControls(state, cards, buttons);
-        const coursesChanged = applyCourseDeleteControls(state, buttons);
+        const context = courseContext(state, buttons);
+        const notesChanged = applyDeleteControls(state, cards, buttons, context);
+        const coursesChanged = applyCourseDeleteControls(state, buttons, context);
         watchList();
         // Other modules use this event to resolve freshly rendered list nodes.
         // Do not wake them for observer noise when nothing in the list changed.
@@ -304,22 +328,22 @@
       if (courseDelete) {
         event.preventDefault(); event.stopPropagation();
         const group = courseDelete.closest('.course-group'); const state = readState();
-        const courseId = group?.dataset.courseId || courseIdForButton(group?.querySelector('.course-button'), state);
-        const courses = Array.isArray(state.courses) ? state.courses : [];
-        const course = courses.find(item => item.id === courseId);
-        if (!course) { alert('\u65e0\u6cd5\u786e\u8ba4\u8fd9\u4e2a\u5206\u7c7b\u3002\u8bf7\u5237\u65b0\u540e\u91cd\u8bd5\u3002'); return; }
-        if (courses.length <= 1) { alert('\u81f3\u5c11\u4fdd\u7559\u4e00\u4e2a\u7b14\u8bb0\u5206\u7c7b\u3002'); return; }
-        const noteCount = (state.notes || []).filter(note => note?.courseId === courseId).length;
-        if (noteCount) {
-          alert(`\u300c${course.name}\u300d\u4e2d\u8fd8\u6709 ${noteCount} \u7bc7\u7b14\u8bb0\u3002\n\n\u4e3a\u4e86\u907f\u514d\u7b14\u8bb0\u88ab\u8bef\u5220\uff0c\u8bf7\u5148\u5728\u7f16\u8f91\u6a21\u5f0f\u5c06\u5b83\u4eec\u79fb\u52a8\u5230\u5176\u4ed6\u5206\u7c7b\u3002`);
+        const buttons = courseButtons(); const context = courseContext(state, buttons);
+        const courseId = group?.dataset.courseId || courseIdForButton(group?.querySelector('.course-button'), state, buttons, context);
+        const deletion = prepareCourseDeletion(state, courseId);
+        if (!deletion) {
+          const courses = Array.isArray(state.courses) ? state.courses : [];
+          if (courses.length <= 1) alert('\u81f3\u5c11\u4fdd\u7559\u4e00\u4e2a\u7b14\u8bb0\u5206\u7c7b\u3002');
+          else alert('\u65e0\u6cd5\u786e\u8ba4\u8fd9\u4e2a\u5206\u7c7b\u3002\u8bf7\u5237\u65b0\u540e\u91cd\u8bd5\u3002');
           return;
         }
-        if (!confirm(`\u786e\u5b9a\u5220\u9664\u7a7a\u5206\u7c7b\u300c${course.name}\u300d\uff1f`)) return;
-        const remaining = courses.filter(item => item.id !== courseId);
+        if (deletion.noteCount) {
+          alert(`\u300c${deletion.course.name}\u300d\u4e2d\u8fd8\u6709 ${deletion.noteCount} \u7bc7\u7b14\u8bb0\u3002\n\n\u4e3a\u4e86\u907f\u514d\u7b14\u8bb0\u88ab\u8bef\u5220\uff0c\u8bf7\u5148\u5728\u7f16\u8f91\u6a21\u5f0f\u5c06\u5b83\u4eec\u79fb\u52a8\u5230\u5176\u4ed6\u5206\u7c7b\u3002`);
+          return;
+        }
+        if (!confirm(`\u786e\u5b9a\u5220\u9664\u7a7a\u5206\u7c7b\u300c${deletion.course.name}\u300d\uff1f`)) return;
         try {
-          localStorage.setItem(stateKey, JSON.stringify({ ...state, courses: remaining }));
-          const session = readSession();
-          if (session?.courseId === courseId) localStorage.setItem(readingSessionKey, JSON.stringify({ ...session, courseId: remaining[0]?.id || '' }));
+          if (!writeCourseDeletion(deletion)) throw new Error('Category state write failed');
           await window.chengmoStorage?.flush?.();
           window.location.reload();
         } catch {
@@ -348,7 +372,7 @@
       const visibleIds = [...document.querySelectorAll('.compact-note')].map(card => card.dataset.noteId).filter(id => knownIds.has(id));
       const selectedId = document.querySelector('.compact-note.selected')?.dataset.noteId || readSession()?.noteId || '';
       const selectedIndex = visibleIds.indexOf(deletion.target.id);
-      const successorId = selectedIndex < 0 ? '' : visibleIds.slice(selectedIndex + 1).concat(visibleIds.slice(0, selectedIndex)).find(id => id !== target.id) || '';
+      const successorId = selectedIndex < 0 ? '' : visibleIds.slice(selectedIndex + 1).concat(visibleIds.slice(0, selectedIndex)).find(id => id !== deletion.target.id) || '';
       const nextId = selectedId === deletion.target.id ? successorId : (notes.some(note => note.id === selectedId && note.id !== deletion.target.id) ? selectedId : '');
       const courseId = activeCourseId(state) || deletion.target.courseId || '';
       const query = document.querySelector('.search input')?.value || '';
