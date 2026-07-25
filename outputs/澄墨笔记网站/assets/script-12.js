@@ -122,7 +122,7 @@
         const replacedUi = records.some(record => [...record.addedNodes].some(node => node.nodeType === 1 && (node.matches?.('.reader, .reader-header, .note-list, .library-content') || node.querySelector?.('.reader-header, .note-list, .library-content'))));
         if (!replacedUi) return;
         scheduleMount();
-        window.chengmoNotifyUiMounted?.();
+        window.chengmoNotifyUiMounted?.({ source: 'react-root' });
       });
       // Direct children are the React view boundaries; observing every nested
       // markdown change needlessly wakes all auxiliary UI modules.
