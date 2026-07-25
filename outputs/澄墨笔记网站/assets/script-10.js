@@ -101,6 +101,56 @@
     const haystack = `${note.title || ''} ${note.content || ''} ${tags.join(' ')}`.toLowerCase();
     return (query ? true : note.courseId === courseId) && haystack.includes(query);
   });
+  let mobileInlineCourseId = '';
+  let suppressMobileCourseToggle = false;
+  const mobileLibraryIsActive = () => window.matchMedia('(max-width: 760px)').matches && document.querySelector('.library')?.classList.contains('mobile-active');
+  const clearMobileInlineNotes = (except = null) => {
+    document.querySelectorAll('.mobile-course-notes').forEach(list => {
+      if (list.parentElement !== except) list.remove();
+    });
+  };
+  const renderMobileInlineNotes = () => {
+    if (!mobileLibraryIsActive() || !mobileInlineCourseId) return;
+    const state = readState();
+    const buttons = courseButtons();
+    const context = courseContext(state, buttons);
+    const courseButton = context.buttonById.get(mobileInlineCourseId);
+    const group = courseButton?.closest('.course-group');
+    if (!group) return;
+    clearMobileInlineNotes(group);
+    let list = group.querySelector(':scope > .mobile-course-notes');
+    if (!list) {
+      list = document.createElement('div');
+      list.className = 'mobile-course-notes';
+      list.setAttribute('aria-label', '该分类的笔记');
+      group.append(list);
+    }
+    list.dataset.courseId = mobileInlineCourseId;
+    const notes = visibleNotes(state, mobileInlineCourseId, '');
+    const selectedId = document.querySelector('.compact-note.selected')?.dataset.noteId || '';
+    const fragment = document.createDocumentFragment();
+    if (!notes.length) {
+      const empty = document.createElement('p');
+      empty.className = 'mobile-course-notes__empty';
+      empty.textContent = '暂无笔记';
+      fragment.append(empty);
+    } else {
+      notes.forEach(note => {
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.className = 'mobile-course-note';
+        button.dataset.noteId = note.id;
+        button.setAttribute('aria-label', `打开笔记「${noteTitle(note)}」`);
+        if (note.id === selectedId) button.classList.add('is-current');
+        const dot = document.createElement('span'); dot.className = 'mobile-course-note__dot'; dot.textContent = '·';
+        const text = document.createElement('span'); text.className = 'mobile-course-note__text';
+        const title = document.createElement('strong'); title.textContent = noteTitle(note);
+        const subtitle = document.createElement('small'); subtitle.textContent = noteSubtitle(note);
+        text.append(title, subtitle); button.append(dot, text); fragment.append(button);
+      });
+    }
+    list.replaceChildren(fragment);
+  };
   const fallbackCardIds = (cards, notes) => {
     // Each card comes from a keyed React item. Matching its visible metadata is
     // only a fallback for the bundled build, and never relies on list order.
@@ -262,6 +312,7 @@
         const notesChanged = applyDeleteControls(state, listContext.cards, buttons, context, listContext.searchInput?.value?.toLowerCase() || '');
         const coursesChanged = applyCourseDeleteControls(state, buttons, context);
         watchList(listContext.list);
+        renderMobileInlineNotes();
         // Other modules use this event to resolve freshly rendered list nodes.
         // Do not wake them for observer noise when nothing in the list changed.
         if (notesChanged || coursesChanged) emit('chengmo:note-list-ready');
@@ -339,6 +390,52 @@
     watchHost();
     window.addEventListener('pagehide', saveSession);
     document.addEventListener('click', async event => {
+      const inlineNote = event.target.closest?.('.mobile-course-note');
+      if (inlineNote) {
+        event.preventDefault(); event.stopPropagation();
+        const noteId = inlineNote.dataset.noteId || '';
+        const state = readState(); const note = (state.notes || []).find(item => item.id === noteId);
+        const courseButton = note && courseButtonForId(note.courseId, state);
+        if (!note || !courseButton) return;
+        // React owns the reader state. Open its compact list briefly, use its
+        // real note button, then return the mobile library to the foreground.
+        const listWasOpen = document.querySelector('.app-shell')?.classList.contains('note-list-open');
+        if (!listWasOpen) courseButton.click();
+        window.setTimeout(() => {
+          const card = cardForId(noteId);
+          if (!card) return;
+          card.click();
+          window.setTimeout(() => {
+            if (document.querySelector('.app-shell')?.classList.contains('note-list-open')) {
+              suppressMobileCourseToggle = true; courseButton.click();
+            }
+            // React re-renders the category tree after changing the reader.
+            // Reattach after that commit instead of rendering into stale nodes.
+            window.setTimeout(renderMobileInlineNotes, 80);
+          }, 60);
+        }, listWasOpen ? 0 : 90);
+        return;
+      }
+      const courseButton = event.target.closest?.('.course-button');
+      if (courseButton && mobileLibraryIsActive()) {
+        if (suppressMobileCourseToggle) { suppressMobileCourseToggle = false; return; }
+        const state = readState(); const buttons = courseButtons(); const context = courseContext(state, buttons);
+        const courseId = courseIdForButton(courseButton, state, buttons, context);
+        if (courseId) {
+          const wasOpen = document.querySelector('.app-shell')?.classList.contains('note-list-open') === true;
+          mobileInlineCourseId = mobileInlineCourseId === courseId ? '' : courseId;
+          window.setTimeout(() => {
+            // Category selection is still handled by React; suppress only its
+            // mobile-only side effect of leaving the separate list panel open.
+            if (document.querySelector('.app-shell')?.classList.contains('note-list-open')) {
+              suppressMobileCourseToggle = true;
+              document.querySelector('.course-button.active')?.click();
+            }
+            if (!mobileInlineCourseId) clearMobileInlineNotes();
+            else renderMobileInlineNotes();
+          }, 0);
+        }
+      }
       const courseDelete = event.target.closest?.('.course-group__delete');
       if (courseDelete) {
         event.preventDefault(); event.stopPropagation();

@@ -1824,4 +1824,67 @@ html .reader-header .data-tools__actions button {
   .library.mobile-active .storage-note {
     padding-top: 10px;
   }
+  /* Mobile uses the category's own row as the note index. This avoids opening
+     a second side panel that cannot share the narrow viewport comfortably. */
+  .library.mobile-active .course-group:has(.mobile-course-notes) {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto auto;
+  }
+  .library.mobile-active .course-group:has(.mobile-course-notes) .mobile-course-notes {
+    grid-column: 1 / -1;
+  }
+  .library.mobile-active .mobile-course-notes {
+    display: grid;
+    gap: 5px;
+    max-height: min(28vh, 184px);
+    margin: 6px 0 2px 10px;
+    padding: 6px 4px 6px 10px;
+    overflow-y: auto;
+    border-left: 2px solid #d8e2e7;
+    overscroll-behavior: contain;
+  }
+  .library.mobile-active .mobile-course-note {
+    display: grid;
+    grid-template-columns: 14px minmax(0, 1fr);
+    align-items: center;
+    gap: 4px;
+    width: 100%;
+    min-height: 42px;
+    padding: 6px 8px;
+    color: #556673;
+    text-align: left;
+    background: #f5f8f9;
+    border: 1px solid #e0e8eb;
+    border-radius: 7px;
+  }
+  .library.mobile-active .mobile-course-note:active,
+  .library.mobile-active .mobile-course-note.is-current {
+    background: #edf3f7;
+    border-color: #d3e0e7;
+  }
+  .library.mobile-active .mobile-course-note__dot {
+    color: #879eaf;
+    font-size: 19px;
+    line-height: 1;
+  }
+  .library.mobile-active .mobile-course-note__text {
+    display: grid;
+    min-width: 0;
+    gap: 1px;
+  }
+  .library.mobile-active .mobile-course-note strong,
+  .library.mobile-active .mobile-course-note small {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .library.mobile-active .mobile-course-note strong { font-size: 13px; }
+  .library.mobile-active .mobile-course-note small { color: #87949c; font-size: 11px; }
+  .library.mobile-active .mobile-course-notes__empty {
+    margin: 2px 0;
+    padding: 7px 8px;
+    color: #8b989f;
+    font-size: 12px;
+  }
 }
