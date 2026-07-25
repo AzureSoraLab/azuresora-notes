@@ -5,8 +5,8 @@
   const listen = runtime?.on || ((type, _, listener) => { document.addEventListener(type, listener); return () => document.removeEventListener(type, listener); });
   const emit = runtime?.emit || ((type, detail) => document.dispatchEvent(new CustomEvent(type, { detail })));
   const key = 'chengmo-text-selection-annotations-v1';
-  // Keep annotation filters aligned with the drawing palette's standard colors.
-  const palette = ['#FFD60A', '#FF453A', '#30D158', '#0A84FF', '#BF5AF2', '#FF2D55', '#FF9F0A', '#8E8E93'];
+  // Keep annotation filters aligned with Zotero's drawing and marking colors.
+  const palette = ['#ffd400', '#ff6666', '#5fb236', '#2ea8e5', '#a28ae5', '#e56eee', '#f19837', '#aaaaaa'];
   const clamp = (value, min, max) => Math.max(min, Math.min(Math.max(min, max), value));
   let filter = null;
   let tagFilter = null;

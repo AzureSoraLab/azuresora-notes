@@ -5,10 +5,12 @@
   const listen = runtime?.on || ((type, _, listener) => { document.addEventListener(type, listener); return () => document.removeEventListener(type, listener); });
   const emit = runtime?.emit || ((type, detail) => document.dispatchEvent(new CustomEvent(type, { detail })));
   const storageKey = 'chengmo-text-selection-annotations-v1';
-  const colors = ['#FFD60A', '#FF453A', '#30D158', '#0A84FF', '#BF5AF2', '#FF2D55', '#FF9F0A', '#8E8E93'];
+  const colors = ['#ffd400', '#ff6666', '#5fb236', '#2ea8e5', '#a28ae5', '#e56eee', '#f19837', '#aaaaaa'];
   const legacyColors = new Map([
     ['#f8d84b', colors[0]], ['#ff6b6b', colors[1]], ['#72b64a', colors[2]], ['#3ca8df', colors[3]],
-    ['#a687e8', colors[4]], ['#d86ee8', colors[5]], ['#f39a3e', colors[6]], ['#a7aaa5', colors[7]]
+    ['#a687e8', colors[4]], ['#d86ee8', colors[5]], ['#f39a3e', colors[6]], ['#a7aaa5', colors[7]],
+    ['#ffd60a', colors[0]], ['#ff453a', colors[1]], ['#30d158', colors[2]], ['#0a84ff', colors[3]],
+    ['#bf5af2', colors[4]], ['#ff2d55', colors[5]], ['#ff9f0a', colors[6]], ['#8e8e93', colors[7]]
   ]);
   const displayColor = color => legacyColors.get(String(color || '').toLowerCase()) || color || colors[0];
   let selected = null;

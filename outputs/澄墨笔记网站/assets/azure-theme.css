@@ -846,9 +846,9 @@ body,
   letter-spacing: .12em;
 }
 
-/* Use the exact selected swatch so text marks and their palette agree. */
+/* Zotero-style highlights are translucent, keeping the text easy to read. */
 mark.selection-annotation--highlight {
-  background: var(--selection-annotation-color) !important;
+  background: color-mix(in srgb, var(--selection-annotation-color) 35%, transparent) !important;
   border-radius: 2px;
   box-shadow: none;
   box-decoration-break: clone;
