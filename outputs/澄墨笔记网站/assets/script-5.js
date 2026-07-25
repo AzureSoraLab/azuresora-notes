@@ -25,7 +25,10 @@
     if (shelfIndex) return shelfIndex;
     refreshMarkCache();
     const activeIds = new Set(markCache.keys());
-    const items = read().filter(item => activeIds.has(item.id)).sort((a, b) => a.start - b.start).map(item => {
+    const selectedNoteId = document.querySelector('.compact-note.selected')?.dataset.noteId || '';
+    // Marks from the prior paper can exist briefly while React switches notes.
+    // Scope persisted annotations to the selected note before consulting the DOM.
+    const items = read().filter(item => item.noteId === selectedNoteId && activeIds.has(item.id)).sort((a, b) => a.start - b.start).map(item => {
       const excerpt = markCache.get(item.id)?.join(' ') || item.text || 'Annotation';
       return { item, excerpt, searchable: `${excerpt} ${item.comment || ''} ${(item.tags || []).join(' ')}`.toLowerCase() };
     });
@@ -96,12 +99,13 @@
     const toggleIcon = document.createElement('span'); toggle.append(toggleIcon);
     const shelf = document.createElement('aside'); shelf.className = 'annotation-shelf is-hidden'; shelf.setAttribute('aria-label', '\u6807\u6ce8\u9762\u677f');
     const bar = document.createElement('div'); bar.className = 'annotation-shelf__bar';
+    const dragHandle = document.createElement('span'); dragHandle.className = 'annotation-shelf__drag-handle'; dragHandle.title = '\u62d6\u52a8\u6807\u6ce8\u9762\u677f'; dragHandle.setAttribute('aria-hidden', 'true'); const dragIcon = document.createElement('img'); dragIcon.src = './assets/move.svg'; dragIcon.alt = ''; dragHandle.append(dragIcon);
     const tabs = document.createElement('div'); tabs.className = 'annotation-shelf__tabs';
     const grid = document.createElement('button'); grid.className = 'annotation-shelf__tab annotation-shelf__tab--grid annotation-shelf__tab--active'; grid.type = 'button'; grid.title = '\u6807\u6ce8'; grid.addEventListener('click', () => { activeView = 'annotations'; grid.classList.add('annotation-shelf__tab--active'); outline.classList.remove('is-active'); search.style.display = ''; scheduleRender(); });
     const outline = document.createElement('button'); outline.type = 'button'; outline.className = 'annotation-shelf__outline'; outline.title = '\u76ee\u5f55'; outline.setAttribute('aria-label', '\u672c\u6587\u76ee\u5f55'); outline.addEventListener('click', () => { activeView = 'outline'; outline.classList.add('is-active'); grid.classList.remove('annotation-shelf__tab--active'); search.style.display = 'none'; scheduleRender(); });
     const search = document.createElement('input'); search.type = 'search'; search.className = 'annotation-shelf__search'; search.placeholder = '\u641c\u7d22\u6807\u6ce8'; search.setAttribute('aria-label', '\u641c\u7d22\u6807\u6ce8'); search.addEventListener('input', () => { searchFilter = search.value.trim().toLowerCase(); scheduleRender(); });
     const close = document.createElement('button'); close.type = 'button'; close.className = 'annotation-shelf__close'; close.title = '\u5173\u95ed'; close.setAttribute('aria-label', '\u5173\u95ed\u6807\u6ce8\u9762\u677f'); close.textContent = '\u00d7'; close.addEventListener('click', () => { shelf.classList.add('is-hidden'); toggle.classList.remove('is-open'); toggle.title = '\u663e\u793a\u6807\u6ce8'; });
-    tabs.append(grid); bar.append(tabs, outline, search, close);
+    tabs.append(grid); bar.append(tabs, outline, dragHandle, search, close);
     const list = document.createElement('div'); list.className = 'annotation-shelf__list';
     const filters = document.createElement('div'); filters.className = 'annotation-shelf__filters';
     palette.forEach(color => { const button = document.createElement('button'); button.type = 'button'; button.className = 'annotation-shelf__filter'; button.style.background = color; button.title = '\u6309\u989c\u8272\u7b5b\u9009'; button.addEventListener('click', () => { filter = filter === color ? null : color; filters.querySelectorAll('button').forEach(item => item.classList.toggle('is-active', item === button && filter === color)); scheduleRender(); }); filters.append(button); });
@@ -111,13 +115,14 @@
     const positionToggle = () => { const header = document.querySelector('.reader-header'); if (!header) return; const rect = header.getBoundingClientRect(); toggle.style.left = `${Math.max(8, rect.left + 13)}px`; toggle.style.top = `${rect.top + Math.max(5, (rect.height - 30) / 2)}px`; };
     const positionShelf = () => { const rect = toggle.getBoundingClientRect(); shelf.style.left = `${Math.max(8, rect.left)}px`; shelf.style.top = `${Math.min(window.innerHeight - 54, rect.bottom + 1)}px`; };
     let shelfWasDragged = false;
-    bar.addEventListener('pointerdown', event => {
-      if (event.target.closest('button, input')) return;
+    // Moving the drawer is deliberately limited to its six-dot handle.
+    dragHandle.addEventListener('pointerdown', event => {
+      event.preventDefault();
       const rect = shelf.getBoundingClientRect(); const offsetX = event.clientX - rect.left; const offsetY = event.clientY - rect.top;
-      shelfWasDragged = false; bar.setPointerCapture(event.pointerId);
+      shelfWasDragged = false; dragHandle.setPointerCapture(event.pointerId);
       const move = moveEvent => { shelfWasDragged = true; shelf.style.left = `${Math.max(8, Math.min(window.innerWidth - rect.width - 8, moveEvent.clientX - offsetX))}px`; shelf.style.top = `${Math.max(8, Math.min(window.innerHeight - rect.height - 8, moveEvent.clientY - offsetY))}px`; };
-      const end = endEvent => { bar.releasePointerCapture?.(endEvent.pointerId); bar.removeEventListener('pointermove', move); bar.removeEventListener('pointerup', end); bar.removeEventListener('pointercancel', end); };
-      bar.addEventListener('pointermove', move); bar.addEventListener('pointerup', end); bar.addEventListener('pointercancel', end);
+      const end = endEvent => { dragHandle.releasePointerCapture?.(endEvent.pointerId); dragHandle.removeEventListener('pointermove', move); dragHandle.removeEventListener('pointerup', end); dragHandle.removeEventListener('pointercancel', end); };
+      dragHandle.addEventListener('pointermove', move); dragHandle.addEventListener('pointerup', end); dragHandle.addEventListener('pointercancel', end);
     });
     // Align only after actual layout changes; a permanent animation frame loop
     // needlessly used CPU while the reader was idle.
@@ -190,6 +195,19 @@
   }
   window.addEventListener('load', () => { build(); render(); });
   listen('chengmo:ui-mounted', 'annotation-shelf-ui', () => { closeTagPopover(); invalidateShelfIndex(true); scheduleRender(); });
+  listen('chengmo:note-selected', 'annotation-shelf-note', () => {
+    closeTagPopover();
+    current = null;
+    // React replaces the paper asynchronously. Refresh after its annotation
+    // pass so the shelf indexes marks from the newly selected note only.
+    let attempts = 0;
+    const refreshForSelectedNote = () => {
+      invalidateShelfIndex(true);
+      scheduleRender();
+      if (++attempts < 4) window.requestAnimationFrame(refreshForSelectedNote);
+    };
+    window.requestAnimationFrame(refreshForSelectedNote);
+  });
   listen('chengmo:annotations-changed', 'annotation-shelf-data', event => {
     cachedItems = null;
     const detail = event.detail || {};

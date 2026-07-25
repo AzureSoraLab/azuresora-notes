@@ -2,7 +2,7 @@
 (() => {
   const recentKey = 'chengmo-recent-notes-v1';
   const stateKey = 'chengmo-notes-v1';
-  const maxRecent = 6;
+  const maxRecent = 5;
   const runtime = window.chengmoRuntime;
   const enqueue = runtime?.schedule || window.chengmoSchedule || ((_, task) => window.requestAnimationFrame(task));
   const listen = runtime?.on || ((type, _, listener) => { document.addEventListener(type, listener); return () => document.removeEventListener(type, listener); });
@@ -72,7 +72,7 @@
       const note = notesById.get(item?.id);
       if (note && !seen.has(note.id)) { seen.add(note.id); notes.push(note); }
     }
-    return notes;
+    return notes.slice(0, maxRecent);
   }
   function remember(note) {
     if (!note?.id) return;
@@ -82,11 +82,14 @@
   function closeListIfNeeded(courseButton) {
     if (document.querySelector('.app-shell')?.classList.contains('note-list-open')) courseButton?.click();
   }
+  let activeNavigation = null;
   function navigate(noteId) {
     const state = noteState(); const note = (state.notes || []).find(item => item.id === noteId);
     if (!note) { render(state, true); return; }
     const courseButton = courseButtonForId(note.courseId, state);
     if (!courseButton) return;
+    // A new recent-note click supersedes any pending category/list retry.
+    activeNavigation?.finish();
     let complete = false;
     let stopWaitingForList = null;
     const finish = () => {
@@ -95,7 +98,9 @@
       stopWaitingForList?.(); stopWaitingForList = null;
       window.clearTimeout(timeout);
       if (window.chengmoSilentCourseSwitch === note.courseId) window.chengmoSilentCourseSwitch = '';
+      if (activeNavigation?.finish === finish) activeNavigation = null;
     };
+    activeNavigation = { finish };
     let retries = 0;
     const tryOpen = () => {
       if (complete) return;
@@ -146,7 +151,7 @@
     });
     section.dataset.recentSignature = signature;
   }
-  let previous = ''; let syncFrame = 0;
+  let previous = ''; let syncFrame = 0; let syncForce = false;
   const sync = force => {
     syncFrame = 0;
     const state = noteState(); const note = selectedNote(state); const token = note?.id || '';
@@ -154,9 +159,10 @@
     render(state, force || !document.querySelector('.recent-notes'));
   };
   const scheduleSync = force => {
+    syncForce ||= Boolean(force);
     if (syncFrame) return;
     syncFrame = 1;
-    const run = () => sync(force);
+    const run = () => { const shouldForce = syncForce; syncForce = false; sync(shouldForce); };
     enqueue('recent-notes', run);
   };
   const start = () => {

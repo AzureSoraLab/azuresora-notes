@@ -516,6 +516,52 @@ body,
   box-shadow: none !important;
   color: #406078 !important;
 }
+
+/* Tighten the category header without changing the shared left alignment. */
+.library .course-section {
+  margin-top: 4px;
+}
+.library .category-add {
+  transform: translateX(-8px);
+}
+
+/* Add a little width to the desktop library without changing its inner rhythm. */
+@media (min-width: 761px) {
+  .app-shell,
+  .app-shell.note-list-open {
+    grid-template-columns: 264px minmax(0, 1fr) !important;
+  }
+  .app-shell.library-collapsed,
+  .app-shell.library-collapsed.note-list-open {
+    grid-template-columns: 0 minmax(0, 1fr) !important;
+  }
+  .note-list {
+    left: 264px !important;
+    width: 264px !important;
+    padding-left: 20px !important;
+    padding-right: 20px !important;
+    background: #f3f6f7 !important;
+    border-right-color: #d7e1e5 !important;
+    box-shadow: 10px 0 24px rgba(64, 83, 98, 0.10) !important;
+  }
+  .library-collapsed .note-list {
+    left: 0 !important;
+  }
+  .app-shell.library-collapsed .sidebar {
+    width: 0;
+    min-width: 0;
+    overflow: visible;
+    padding: 0;
+    border-right: 0;
+  }
+  .sidebar-toggle {
+    position: fixed;
+    top: var(--library-toggle-top, 16px) !important;
+    left: var(--library-toggle-left, 14px) !important;
+    right: auto;
+    z-index: 10050;
+  }
+}
 .library .course-button.active i { box-shadow: 0 0 0 2px #eaf2f6 !important; }
 .library .recent-notes__item.is-current::after { display: none !important; }
 
@@ -635,26 +681,6 @@ body,
   font-weight: 550;
 }
 
-/* The heading is outside the scroll box, so its scrollbar begins below it. */
-.course-section:has(.course-list-scroll .course-group:nth-child(7)) {
-  max-height: none !important;
-  overflow: visible !important;
-  padding-right: 0 !important;
-}
-.course-section .course-list-scroll:has(.course-group:nth-child(7)) {
-  max-height: min(29vh, 208px);
-  padding-right: 4px;
-  overflow-y: auto;
-  overscroll-behavior: contain;
-}
-.course-section .course-list-scroll:has(.course-group:nth-child(7))::-webkit-scrollbar { width: 6px; }
-.course-section .course-list-scroll:has(.course-group:nth-child(7))::-webkit-scrollbar-thumb {
-  border-radius: 99px;
-  background: #c7d1c9;
-}
-
-/* The category scroller owns only the rows. Keeping it in normal flow
-   prevents its track or final row from crossing into the recent-notes block. */
 .library .course-section {
   max-height: none !important;
   overflow: visible !important;
@@ -1239,6 +1265,7 @@ html.paper-amber {
   font-weight: 700 !important;
 }
 
+
 /* Paper-dependent controls: the whole reading workspace changes as one surface. */
 .reader-header .crumb { color: color-mix(in srgb, var(--paper-ink) 64%, transparent) !important; }
 .reader-actions button,
@@ -1361,7 +1388,105 @@ html .reader-header .data-tools__actions button {
 .annotation-shelf__filter { border-color: var(--paper-surface) !important; }
 .annotation-shelf__filter.is-active { outline-color: var(--paper-accent) !important; }
 
+/* The annotation drawer is part of the paper, not a fixed white utility panel. */
+.annotation-shelf-toggle {
+  box-sizing: border-box;
+  border: 1px solid transparent !important;
+  border-radius: 6px !important;
+  background: transparent !important;
+}
+.annotation-shelf-toggle:hover,
+.annotation-shelf-toggle.is-open {
+  border-color: color-mix(in srgb, var(--paper-accent) 38%, var(--paper-line)) !important;
+  background: var(--paper-soft) !important;
+  color: var(--paper-accent) !important;
+}
+.annotation-shelf-toggle span {
+  background: #fff !important;
+}
+.annotation-shelf,
+.annotation-shelf__list,
+.annotation-shelf__outline-list {
+  background: var(--paper-surface) !important;
+  color: var(--paper-ink) !important;
+}
+.annotation-shelf__bar,
+.annotation-shelf__filters,
+.annotation-shelf__tag-summary,
+.annotation-tag-popover {
+  background: var(--paper-header) !important;
+  border-color: var(--paper-line) !important;
+}
+.annotation-shelf__card,
+.annotation-shelf__outline-item.level-2 {
+  background: color-mix(in srgb, var(--paper-surface) 97%, var(--paper-ink)) !important;
+  border-color: var(--paper-line) !important;
+  color: var(--paper-ink) !important;
+}
+.annotation-shelf__card:hover,
+.annotation-shelf__outline-item:hover {
+  background: var(--paper-soft) !important;
+  border-color: color-mix(in srgb, var(--paper-accent) 38%, var(--paper-line)) !important;
+  color: var(--paper-accent) !important;
+}
+.annotation-shelf__card.is-current {
+  background: var(--paper-soft) !important;
+  border-color: color-mix(in srgb, var(--paper-accent) 52%, var(--paper-line)) !important;
+}
+.annotation-shelf__outline-item.level-3,
+.annotation-shelf__outline-item.level-3::before { border-color: var(--paper-line) !important; }
+.annotation-shelf__search,
+.annotation-shelf__inline-comment,
+.annotation-shelf__add-tag {
+  background-color: var(--paper-surface) !important;
+  color: var(--paper-ink) !important;
+}
+.annotation-shelf__drag-handle {
+  width: 24px;
+  height: 24px;
+  display: grid;
+  place-items: center;
+  margin: 0 5px 0 7px;
+  border: 1px solid transparent;
+  border-radius: 5px;
+  color: color-mix(in srgb, var(--paper-ink) 52%, var(--paper-accent));
+  cursor: url("./move-cursor.svg") 16 16, grab;
+  touch-action: none;
+}
+.annotation-shelf__drag-handle img {
+  width: 18px;
+  height: 18px;
+  pointer-events: none;
+}
+.annotation-shelf__drag-handle:hover {
+  border-color: color-mix(in srgb, var(--paper-accent) 35%, var(--paper-line));
+  background-color: var(--paper-soft);
+  color: var(--paper-accent);
+}
+.annotation-shelf__drag-handle:active { cursor: url("./move-cursor.svg") 16 16, grabbing; }
 
+/* Only the dedicated move control advertises dragging; the bar stays neutral. */
+.annotation-shelf__bar,
+.annotation-shelf__bar:active {
+  cursor: default !important;
+}
+
+/* Header controls inherit the active paper instead of the old blue utility tint. */
+.annotation-shelf__outline,
+.annotation-shelf__tab {
+  color: color-mix(in srgb, var(--paper-ink) 58%, var(--paper-accent)) !important;
+}
+.annotation-shelf__tabs {
+  padding-right: 0;
+  border-right: 0 !important;
+}
+.annotation-shelf__outline:hover,
+.annotation-shelf__outline.is-active,
+.annotation-shelf__tab:hover,
+.annotation-shelf__tab--grid.annotation-shelf__tab--active {
+  background: var(--paper-soft) !important;
+  color: var(--paper-accent) !important;
+}
 /* The brand signature and browsing rows keep distinct, intentional weights. */
 .library .brand small {
   font-family: "Microsoft YaHei", "Microsoft YaHei UI", sans-serif !important;
@@ -1378,6 +1503,13 @@ html .reader-header .data-tools__actions button {
   font-style: italic;
 }
 
+/* Keep the note-index label and empty-note prompt in the same muted blue as
+   the library's "笔记分类" heading. */
+.note-list .note-list-header p,
+.reader-body > div > h1:only-child::after {
+  color: #516b7d !important;
+}
+
 /* Library and note-index typography share one sturdy, readable UI face. */
 .library .section-title,
 .library .recent-notes__title,
@@ -1389,4 +1521,95 @@ html .reader-header .data-tools__actions button {
 .note-list .empty-index {
   font-family: "Microsoft YaHei", "Microsoft YaHei UI", sans-serif !important;
   font-weight: 700 !important;
+}
+.course-section:has(.course-list-scroll .course-group:nth-child(7)) {
+  max-height: none !important;
+  overflow: visible !important;
+  padding-right: 0 !important;
+}
+.course-section .course-list-scroll:has(.course-group:nth-child(7)) {
+  max-height: min(29vh, 208px);
+  padding-right: 4px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+.course-section .course-list-scroll:has(.course-group:nth-child(7))::-webkit-scrollbar { width: 6px; }
+.course-section .course-list-scroll:has(.course-group:nth-child(7))::-webkit-scrollbar-thumb {
+  border-radius: 99px;
+  background: #c7d1c9;
+}
+/* Show four category rows completely before this list begins to scroll. */
+.library .course-section .course-list-scroll:has(.course-group:nth-child(4)) {
+  max-height: min(34vh, 184px);
+}
+
+/* A fifth category starts a scrollbar; the first four rows remain visible. */
+.library .course-section .course-list-scroll:has(.course-group:nth-child(5)) {
+  max-height: 140px;
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+
+/* Sidebar browsing rows use a smaller type scale than their section headings. */
+.library .course-button,
+.library .recent-notes__item {
+  font-size: 14px !important;
+}
+
+/* Add breathing room between recently read notes. */
+.library .recent-notes__item {
+  min-height: 32px;
+  margin: 5px 0;
+  padding-top: 5px !important;
+  padding-bottom: 5px !important;
+}
+
+/* The current recent note intentionally uses the exact category-selection frame. */
+.library .course-button.active,
+.library .recent-notes__item.is-current {
+  box-sizing: border-box;
+  min-height: 32px;
+  padding: 5px 10px !important;
+  border: 0 !important;
+  border-radius: 7px !important;
+  background: #eaf2f6 !important;
+  box-shadow: none !important;
+  color: #406078 !important;
+}
+
+/* Give the index a visible low-saturation warm gray-blue surface so it does
+   not disappear into the white reader beside it. */
+.note-list,
+.note-list-open .note-list,
+.note-list .note-index-scroll {
+  background: #e9eef0 !important;
+  border-right-color: #d1dce1 !important;
+}
+.note-list .note-list-header {
+  background: #f0f3f3 !important;
+  border-bottom-color: #d6e0e3 !important;
+}
+.note-list .search {
+  background: #f7f9f9 !important;
+  border-color: #d4dfe3 !important;
+}
+.note-list .compact-note.selected {
+  background: #dfe9ef !important;
+  border-color: #c8d9e2 !important;
+}
+
+/* A narrower annotation drawer keeps the reader surface visually primary. */
+.annotation-shelf {
+  width: 252px;
+}
+.annotation-shelf__bar {
+  padding-left: 6px;
+  padding-right: 6px;
+}
+.annotation-shelf__search {
+  width: 88px;
+}
+.annotation-shelf__card {
+  padding-left: 9px;
+  padding-right: 9px;
 }
