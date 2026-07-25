@@ -6,9 +6,28 @@
   const runtime = window.chengmoRuntime;
   const enqueue = runtime?.schedule || window.chengmoSchedule || ((_, task) => window.requestAnimationFrame(task));
   const listen = runtime?.on || ((type, _, listener) => { document.addEventListener(type, listener); return () => document.removeEventListener(type, listener); });
-  const readRecent = () => { try { const value = JSON.parse(localStorage.getItem(recentKey) || '[]'); return Array.isArray(value) ? value : []; } catch { return []; } };
-  const saveRecent = items => localStorage.setItem(recentKey, JSON.stringify(items.slice(0, maxRecent)));
-  const noteState = () => { try { const value = JSON.parse(localStorage.getItem(stateKey) || '{}'); return value && typeof value === 'object' ? value : {}; } catch { return {}; } };
+  let recentCache = { raw: null, value: [] };
+  let stateCache = { raw: null, value: {} };
+  const cachedJson = (key, cache, fallback) => {
+    try {
+      const raw = localStorage.getItem(key);
+      if (cache.raw === raw) return cache.value;
+      const parsed = JSON.parse(raw || 'null');
+      cache.raw = raw; cache.value = parsed && typeof parsed === 'object' ? parsed : fallback;
+      return cache.value;
+    } catch { return fallback; }
+  };
+  const readRecent = () => {
+    const value = cachedJson(recentKey, recentCache, []);
+    return Array.isArray(value) ? value : [];
+  };
+  const saveRecent = items => {
+    const value = items.slice(0, maxRecent);
+    const raw = JSON.stringify(value);
+    recentCache = { raw, value };
+    localStorage.setItem(recentKey, raw);
+  };
+  const noteState = () => cachedJson(stateKey, stateCache, {});
   const noteTitle = note => note?.title?.trim() || '未命名笔记';
   const noteSubtitle = note => (Array.isArray(note?.tags) ? note.tags.slice(0, 2).map(tag => `#${tag}`).join('  ') : '') || '未添加标签';
   const recentRecord = note => ({ id: note.id, courseId: note.courseId || '', title: noteTitle(note), subtitle: noteSubtitle(note) });
@@ -155,7 +174,7 @@
   const sync = force => {
     syncFrame = 0;
     const state = noteState(); const note = selectedNote(state); const token = note?.id || '';
-    if (token && token !== previous) { previous = token; remember(note); force = true; }
+    if (token && token !== previous) { previous = token; remember(note); }
     render(state, force || !document.querySelector('.recent-notes'));
   };
   const scheduleSync = force => {
@@ -183,7 +202,12 @@
     const syncAndWatch = () => { watchContent(); scheduleSync(true); };
     listen('chengmo:ui-mounted', 'recent-notes-ui', syncAndWatch);
     listen('chengmo:note-selected', 'recent-notes-selection', scheduleSync);
-    window.addEventListener('storage', event => { if (event.key === stateKey || event.key === recentKey) scheduleSync(true); });
+    window.addEventListener('storage', event => {
+      if (event.key === stateKey) stateCache.raw = undefined;
+      if (event.key === recentKey) recentCache.raw = undefined;
+      if (event.key === stateKey || event.key === recentKey) scheduleSync(true);
+    });
+    listen('chengmo:notes-state-updated', 'recent-notes-state', () => { stateCache.raw = undefined; scheduleSync(true); });
     syncAndWatch();
   };
   (runtime?.whenReady || (task => document.readyState === 'loading' ? document.addEventListener('DOMContentLoaded', task, { once: true }) : task()))(start);

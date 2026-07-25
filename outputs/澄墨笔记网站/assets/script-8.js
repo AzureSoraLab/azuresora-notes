@@ -1,10 +1,8 @@
 
 (() => {
-  const stateKey = 'chengmo-notes-v1';
   const runtime = window.chengmoRuntime;
   const enqueue = runtime?.schedule || window.chengmoSchedule || ((_, task) => window.requestAnimationFrame(task));
   const listen = runtime?.on || ((type, _, listener) => { document.addEventListener(type, listener); return () => document.removeEventListener(type, listener); });
-  const state = () => { try { return JSON.parse(localStorage.getItem(stateKey) || '{}'); } catch { return {}; } };
   function selectedTitle() { return document.querySelector('.compact-note.selected strong')?.textContent?.trim() || ''; }
   function syncHeaderAndOrder() {
     const title = selectedTitle();
@@ -12,7 +10,8 @@
     if (crumb) {
       let suffix = crumb.querySelector('.reader-current-note');
       if (!suffix) { suffix = document.createElement('span'); suffix.className = 'reader-current-note'; crumb.append(suffix); }
-      suffix.textContent = title ? ` / ${title}` : '';
+      const text = title ? ` / ${title}` : '';
+      if (suffix.textContent !== text) suffix.textContent = text;
     }
   }
   const start = () => {
