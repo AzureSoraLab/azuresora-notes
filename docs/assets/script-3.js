@@ -6,9 +6,10 @@
   const listen = runtime?.on || ((type, _, listener) => { document.addEventListener(type, listener); return () => document.removeEventListener(type, listener); });
   const storageKey = 'chengmo-freehand-annotations-v1';
   const preferencesKey = 'chengmo-freehand-drawing-preferences-v1';
+  // Use the same full-chroma annotation color card as text highlighting.
   const palette = [
-    ['#f8d84b', '黄色'], ['#ff6b6b', '红色'], ['#72b64a', '绿色'], ['#3ca8df', '蓝色'],
-    ['#a687e8', '紫色'], ['#d86ee8', '洋红'], ['#f39a3e', '橙色'], ['#a7aaa5', '灰色']
+    ['#FFD60A', '黄色'], ['#FF453A', '红色'], ['#30D158', '绿色'], ['#0A84FF', '蓝色'],
+    ['#BF5AF2', '紫色'], ['#FF2D55', '洋红'], ['#FF9F0A', '橙色'], ['#8E8E93', '灰色']
   ];
   // Ink remains stored per note, but starts hidden after every page load so a
   // reader opens on the clean text. Entering drawing or selection reveals it.

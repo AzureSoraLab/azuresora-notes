@@ -5,7 +5,8 @@
   const listen = runtime?.on || ((type, _, listener) => { document.addEventListener(type, listener); return () => document.removeEventListener(type, listener); });
   const emit = runtime?.emit || ((type, detail) => document.dispatchEvent(new CustomEvent(type, { detail })));
   const key = 'chengmo-text-selection-annotations-v1';
-  const palette = ['#f8d84b', '#ff6b6b', '#72b64a', '#3ca8df', '#a687e8', '#d86ee8', '#f39a3e', '#a7aaa5'];
+  // Keep annotation filters aligned with the drawing palette's standard colors.
+  const palette = ['#FFD60A', '#FF453A', '#30D158', '#0A84FF', '#BF5AF2', '#FF2D55', '#FF9F0A', '#8E8E93'];
   const clamp = (value, min, max) => Math.max(min, Math.min(Math.max(min, max), value));
   let filter = null;
   let tagFilter = null;
