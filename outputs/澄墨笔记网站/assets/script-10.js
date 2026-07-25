@@ -11,13 +11,38 @@
   // Kept outside start() because list hydration also runs before its observers
   // are established (for example during React's initial render).
   let pendingCreatedNoteId = '';
+  let stateCache = { raw: undefined, value: null };
+  const valueCache = new Map();
   const readState = () => {
     const pending = window.chengmoStorage?.peekNotes?.();
     if (pending && typeof pending === 'object') return pending;
-    try { return JSON.parse(localStorage.getItem(stateKey) || '{}'); } catch { return {}; }
+    try {
+      const raw = localStorage.getItem(stateKey);
+      if (stateCache.raw === raw && stateCache.value) return stateCache.value;
+      const value = JSON.parse(raw || '{}');
+      stateCache = { raw, value: value && typeof value === 'object' ? value : {} };
+      return stateCache.value;
+    } catch { return {}; }
   };
-  const readArray = key => { try { const value = JSON.parse(localStorage.getItem(key) || '[]'); return Array.isArray(value) ? value : null; } catch { return null; } };
-  const readRecord = key => { try { const value = JSON.parse(localStorage.getItem(key) || '{}'); return value && typeof value === 'object' && !Array.isArray(value) ? value : null; } catch { return null; } };
+  const readCached = (key, fallback) => {
+    try {
+      const raw = localStorage.getItem(key);
+      const cached = valueCache.get(key);
+      if (cached?.raw === raw) return cached.value;
+      const value = JSON.parse(raw || 'null');
+      const normalized = value && typeof value === 'object' ? value : fallback;
+      valueCache.set(key, { raw, value: normalized });
+      return normalized;
+    } catch { return fallback; }
+  };
+  const readArray = key => {
+    const value = readCached(key, null);
+    return Array.isArray(value) ? value : null;
+  };
+  const readRecord = key => {
+    const value = readCached(key, null);
+    return value && !Array.isArray(value) ? value : null;
+  };
   const noteTitle = note => note?.title?.trim() || '\u672a\u547d\u540d\u7b14\u8bb0';
   const noteSubtitle = note => (Array.isArray(note?.tags) ? note.tags.slice(0, 2).map(tag => `#${tag}`).join('  ') : '') || '\u672a\u6dfb\u52a0\u6807\u7b7e';
   const reactKey = (node, ids) => {
@@ -26,25 +51,28 @@
     const id = fiber?.key ?? fiber?.alternate?.key;
     return typeof id === 'string' && ids.has(id) ? id : '';
   };
-  const cardForId = id => [...document.querySelectorAll('.compact-note')].find(card => card.dataset.noteId === id) || null;
-  const courseButtonForId = (courseId, state = readState()) => {
-    const keyed = [...document.querySelectorAll('.course-button')].find(button => reactKey(button, new Set((state.courses || []).map(course => course.id))) === courseId);
+  const noteCards = () => [...document.querySelectorAll('.compact-note')];
+  const courseButtons = () => [...document.querySelectorAll('.course-button')];
+  const cardForId = (id, cards = noteCards()) => cards.find(card => card.dataset.noteId === id) || null;
+  const courseButtonForId = (courseId, state = readState(), buttons = courseButtons()) => {
+    const ids = new Set((state.courses || []).map(course => course.id));
+    const keyed = buttons.find(button => reactKey(button, ids) === courseId);
     if (keyed) return keyed;
     const index = (state.courses || []).findIndex(course => course.id === courseId);
-    return index < 0 ? null : document.querySelectorAll('.course-button')[index] || null;
+    return index < 0 ? null : buttons[index] || null;
   };
-  const activeCourseId = (state = readState()) => {
+  const activeCourseId = (state = readState(), buttons = courseButtons()) => {
     const active = document.querySelector('.course-button.active');
     const keyedId = active && reactKey(active, new Set((state.courses || []).map(course => course.id)));
     if (keyedId) return keyedId;
-    const index = [...document.querySelectorAll('.course-button')].indexOf(active);
+    const index = buttons.indexOf(active);
     return index < 0 ? '' : state.courses?.[index]?.id || '';
   };
-  const courseIdForButton = (button, state = readState()) => {
+  const courseIdForButton = (button, state = readState(), buttons = courseButtons()) => {
     const ids = new Set((state.courses || []).map(course => course.id));
     const keyed = reactKey(button, ids);
     if (keyed) return keyed;
-    const index = [...document.querySelectorAll('.course-button')].indexOf(button);
+    const index = buttons.indexOf(button);
     return index < 0 ? '' : state.courses?.[index]?.id || '';
   };
   const readSession = () => { try { return JSON.parse(localStorage.getItem(readingSessionKey) || 'null'); } catch { return null; } };
@@ -73,14 +101,12 @@
     });
     return resolved;
   };
-  const applyDeleteControls = () => {
-    const cards = [...document.querySelectorAll('.compact-note')];
+  const applyDeleteControls = (state = readState(), cards = noteCards(), buttons = courseButtons()) => {
     // Most observer callbacks are caused by a small React text update. When
     // every rendered card is already bound, avoid rebuilding note metadata and
     // notifying the other reader enhancements again.
     if (!cards.some(card => !card.dataset.noteId || !card.querySelector(':scope > .compact-note__delete'))) return false;
-    const state = readState();
-    const courseId = activeCourseId(state);
+    const courseId = activeCourseId(state, buttons);
     const query = document.querySelector('.search input')?.value?.toLowerCase() || '';
     const matchingNotes = visibleNotes(state, courseId, query);
     const knownIds = new Set((state.notes || []).map(note => note.id));
@@ -100,13 +126,12 @@
     });
     return true;
   };
-  const applyCourseDeleteControls = () => {
+  const applyCourseDeleteControls = (state = readState(), buttons = courseButtons()) => {
     const groups = [...document.querySelectorAll('.course-group')];
     if (!groups.some(group => !group.dataset.courseId || !group.querySelector(':scope > .course-group__delete'))) return false;
-    const state = readState();
     groups.forEach(group => {
       const button = group.querySelector('.course-button');
-      const courseId = button && courseIdForButton(button, state);
+      const courseId = button && courseIdForButton(button, state, buttons);
       const existing = group.querySelector('.course-group__delete');
       if (!courseId) { existing?.remove(); return; }
       group.dataset.courseId = courseId;
@@ -173,8 +198,11 @@
       queued = true;
       const run = () => {
         queued = false;
-        const notesChanged = applyDeleteControls();
-        const coursesChanged = applyCourseDeleteControls();
+        const state = readState();
+        const buttons = courseButtons();
+        const cards = noteCards();
+        const notesChanged = applyDeleteControls(state, cards, buttons);
+        const coursesChanged = applyCourseDeleteControls(state, buttons);
         watchList();
         // Other modules use this event to resolve freshly rendered list nodes.
         // Do not wake them for observer noise when nothing in the list changed.
@@ -239,7 +267,11 @@
     };
     listen('chengmo:ui-mounted', 'note-controls-ui', () => { watchHost(); sync(); });
     listen('chengmo:note-created', 'note-controls-created', event => { pendingCreatedNoteId = event.detail?.id || ''; sync(); });
-    listen('chengmo:notes-state-updated', 'note-controls-state', sync);
+    listen('chengmo:notes-state-updated', 'note-controls-state', () => { stateCache.raw = undefined; sync(); });
+    window.addEventListener('storage', event => {
+      if (event.key === stateKey) stateCache.raw = undefined;
+      if ([annotationKey, recentKey, drawingKey].includes(event.key)) valueCache.delete(event.key);
+    });
     watchHost();
     window.addEventListener('pagehide', saveSession);
     document.addEventListener('click', async event => {
