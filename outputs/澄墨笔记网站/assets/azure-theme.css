@@ -1681,3 +1681,64 @@ html .reader-header .data-tools__actions button {
 .library .brand small {
   left: 2px;
 }
+
+/* Keep the reader header to one touch-friendly row on phones. The paper picker
+   uses its accessible label instead of wrapping its descriptive text. */
+@media (max-width: 760px) {
+  .app-shell {
+    height: calc(100vh - 54px - env(safe-area-inset-bottom));
+  }
+  .mobile-nav {
+    height: calc(54px + env(safe-area-inset-bottom));
+    padding-bottom: env(safe-area-inset-bottom);
+    box-sizing: border-box;
+  }
+  .reader-header {
+    min-height: 58px;
+    height: 58px;
+    padding-right: 12px;
+    padding-left: 12px;
+    overflow: visible;
+  }
+  .reader-actions {
+    min-width: 0;
+    gap: 3px;
+  }
+  .paper-theme-control,
+  .reader-actions .paper-theme-trigger {
+    height: 32px;
+  }
+  .reader-actions .paper-theme-trigger {
+    width: 32px;
+    min-width: 32px;
+    justify-content: center;
+    padding: 0;
+  }
+  .paper-theme-trigger [data-paper-theme-label] {
+    display: none;
+  }
+  .paper-theme-chevron {
+    font-size: 16px;
+  }
+  .paper-theme-menu {
+    right: 0;
+    left: auto;
+    min-width: 124px;
+  }
+  .annotation-shelf {
+    max-height: calc(100vh - 86px - env(safe-area-inset-bottom));
+  }
+}
+
+@media (max-width: 400px) {
+  .reader-header .crumb {
+    display: none;
+  }
+  .reader-actions {
+    margin-left: auto;
+  }
+  .zotero-draw-control {
+    margin-right: 2px !important;
+    padding-right: 3px !important;
+  }
+}
