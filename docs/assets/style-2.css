@@ -26,7 +26,7 @@
 .zotero-draw-control__visibility svg { width: 18px; height: 18px; vertical-align: middle; }
 .drawing-canvas.is-selecting { pointer-events: auto; cursor: default; }
 .drawing-canvas.is-selecting.is-dragging { cursor: grabbing; }
-.drawing-selection-delete { position: fixed; z-index: 10036; height: 26px; padding: 0 8px; border: 1px solid #d6ded9; border-radius: 5px; background: #fffefa; box-shadow: 0 3px 10px rgba(37,58,50,.14); color: #5c6862; font: 12px/24px Arial, "Microsoft YaHei", sans-serif; cursor: pointer; }
+.drawing-selection-delete { position: fixed; z-index: 10036; height: 26px; padding: 0 8px; border: 1px solid #d6ded9; border-radius: 5px; background: #fffefa; box-shadow: 0 3px 10px rgba(37,58,50,.14); color: #5c6862; font: 12px/24px Arial, "Microsoft YaHei", sans-serif; cursor: pointer; touch-action: manipulation; }
 .drawing-selection-delete:hover { border-color: #c9a7a0; background: #faf3f1; color: #9b5147; }
 .drawing-selection-delete[hidden] { display: none; }
 .zotero-draw-control__color { display: inline-flex; align-items: center; gap: 4px; height: 28px; margin-left: 5px; padding: 0 4px 0 5px; border: 0; border-radius: 5px; background: transparent; color: #69736f; cursor: pointer; }

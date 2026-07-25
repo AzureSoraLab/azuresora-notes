@@ -2033,3 +2033,26 @@ html .reader-header .data-tools__actions button {
     max-width: calc(100vw - 24px);
   }
 }
+
+/* Phone library: keep the wordmark and its signature on the screen axis.
+   The decorative dot is positioned independently so it cannot offset text. */
+@media (max-width: 760px) {
+  .library.mobile-active .brand {
+    width: 100%;
+    min-height: 88px;
+    padding: 0 !important;
+    text-align: center;
+  }
+  .library.mobile-active .brand > span:not(.brand-mark),
+  .library.mobile-active .brand small {
+    text-align: center;
+  }
+  .library.mobile-active .brand-mark {
+    top: 23px;
+    left: calc(50% - 110px);
+  }
+  .library.mobile-active .recent-notes__title {
+    min-height: 34px;
+    margin-bottom: 12px;
+  }
+}

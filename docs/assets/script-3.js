@@ -316,7 +316,19 @@
   const updateSelectionDelete = rect => {
     if (!selectionDelete) {
       selectionDelete = document.createElement('button'); selectionDelete.type = 'button'; selectionDelete.className = 'drawing-selection-delete'; selectionDelete.title = '删除所选笔迹'; selectionDelete.setAttribute('aria-label', '删除所选笔迹'); selectionDelete.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 7h14M10 11v6m4-6v6M9 7l.8-2h4.4l.8 2M7.5 7l.7 12h7.6l.7-12" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>';
-      selectionDelete.addEventListener('click', deleteSelectedStroke); document.body.append(selectionDelete);
+      const activateDelete = event => {
+        event.preventDefault(); event.stopPropagation();
+        deleteSelectedStroke();
+      };
+      // Activate on press so touch input cannot be taken over by the drawing
+      // canvas before the browser produces its delayed synthetic click.
+      selectionDelete.addEventListener('pointerdown', event => {
+        if (event.isPrimary === false || event.button !== 0) return;
+        activateDelete(event);
+      });
+      // Keep keyboard activation and older browsers working. After a pointer
+      // press the selection is already cleared, making this a harmless no-op.
+      selectionDelete.addEventListener('click', activateDelete); document.body.append(selectionDelete);
     }
     const stroke = drawingsCache[selectedStroke];
     if (!state.selecting || !stroke?.points?.length) { selectionDelete.hidden = true; selectionDeletePosition = ''; return; }
