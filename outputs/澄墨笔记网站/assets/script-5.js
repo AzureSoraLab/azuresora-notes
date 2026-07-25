@@ -137,7 +137,7 @@
     const filters = document.createElement('div'); filters.className = 'annotation-shelf__filters';
     palette.forEach(color => { const button = document.createElement('button'); button.type = 'button'; button.className = 'annotation-shelf__filter'; button.style.background = color; button.title = '\u6309\u989c\u8272\u7b5b\u9009'; button.addEventListener('click', () => { filter = filter === color ? null : color; filters.querySelectorAll('button').forEach(item => item.classList.toggle('is-active', item === button && filter === color)); scheduleRender(); }); filters.append(button); });
     const summary = document.createElement('div'); summary.className = 'annotation-shelf__tag-summary'; shelf.append(bar, list, filters, summary);
-    document.body.append(toggle, shelf);
+    document.body.append(shelf);
     shelfNodes = { shelf, list, filters, summary };
     // Avoid style invalidation when a scroll/resize calculation resolves to the same spot.
     const setPosition = (element, left, top) => {
@@ -155,18 +155,19 @@
       setPosition(shelf, position.left, position.top);
     };
     let observedHeader = null;
-    let lastToggleAnchor = '';
-    const positionToggle = () => {
-      if (!observedHeader?.isConnected) return null;
-      const rect = observedHeader.getBoundingClientRect();
-      const left = Math.max(8, rect.left + 13);
-      const top = rect.top + Math.max(5, (rect.height - 30) / 2);
-      const anchor = `${left}:${top}`;
-      if (anchor !== lastToggleAnchor) {
-        setPosition(toggle, left, top);
-        lastToggleAnchor = anchor;
-      }
-      return { left, bottom: top + 30 };
+    const attachToggleToHeader = header => {
+      const actions = header?.querySelector('.reader-actions');
+      if (!actions) return false;
+      if (toggle.parentElement !== actions) actions.prepend(toggle);
+      // Remove coordinates from a previous floating implementation.
+      toggle.style.left = '';
+      toggle.style.top = '';
+      return true;
+    };
+    const togglePosition = () => {
+      const rect = toggle.getBoundingClientRect();
+      if (!rect.width || !rect.height) return null;
+      return { left: rect.left, bottom: rect.bottom };
     };
     const positionShelf = togglePosition => {
       if (!togglePosition) return;
@@ -211,10 +212,10 @@
       if (positionFrame) return;
       positionFrame = window.requestAnimationFrame(() => {
         positionFrame = 0;
-        const togglePosition = positionToggle();
+        const toggleAnchor = togglePosition();
         if (shelf.classList.contains('is-hidden')) return;
         if (shelfWasDragged) keepShelfInViewport();
-        else positionShelf(togglePosition);
+        else positionShelf(toggleAnchor);
       });
     };
     const headerResizeObserver = window.ResizeObserver ? new ResizeObserver(() => schedulePosition(true)) : null;
@@ -224,8 +225,8 @@
         if (headerResizeObserver && observedHeader) headerResizeObserver.unobserve(observedHeader);
         if (headerResizeObserver && header) headerResizeObserver.observe(header);
         observedHeader = header;
-        lastToggleAnchor = '';
       }
+      attachToggleToHeader(header);
       schedulePosition(true);
     };
     // The data-tools module emits this only when React replaces a major UI region.
