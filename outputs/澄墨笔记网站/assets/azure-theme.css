@@ -1679,5 +1679,5 @@ html .reader-header .data-tools__actions button {
    little more room on its right. */
 .library .brand > span:not(.brand-mark),
 .library .brand small {
-  left: -2px;
+  left: 2px;
 }
