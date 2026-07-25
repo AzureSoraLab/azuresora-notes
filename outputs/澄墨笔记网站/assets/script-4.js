@@ -12,11 +12,11 @@
   let selectionBox = null;
   let observer = null;
   let applyTimer = 0;
-  let longPressTimer = 0;
-  let longPressTarget = null;
-  let longPressPoint = null;
-  let longPressOpened = false;
-  let consumeAnnotationClick = false;
+  const longPressDelay = 500;
+  const longPressMoveTolerance = 8;
+  let annotationPointer = null;
+  let suppressSelectionMenuOnce = false;
+  let suppressAnnotationClickId = '';
   let commentSaveTimer = 0;
   let cachedItems = null;
   let renderFrame = 0;
@@ -358,31 +358,67 @@
     document.body.append(menu);
   }
   document.addEventListener('mouseup', event => {
-    if (longPressOpened) { longPressOpened = false; return; }
+    if (suppressSelectionMenuOnce) { suppressSelectionMenuOnce = false; return; }
     if (event.target.closest('mark.selection-annotation')) return;
     if (menu?.contains(event.target)) return;
     window.setTimeout(showMenu, 0);
   });
   document.addEventListener('mousedown', event => { if (menu && !menu.contains(event.target)) removeMenu(); });
+  const clearAnnotationPointer = () => {
+    if (!annotationPointer) return null;
+    const pointer = annotationPointer;
+    window.clearTimeout(pointer.timer);
+    pointer.target.releasePointerCapture?.(pointer.pointerId);
+    annotationPointer = null;
+    return pointer;
+  };
   document.addEventListener('pointerdown', event => {
-    if (event.button !== 0) return;
+    if (event.button !== 0 || event.isPrimary === false) return;
     const mark = event.target.closest('mark.selection-annotation');
     if (!mark) return;
-    longPressTarget = mark;
-    longPressPoint = { x: event.clientX, y: event.clientY };
-    longPressTimer = window.setTimeout(() => {
-      if (longPressTarget === mark) { longPressOpened = true; consumeAnnotationClick = true; showManageMenu(mark, longPressPoint); }
-      longPressTimer = 0;
-    }, 500);
+    clearAnnotationPointer();
+    const pointer = annotationPointer = {
+      pointerId: event.pointerId,
+      target: mark,
+      x: event.clientX,
+      y: event.clientY,
+      opened: false,
+      timer: 0
+    };
+    mark.setPointerCapture?.(event.pointerId);
+    pointer.timer = window.setTimeout(() => {
+      if (annotationPointer !== pointer) return;
+      pointer.opened = true;
+      suppressAnnotationClickId = mark.dataset.annotationId || '';
+      showManageMenu(mark, { x: pointer.x, y: pointer.y });
+    }, longPressDelay);
   });
-  const cancelLongPress = () => { window.clearTimeout(longPressTimer); longPressTimer = 0; longPressTarget = null; longPressPoint = null; };
-  document.addEventListener('pointerup', cancelLongPress);
-  document.addEventListener('pointercancel', cancelLongPress);
-  document.addEventListener('pointermove', cancelLongPress);
+  document.addEventListener('pointermove', event => {
+    const pointer = annotationPointer;
+    if (!pointer || pointer.pointerId !== event.pointerId || pointer.opened) return;
+    const distanceX = event.clientX - pointer.x;
+    const distanceY = event.clientY - pointer.y;
+    if (distanceX * distanceX + distanceY * distanceY > longPressMoveTolerance * longPressMoveTolerance) clearAnnotationPointer();
+  });
+  document.addEventListener('pointerup', event => {
+    const pointer = annotationPointer;
+    if (!pointer || pointer.pointerId !== event.pointerId) return;
+    if (pointer.opened) {
+      suppressSelectionMenuOnce = true;
+      const annotationId = pointer.target.dataset.annotationId || '';
+      // Click follows pointerup synchronously. Clear the guard afterwards so a
+      // missing synthetic click cannot suppress a later normal activation.
+      window.setTimeout(() => { if (suppressAnnotationClickId === annotationId) suppressAnnotationClickId = ''; }, 0);
+    }
+    clearAnnotationPointer();
+  });
+  document.addEventListener('pointercancel', event => {
+    if (annotationPointer?.pointerId === event.pointerId) clearAnnotationPointer();
+  });
   document.addEventListener('click', event => {
     const mark = event.target.closest('mark.selection-annotation');
     if (!mark) return;
-    if (consumeAnnotationClick) { consumeAnnotationClick = false; return; }
+    if (suppressAnnotationClickId && mark.dataset.annotationId === suppressAnnotationClickId) { suppressAnnotationClickId = ''; return; }
     event.preventDefault(); event.stopPropagation(); showCommentCard(mark);
   });
   document.addEventListener('keydown', event => {
