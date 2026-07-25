@@ -51,7 +51,17 @@
     const id = fiber?.key ?? fiber?.alternate?.key;
     return typeof id === 'string' && ids.has(id) ? id : '';
   };
-  const noteCards = () => [...document.querySelectorAll('.compact-note')];
+  const noteCards = (list = document.querySelector('.note-index-scroll')) => list ? [...list.querySelectorAll(':scope > .compact-note')] : [];
+  const noteListContext = () => {
+    const list = document.querySelector('.note-index-scroll');
+    const cards = noteCards(list);
+    return {
+      list,
+      cards,
+      searchInput: document.querySelector('.note-list .search input'),
+      selectedCard: cards.find(card => card.classList.contains('selected')) || null
+    };
+  };
   const courseButtons = () => [...document.querySelectorAll('.course-button')];
   const cardForId = (id, cards = noteCards()) => cards.find(card => card.dataset.noteId === id) || null;
   const courseContext = (state = readState(), buttons = courseButtons()) => {
@@ -103,13 +113,12 @@
     });
     return resolved;
   };
-  const applyDeleteControls = (state = readState(), cards = noteCards(), buttons = courseButtons(), context = courseContext(state, buttons)) => {
+  const applyDeleteControls = (state = readState(), cards = noteCards(), buttons = courseButtons(), context = courseContext(state, buttons), query = '') => {
     // Most observer callbacks are caused by a small React text update. When
     // every rendered card is already bound, avoid rebuilding note metadata and
     // notifying the other reader enhancements again.
     if (!cards.some(card => !card.dataset.noteId || !card.querySelector(':scope > .compact-note__delete'))) return false;
     const courseId = activeCourseId(state, buttons, context);
-    const query = document.querySelector('.search input')?.value?.toLowerCase() || '';
     const matchingNotes = visibleNotes(state, courseId, query);
     const knownIds = new Set((state.notes || []).map(note => note.id));
     const fallbackIds = fallbackCardIds(cards, matchingNotes);
@@ -226,8 +235,7 @@
     let observedList = null;
     let restoreScheduled = false;
     let sessionRestoreScheduled = false;
-    const watchList = () => {
-      const list = document.querySelector('.note-index-scroll');
+    const watchList = (list = document.querySelector('.note-index-scroll')) => {
       if (!list) return false;
       if (list === observedList) return true;
       listObserver?.disconnect();
@@ -248,11 +256,11 @@
         queued = false;
         const state = readState();
         const buttons = courseButtons();
-        const cards = noteCards();
+        const listContext = noteListContext();
         const context = courseContext(state, buttons);
-        const notesChanged = applyDeleteControls(state, cards, buttons, context);
+        const notesChanged = applyDeleteControls(state, listContext.cards, buttons, context, listContext.searchInput?.value?.toLowerCase() || '');
         const coursesChanged = applyCourseDeleteControls(state, buttons, context);
-        watchList();
+        watchList(listContext.list);
         // Other modules use this event to resolve freshly rendered list nodes.
         // Do not wake them for observer noise when nothing in the list changed.
         if (notesChanged || coursesChanged) document.dispatchEvent(new CustomEvent('chengmo:note-list-ready'));
@@ -269,7 +277,9 @@
               const listOpen = document.querySelector('.app-shell')?.classList.contains('note-list-open') === true;
               if (needsCourse || Boolean(latest.listOpen) !== listOpen) courseButton.click();
               window.setTimeout(() => {
-                applyDeleteControls(); cardForId(note.id)?.click();
+                const listContext = noteListContext();
+                applyDeleteControls(readState(), listContext.cards, courseButtons(), undefined, listContext.searchInput?.value?.toLowerCase() || '');
+                cardForId(note.id, listContext.cards)?.click();
                 window.setTimeout(() => {
                   if (!latest.listOpen && document.querySelector('.app-shell')?.classList.contains('note-list-open')) courseButton.click();
                   document.documentElement.classList.remove('chengmo-restoring-session');
@@ -297,7 +307,11 @@
               const setValue = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set;
               setValue?.call(input, restore.query); input.dispatchEvent(new Event('input', { bubbles: true }));
             }
-            window.setTimeout(() => { applyDeleteControls(); cardForId(restore.nextId)?.click(); }, 100);
+            window.setTimeout(() => {
+              const listContext = noteListContext();
+              applyDeleteControls(readState(), listContext.cards, courseButtons(), undefined, listContext.searchInput?.value?.toLowerCase() || '');
+              cardForId(restore.nextId, listContext.cards)?.click();
+            }, 100);
           }, 120);
         }, 300);
       };
@@ -368,14 +382,16 @@
       const relatedHint = related ? `\n\n\u540c\u65f6\u4f1a\u5220\u9664\uff1a${related}\u3002` : '';
       if (!confirm(`\u786e\u5b9a\u5220\u9664\u300c${noteTitle(deletion.target)}\u300d\uff1f${relatedHint}`)) return;
       if (!confirm('\u8bf7\u518d\u6b21\u786e\u8ba4\uff1a\u5220\u9664\u540e\u65e0\u6cd5\u64a4\u9500\u3002')) return;
-      applyDeleteControls();
-      const visibleIds = [...document.querySelectorAll('.compact-note')].map(card => card.dataset.noteId).filter(id => knownIds.has(id));
-      const selectedId = document.querySelector('.compact-note.selected')?.dataset.noteId || readSession()?.noteId || '';
+      const listContext = noteListContext();
+      const buttons = courseButtons(); const context = courseContext(state, buttons);
+      applyDeleteControls(state, listContext.cards, buttons, context, listContext.searchInput?.value?.toLowerCase() || '');
+      const visibleIds = listContext.cards.map(card => card.dataset.noteId).filter(id => knownIds.has(id));
+      const selectedId = listContext.selectedCard?.dataset.noteId || readSession()?.noteId || '';
       const selectedIndex = visibleIds.indexOf(deletion.target.id);
       const successorId = selectedIndex < 0 ? '' : visibleIds.slice(selectedIndex + 1).concat(visibleIds.slice(0, selectedIndex)).find(id => id !== deletion.target.id) || '';
       const nextId = selectedId === deletion.target.id ? successorId : (notes.some(note => note.id === selectedId && note.id !== deletion.target.id) ? selectedId : '');
-      const courseId = activeCourseId(state) || deletion.target.courseId || '';
-      const query = document.querySelector('.search input')?.value || '';
+      const courseId = activeCourseId(state, buttons, context) || deletion.target.courseId || '';
+      const query = listContext.searchInput?.value || '';
       if (!writeDeletion({ deletion, nextId, courseId })) { alert('\u5220\u9664\u5931\u8d25\uff0c\u8bf7\u68c0\u67e5\u6d4f\u89c8\u5668\u7684\u672c\u5730\u5b58\u50a8\u7a7a\u95f4\u540e\u91cd\u8bd5\u3002'); return; }
       // Reloading lets React load the changed note data cleanly. Preserve the
       // current list and reader target, then restore them exactly once.
