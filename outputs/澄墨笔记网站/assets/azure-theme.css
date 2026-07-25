@@ -285,13 +285,13 @@ body,
 
 /* Make the library groups and their entries easier to scan at a glance. */
 .library .section-title,
-.library .recent-notes__title { font-size: 45px; }
+.library .recent-notes__title { font-size: 15px !important; }
 .note-list .note-list-header p {
-  font-size: 45px;
+  font-size: 15px !important;
   transform: translateY(-6px);
 }
 .library .course-button,
-.library .recent-notes__item { font-size: 35px !important; }
+.library .recent-notes__item { font-size: 14px !important; }
 .library .course-button,
 .library .recent-notes__item { color: #4d6170 !important; }
 .library .storage-note { color: #8b989f !important; }
@@ -1612,4 +1612,59 @@ html .reader-header .data-tools__actions button {
 .annotation-shelf__card {
   padding-left: 9px;
   padding-right: 9px;
+}
+
+/* Keep the library usable when a desktop window becomes narrow. Fixed-size
+   signature and action controls previously crowded the navigation column. */
+.library-content {
+  min-width: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  scrollbar-gutter: stable;
+}
+.library .brand,
+.library .new-note {
+  max-width: 100%;
+}
+.library .brand {
+  width: min(196px, 100%);
+}
+.library .new-note {
+  width: min(196px, 100%);
+}
+.library .section-title {
+  min-width: 0;
+  gap: 8px;
+}
+.library .section-title > span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.library .category-add,
+.library .course-group__delete,
+.library .category-edit {
+  flex: 0 0 auto;
+}
+.library .course-group,
+.library .course-button,
+.library .recent-notes__item {
+  min-width: 0;
+}
+.library .course-button,
+.library .recent-notes__item {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+@media (min-width: 761px) and (max-width: 1080px) {
+  .app-shell,
+  .app-shell.note-list-open {
+    grid-template-columns: clamp(224px, 30vw, 264px) minmax(0, 1fr) !important;
+  }
+  .note-list {
+    left: clamp(224px, 30vw, 264px) !important;
+  }
 }
