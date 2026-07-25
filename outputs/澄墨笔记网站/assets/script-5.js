@@ -5,6 +5,7 @@
   const listen = runtime?.on || ((type, _, listener) => { document.addEventListener(type, listener); return () => document.removeEventListener(type, listener); });
   const key = 'chengmo-text-selection-annotations-v1';
   const palette = ['#f8d84b', '#ff6b6b', '#72b64a', '#3ca8df', '#a687e8', '#d86ee8', '#f39a3e', '#a7aaa5'];
+  const clamp = (value, min, max) => Math.max(min, Math.min(Math.max(min, max), value));
   let filter = null;
   let tagFilter = null;
   let searchFilter = '';
@@ -112,16 +113,48 @@
     const summary = document.createElement('div'); summary.className = 'annotation-shelf__tag-summary'; shelf.append(bar, list, filters, summary);
     document.body.append(toggle, shelf);
     shelfNodes = { shelf, list, filters, summary };
-    const positionToggle = () => { const header = document.querySelector('.reader-header'); if (!header) return; const rect = header.getBoundingClientRect(); toggle.style.left = `${Math.max(8, rect.left + 13)}px`; toggle.style.top = `${rect.top + Math.max(5, (rect.height - 30) / 2)}px`; };
-    const positionShelf = () => { const rect = toggle.getBoundingClientRect(); shelf.style.left = `${Math.max(8, rect.left)}px`; shelf.style.top = `${Math.min(window.innerHeight - 54, rect.bottom + 1)}px`; };
+    // Avoid style invalidation when a scroll/resize calculation resolves to the same spot.
+    const setPosition = (element, left, top) => {
+      if (Math.abs((Number.parseFloat(element.style.left) || 0) - left) > 0.1) element.style.left = `${left}px`;
+      if (Math.abs((Number.parseFloat(element.style.top) || 0) - top) > 0.1) element.style.top = `${top}px`;
+    };
+    const shelfPosition = (left, top, width, height) => ({
+      left: clamp(left, 8, window.innerWidth - width - 8),
+      top: clamp(top, 8, window.innerHeight - height - 8)
+    });
+    const keepShelfInViewport = () => {
+      const rect = shelf.getBoundingClientRect();
+      if (!rect.width || !rect.height) return;
+      const position = shelfPosition(rect.left, rect.top, rect.width, rect.height);
+      setPosition(shelf, position.left, position.top);
+    };
+    const positionToggle = () => { const header = document.querySelector('.reader-header'); if (!header) return; const rect = header.getBoundingClientRect(); setPosition(toggle, Math.max(8, rect.left + 13), rect.top + Math.max(5, (rect.height - 30) / 2)); };
+    const positionShelf = () => { const toggleRect = toggle.getBoundingClientRect(); const shelfRect = shelf.getBoundingClientRect(); const position = shelfPosition(toggleRect.left, toggleRect.bottom + 1, shelfRect.width, shelfRect.height); setPosition(shelf, position.left, position.top); };
     let shelfWasDragged = false;
+    let dragFrame = 0;
+    let pendingDragPosition = null;
     // Moving the drawer is deliberately limited to its six-dot handle.
     dragHandle.addEventListener('pointerdown', event => {
       event.preventDefault();
       const rect = shelf.getBoundingClientRect(); const offsetX = event.clientX - rect.left; const offsetY = event.clientY - rect.top;
       shelfWasDragged = false; dragHandle.setPointerCapture(event.pointerId);
-      const move = moveEvent => { shelfWasDragged = true; shelf.style.left = `${Math.max(8, Math.min(window.innerWidth - rect.width - 8, moveEvent.clientX - offsetX))}px`; shelf.style.top = `${Math.max(8, Math.min(window.innerHeight - rect.height - 8, moveEvent.clientY - offsetY))}px`; };
-      const end = endEvent => { dragHandle.releasePointerCapture?.(endEvent.pointerId); dragHandle.removeEventListener('pointermove', move); dragHandle.removeEventListener('pointerup', end); dragHandle.removeEventListener('pointercancel', end); };
+      const applyPendingDragPosition = () => {
+        dragFrame = 0;
+        if (!pendingDragPosition) return;
+        setPosition(shelf, pendingDragPosition.left, pendingDragPosition.top);
+        pendingDragPosition = null;
+      };
+      const move = moveEvent => {
+        shelfWasDragged = true;
+        pendingDragPosition = shelfPosition(moveEvent.clientX - offsetX, moveEvent.clientY - offsetY, rect.width, rect.height);
+        if (!dragFrame) dragFrame = window.requestAnimationFrame(applyPendingDragPosition);
+      };
+      const end = endEvent => {
+        if (endEvent.type === 'pointerup') applyPendingDragPosition();
+        else if (dragFrame) { window.cancelAnimationFrame(dragFrame); dragFrame = 0; pendingDragPosition = null; }
+        dragHandle.releasePointerCapture?.(endEvent.pointerId);
+        dragHandle.removeEventListener('pointermove', move); dragHandle.removeEventListener('pointerup', end); dragHandle.removeEventListener('pointercancel', end);
+      };
       dragHandle.addEventListener('pointermove', move); dragHandle.addEventListener('pointerup', end); dragHandle.addEventListener('pointercancel', end);
     });
     // Align only after actual layout changes; a permanent animation frame loop
@@ -131,7 +164,13 @@
       // A hidden shelf has no visible geometry to maintain during reader scroll.
       if (!force && shelf.classList.contains('is-hidden')) return;
       if (positionFrame) return;
-      positionFrame = window.requestAnimationFrame(() => { positionFrame = 0; positionToggle(); if (!shelf.classList.contains('is-hidden') && !shelfWasDragged) positionShelf(); });
+      positionFrame = window.requestAnimationFrame(() => {
+        positionFrame = 0;
+        positionToggle();
+        if (shelf.classList.contains('is-hidden')) return;
+        if (shelfWasDragged) keepShelfInViewport();
+        else positionShelf();
+      });
     };
     const headerResizeObserver = window.ResizeObserver ? new ResizeObserver(schedulePosition) : null;
     let observedHeader = null;
