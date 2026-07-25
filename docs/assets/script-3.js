@@ -391,13 +391,21 @@
   };
   const deleteSelectedStroke = () => {
     if (selectedStroke < 0) return;
-    drawingsCache.splice(selectedStroke, 1); selectedStroke = -1; selectionAnchor = null; markDrawingChanged();
-    if (selectionDelete) selectionDelete.hidden = true;
-    // Deletion must be immediate: do not leave the old canvas pixels visible
-    // while a debounced persistence/update cycle is waiting to run.
+    // A delayed save may still point at the pre-delete stroke array. Retire it
+    // before saving an immutable post-delete snapshot, so old ink cannot be
+    // written back after the user has removed it.
     window.clearTimeout(saveTimer); saveTimer = 0;
-    persistRecoverySnapshot();
-    saveDrawing(loadedNoteId, drawingsCache);
+    if (saveIdle) {
+      if (window.cancelIdleCallback) window.cancelIdleCallback(saveIdle); else window.clearTimeout(saveIdle);
+      saveIdle = 0;
+    }
+    pendingDrawingSave = null;
+    drawingsCache = drawingsCache.filter((_, index) => index !== selectedStroke);
+    selectedStroke = -1; selectionAnchor = null; markDrawingChanged();
+    if (selectionDelete) selectionDelete.hidden = true;
+    const snapshot = drawingsCache.map(stroke => ({ ...stroke, points: (stroke.points || []).map(point => [...point]) }));
+    persistRecoverySnapshot(loadedNoteId, snapshot);
+    saveDrawing(loadedNoteId, snapshot);
     lastCanvasGeometry = ''; renderedRevision = -1;
     redraw();
   };
