@@ -1,5 +1,7 @@
 
 (() => {
+  const runtime = window.chengmoRuntime;
+  const enqueue = runtime?.schedule || window.chengmoSchedule || ((_, task) => window.requestAnimationFrame(task));
   const key = 'chengmo-text-selection-annotations-v1';
   const palette = ['#f8d84b', '#ff6b6b', '#72b64a', '#3ca8df', '#a687e8', '#d86ee8', '#f39a3e', '#a7aaa5'];
   let filter = null;
@@ -45,7 +47,8 @@
   const scheduleRender = () => {
     const shelf = shelfNodes?.shelf || document.querySelector('.annotation-shelf');
     if (!shelf || shelf.classList.contains('is-hidden') || renderFrame) return;
-    renderFrame = window.requestAnimationFrame(() => { renderFrame = 0; render(); });
+    renderFrame = 1;
+    enqueue('annotation-shelf-render', () => { renderFrame = 0; render(); });
   };
   const renderTagSummary = () => {
     const summary = shelfNodes?.summary; if (!summary) return;

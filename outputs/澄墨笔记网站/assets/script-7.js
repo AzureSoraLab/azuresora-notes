@@ -3,6 +3,8 @@
   const recentKey = 'chengmo-recent-notes-v1';
   const stateKey = 'chengmo-notes-v1';
   const maxRecent = 6;
+  const runtime = window.chengmoRuntime;
+  const enqueue = runtime?.schedule || window.chengmoSchedule || ((_, task) => window.requestAnimationFrame(task));
   const readRecent = () => { try { const value = JSON.parse(localStorage.getItem(recentKey) || '[]'); return Array.isArray(value) ? value : []; } catch { return []; } };
   const saveRecent = items => localStorage.setItem(recentKey, JSON.stringify(items.slice(0, maxRecent)));
   const noteState = () => { try { const value = JSON.parse(localStorage.getItem(stateKey) || '{}'); return value && typeof value === 'object' ? value : {}; } catch { return {}; } };
@@ -82,10 +84,16 @@
       window.clearTimeout(timeout);
       if (window.chengmoSilentCourseSwitch === note.courseId) window.chengmoSilentCourseSwitch = '';
     };
+    let retries = 0;
     const tryOpen = () => {
       if (complete) return;
       const target = noteButtonForId(note.id, noteState());
-      if (!target) return;
+      if (!target) {
+        // React may replace the list one frame after a cross-category switch.
+        // Retry briefly instead of leaving the recent-note click without a result.
+        if (retries++ < 12) window.requestAnimationFrame(tryOpen);
+        return;
+      }
       target.click();
       window.requestAnimationFrame(() => closeListIfNeeded(courseButton));
       finish();
@@ -133,7 +141,7 @@
     if (syncFrame) return;
     syncFrame = 1;
     const run = () => sync(force);
-    window.chengmoSchedule ? window.chengmoSchedule('recent-notes', run) : window.requestAnimationFrame(run);
+    enqueue('recent-notes', run);
   };
   const start = () => {
     let observedContent = null;
@@ -156,5 +164,5 @@
     window.addEventListener('storage', event => { if (event.key === stateKey || event.key === recentKey) scheduleSync(true); });
     syncAndWatch();
   };
-  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start, { once: true }); else start();
+  (runtime?.whenReady || (task => document.readyState === 'loading' ? document.addEventListener('DOMContentLoaded', task, { once: true }) : task()))(start);
 })();

@@ -1,5 +1,7 @@
 
 (() => {
+  const runtime = window.chengmoRuntime;
+  const enqueue = runtime?.schedule || window.chengmoSchedule || ((_, task) => window.requestAnimationFrame(task));
   let observedSearch = null;
   let observer = null;
   let queued = false;
@@ -7,7 +9,7 @@
     if (queued) return;
     queued = true;
     const run = () => { queued = false; mount(); };
-    window.chengmoSchedule ? window.chengmoSchedule('note-search', run) : requestAnimationFrame(run);
+    enqueue('note-search', run);
   };
   const reset = input => {
     const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set;

@@ -79,7 +79,22 @@
   background: #f0f5f1;
 }
 .zotero-draw-menu__size input { cursor: pointer; }
-.drawing-selection-delete { border-color: #dce4dd; border-radius: 6px; box-shadow: 0 5px 14px rgba(37, 58, 50, .13); }
+.drawing-selection-delete {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border-color: #d9dfdb;
+  border-radius: 50%;
+  background: #fff;
+  color: #b35e54;
+  box-shadow: 0 4px 12px rgba(37, 58, 50, .14);
+}
+.drawing-selection-delete svg { width: 15px; height: 15px; }
+.drawing-selection-delete:hover { border-color: #c78279; background: #fff7f6; color: #94483f; }
+.drawing-selection-delete:focus-visible { outline: 2px solid #7ba895; outline-offset: 2px; }
 
 .selection-annotation-menu { border-color: #d9e1da; border-radius: 9px; box-shadow: 0 9px 24px rgba(37, 58, 50, .16); }
 .selection-annotation-menu__colors { padding: 11px 13px 10px; }

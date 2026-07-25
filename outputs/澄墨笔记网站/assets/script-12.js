@@ -1,5 +1,7 @@
 
 (() => {
+  const runtime = window.chengmoRuntime;
+  const enqueue = runtime?.schedule || window.chengmoSchedule || ((_, task) => window.requestAnimationFrame(task));
   const notesKey = 'chengmo-notes-v1';
   const annotationsKey = 'chengmo-text-selection-annotations-v1';
   const recentKey = 'chengmo-recent-notes-v1';
@@ -24,6 +26,8 @@
     exportButton.addEventListener('click', async () => {
       // IndexedDB may contain newer ink than the legacy boot cache. Prefer it
       // for backups while retaining the cache as an offline fallback.
+      // Complete deferred ink writes so a just-finished stroke is included.
+      await window.chengmoStorage?.flush?.().catch(() => {});
       const indexedDrawings = await window.chengmoStorage?.getAllDrawings?.().catch(() => null);
       const payload = { version: 2, exportedAt: new Date().toISOString(), notes: parse(notesKey), annotations: makeArray(parse(annotationsKey)), drawings: indexedDrawings && Object.keys(indexedDrawings).length ? indexedDrawings : makeRecord(parse(drawingsKey)), drawingPreferences: makeRecord(parse(drawingPreferencesKey)), recent: makeArray(parse(recentKey)) };
       const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json;charset=utf-8' });
@@ -37,7 +41,7 @@
       if (!source) return;
       const reader = new FileReader();
       reader.onerror = () => show('\u65e0\u6cd5\u8bfb\u53d6\u8be5\u5907\u4efd\u6587\u4ef6\u3002', true);
-      reader.onload = () => {
+      reader.onload = async () => {
         let backup;
         try { backup = JSON.parse(String(reader.result)); } catch { show('\u5907\u4efd\u6587\u4ef6\u4e0d\u662f\u6709\u6548\u7684 JSON\u3002', true); return; }
         if (!backup || typeof backup !== 'object' || !backup.notes || !Array.isArray(backup.notes.notes) || !Array.isArray(backup.notes.courses) || !Array.isArray(backup.annotations)) { show('\u5907\u4efd\u6587\u4ef6\u683c\u5f0f\u4e0d\u517c\u5bb9\uff0c\u672a\u5bfc\u5165\u4efb\u4f55\u6570\u636e\u3002', true); return; }
@@ -56,8 +60,34 @@
         const courseCount = mergedNotes.courses.length - makeArray(currentNotes.courses).length;
         const drawingCount = Object.keys(mergedDrawings).length - Object.keys(currentDrawings).length;
         const mergedPreferences = Object.keys(currentPreferences).length ? currentPreferences : makeRecord(backup.drawingPreferences);
-        localStorage.setItem(notesKey, JSON.stringify(mergedNotes)); localStorage.setItem(annotationsKey, JSON.stringify(mergedAnnotations)); localStorage.setItem(recentKey, JSON.stringify(mergedRecent)); localStorage.setItem(drawingsKey, JSON.stringify(mergedDrawings));
-        if (Object.keys(mergedPreferences).length) localStorage.setItem(drawingPreferencesKey, JSON.stringify(mergedPreferences));
+        // Roll local state back if a quota or browser-storage error interrupts
+        // the merge, instead of leaving a partially imported notebook.
+        const keys = [notesKey, annotationsKey, recentKey, drawingsKey, drawingPreferencesKey];
+        const snapshot = new Map(keys.map(key => [key, localStorage.getItem(key)]));
+        const restore = () => snapshot.forEach((value, key) => value === null ? localStorage.removeItem(key) : localStorage.setItem(key, value));
+        const persistedSnapshot = {
+          notes: currentNotes,
+          annotations: currentAnnotations,
+          recent: currentRecent,
+          drawings: currentDrawings,
+          preferences: currentPreferences
+        };
+        try {
+          localStorage.setItem(notesKey, JSON.stringify(mergedNotes)); localStorage.setItem(annotationsKey, JSON.stringify(mergedAnnotations)); localStorage.setItem(recentKey, JSON.stringify(mergedRecent)); localStorage.setItem(drawingsKey, JSON.stringify(mergedDrawings));
+          if (Object.keys(mergedPreferences).length) localStorage.setItem(drawingPreferencesKey, JSON.stringify(mergedPreferences));
+          await window.chengmoStorage?.flush?.();
+        } catch {
+          try {
+            restore();
+            // Local storage mirrors the reader immediately; reset IndexedDB to
+            // the same pre-import snapshot so a later hydration cannot revive
+            // only part of a failed import.
+            await window.chengmoStorage?.replaceSnapshot?.(persistedSnapshot);
+            await window.chengmoStorage?.flush?.();
+          } catch {}
+          show('导入未完成，已恢复导入前的数据。', true);
+          return;
+        }
         const result = `\u5df2\u5bfc\u5165 ${noteCount} \u7bc7\u7b14\u8bb0\u3001${courseCount} \u4e2a\u5206\u7c7b\u3001${annotationCount} \u6761\u6807\u6ce8\u3001${drawingCount} \u7ec4\u7b14\u8ff9\u3002`;
         sessionStorage.setItem(pendingNoticeKey, JSON.stringify({ message: result })); show(result);
         window.setTimeout(() => window.location.reload(), 500);
@@ -79,7 +109,7 @@
       if (frame) return;
       frame = 1;
       const run = () => { frame = 0; mount(); };
-      window.chengmoSchedule ? window.chengmoSchedule('data-tools', run) : window.requestAnimationFrame(run);
+      enqueue('data-tools', run);
     };
     scheduleMount();
     // React can replace the reader header after a note operation.  Watching
@@ -101,6 +131,6 @@
     };
     watchRoot();
   };
-  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start, { once: true }); else start();
+  (runtime?.whenReady || (task => document.readyState === 'loading' ? document.addEventListener('DOMContentLoaded', task, { once: true }) : task()))(start);
   window.addEventListener('load', createTools, { once: true });
 })();

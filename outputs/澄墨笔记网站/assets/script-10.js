@@ -1,10 +1,15 @@
 (() => {
+  const runtime = window.chengmoRuntime;
+  const enqueue = runtime?.schedule || window.chengmoSchedule || ((_, task) => window.requestAnimationFrame(task));
   const stateKey = 'chengmo-notes-v1';
   const recentKey = 'chengmo-recent-notes-v1';
   const annotationKey = 'chengmo-text-selection-annotations-v1';
   const drawingKey = 'chengmo-freehand-annotations-v1';
   const keepListOpenKey = 'chengmo-keep-note-list-open';
   const readingSessionKey = 'chengmo-reading-session-v1';
+  // Kept outside start() because list hydration also runs before its observers
+  // are established (for example during React's initial render).
+  let pendingCreatedNoteId = '';
   const readState = () => {
     const pending = window.chengmoStorage?.peekNotes?.();
     if (pending && typeof pending === 'object') return pending;
@@ -112,7 +117,6 @@
     let observedList = null;
     let restoreScheduled = false;
     let sessionRestoreScheduled = false;
-    let pendingCreatedNoteId = '';
     const watchList = () => {
       const list = document.querySelector('.note-index-scroll');
       if (!list) return false;
@@ -181,7 +185,7 @@
           }, 120);
         }, 300);
       };
-      window.chengmoSchedule ? window.chengmoSchedule('note-delete-controls', run) : requestAnimationFrame(run);
+      enqueue('note-delete-controls', run);
     };
     sync();
     const watchHost = () => {
@@ -240,5 +244,5 @@
       window.location.reload();
     }, true);
   };
-  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start, { once: true }); else start();
+  (runtime?.whenReady || (task => document.readyState === 'loading' ? document.addEventListener('DOMContentLoaded', task, { once: true }) : task()))(start);
 })();

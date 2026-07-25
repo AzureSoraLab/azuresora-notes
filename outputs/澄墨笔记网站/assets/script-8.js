@@ -1,6 +1,8 @@
 
 (() => {
   const stateKey = 'chengmo-notes-v1';
+  const runtime = window.chengmoRuntime;
+  const enqueue = runtime?.schedule || window.chengmoSchedule || ((_, task) => window.requestAnimationFrame(task));
   const state = () => { try { return JSON.parse(localStorage.getItem(stateKey) || '{}'); } catch { return {}; } };
   function selectedTitle() { return document.querySelector('.compact-note.selected strong')?.textContent?.trim() || ''; }
   function syncHeaderAndOrder() {
@@ -20,7 +22,7 @@
       if (frame) return;
       frame = 1;
       const run = () => { frame = 0; syncHeaderAndOrder(); };
-      window.chengmoSchedule ? window.chengmoSchedule('reader-title', run) : window.requestAnimationFrame(run);
+      enqueue('reader-title', run);
     };
     const watchHeader = () => {
       const header = document.querySelector('.reader-header');
@@ -35,7 +37,7 @@
     document.addEventListener('chengmo:note-selected', schedule);
     syncAndWatch();
   };
-  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start, { once: true }); else start();
+  (runtime?.whenReady || (task => document.readyState === 'loading' ? document.addEventListener('DOMContentLoaded', task, { once: true }) : task()))(start);
   document.addEventListener('keydown', event => {
     if (event.key !== 'Enter' || !event.target.matches('.title-input')) return;
     event.preventDefault();

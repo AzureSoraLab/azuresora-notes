@@ -1,6 +1,8 @@
 
 /* Freehand annotations: a small, persistent drawing layer modelled on Zotero's reader controls. */
 (() => {
+  const runtime = window.chengmoRuntime;
+  const enqueue = runtime?.schedule || window.chengmoSchedule || ((_, task) => window.requestAnimationFrame(task));
   const storageKey = 'chengmo-freehand-annotations-v1';
   const preferencesKey = 'chengmo-freehand-drawing-preferences-v1';
   const palette = [
@@ -10,7 +12,7 @@
   const defaultState = { color: palette[0][0], size: 2, eraserSize: 14, eraser: false, drawing: false, selecting: false };
   let state = { ...defaultState };
   const chunkHeight = 900;
-  let canvas = null, context = null, activeStroke = null, selectedStroke = -1, dragStart = null, eraserPointerActive = false, saveTimer = 0, saveIdle = 0, pendingDrawingSave = null, redrawFrame = 0, eraseFrame = 0, pendingErasePoints = [], resizeObserver = null, scrollRoot = null, selectionDelete = null, observedDrawContent = null, colorButton = null;
+  let canvas = null, context = null, activeStroke = null, selectedStroke = -1, dragStart = null, selectionAnchor = null, eraserPointerActive = false, saveTimer = 0, saveIdle = 0, pendingDrawingSave = null, redrawFrame = 0, eraseFrame = 0, pendingErasePoints = [], resizeObserver = null, scrollRoot = null, selectionDelete = null, observedDrawContent = null, colorButton = null;
   let chunkCanvases = new Map();
   let menu = null;
   let drawingStore = null;
@@ -25,7 +27,26 @@
   const savePreferences = () => localStorage.setItem(preferencesKey, JSON.stringify({ color: state.color, size: state.size, eraserSize: state.eraserSize }));
   loadPreferences();
   const reader = () => document.querySelector('.reader-body');
-  const noteId = () => document.querySelector('.compact-note.selected')?.dataset.noteId || document.querySelector('.compact-note.selected')?.getAttribute('data-note-id') || 'default';
+  const noteIds = () => {
+    try { return new Set((window.chengmoStorage?.peekNotes?.()?.notes || JSON.parse(localStorage.getItem('chengmo-notes-v1') || '{}').notes || []).map(note => note?.id).filter(Boolean)); } catch { return new Set(); }
+  };
+  const reactKey = (node, ids) => {
+    const fiberKey = Object.keys(node || {}).find(key => key.startsWith('__reactFiber$'));
+    const fiber = fiberKey && node[fiberKey];
+    const id = fiber?.key ?? fiber?.alternate?.key;
+    return typeof id === 'string' && ids.has(id) ? id : '';
+  };
+  // Ink is always owned by a real note ID. Prefer React's keyed note item over
+  // a DOM attribute, which can briefly belong to the prior card during a list
+  // reconciliation. The old shared `default` bucket is never read again.
+  const noteId = () => {
+    const card = document.querySelector('.compact-note.selected');
+    const ids = noteIds();
+    const keyed = reactKey(card, ids);
+    if (keyed) return keyed;
+    const attribute = card?.dataset.noteId || card?.getAttribute('data-note-id') || '';
+    return ids.has(attribute) ? attribute : '';
+  };
   // Zotero treats the complete reading page (including its side whitespace) as
   // drawable, rather than restricting ink to the text column alone.
   const drawingRoot = () => reader() || null;
@@ -38,11 +59,12 @@
     return Math.max(root.clientHeight, contentHeight);
   };
   const saveDrawing = (id, strokes) => {
+    if (!id) return;
     const data = read(); data[id] = strokes;
-    window.chengmoStorage?.saveDrawing(id, strokes);
-    // The full cache is only a compatibility snapshot. Let the asynchronous
-    // store carry day-to-day drawing writes, then update the cache while idle.
-    if (window.chengmoStorage) return;
+    window.chengmoStorage?.saveDrawing?.(id, strokes);
+    // Retain a synchronous recovery snapshot as well. Refresh and tab close do
+    // not wait for IndexedDB, while localStorage can preserve this completed
+    // stroke immediately for the next reader boot.
     write(data);
   };
   const flushDrawingSave = () => {
@@ -65,14 +87,18 @@
     }, 480);
   };
   let drawingsCache = [];
-  let loadedNoteId = '', renderedNoteId = '', lastCanvasGeometry = '', lastVisibleRange = '', drawingRevision = 0, renderedRevision = -1;
+  let loadedNoteId = '', renderedNoteId = '', lastCanvasGeometry = '', lastVisibleRange = '', drawingRevision = 0, renderedRevision = -1, renderedSelectedStroke = -1;
+  // React replaces the reader shortly after a note card is clicked. Keep the
+  // outgoing ink hidden during that hand-off so it can never be painted on the
+  // incoming note, even for two notes with the same visible title.
+  let pendingNoteSwitchId = '', noteSwitchFrame = 0;
   let geometryRoot = null, geometryDirty = true, cachedGeometry = { width: 0, height: 0 };
   let chunkStrokeIndex = null, chunkIndexSignature = '', segmentHitIndex = null, segmentHitSignature = '';
   let strokeBounds = new WeakMap();
   const clearRenderedChunks = () => {
     chunkCanvases.forEach(chunk => chunk.node.remove());
     chunkCanvases.clear();
-    lastCanvasGeometry = ''; lastVisibleRange = ''; renderedNoteId = ''; renderedRevision = -1;
+    lastCanvasGeometry = ''; lastVisibleRange = ''; renderedNoteId = ''; renderedRevision = -1; renderedSelectedStroke = -1;
   };
   const discardOverflowChunks = pageHeight => {
     chunkCanvases.forEach((chunk, index) => {
@@ -151,7 +177,21 @@
   const loadDrawing = () => {
     // Only materialize the selected note's strokes. Other notes remain compact
     // JSON data until the user actually opens them.
-    loadedNoteId = noteId(); drawingsCache = read()[loadedNoteId] || []; selectedStroke = -1;
+    const nextNoteId = noteId();
+    if (!nextNoteId) return;
+    loadedNoteId = nextNoteId;
+    const cachedDrawings = read();
+    // Legacy builds could write unowned strokes under `default`. Keep the
+    // record untouched for safety, but never attach it to any real note.
+    if (Object.prototype.hasOwnProperty.call(cachedDrawings, 'default')) delete cachedDrawings.default;
+    // The synchronous cache is written before deferred IndexedDB work. If it
+    // already has this note, it may be newer after a quick close/reload.
+    const cachedStrokes = Array.isArray(cachedDrawings[loadedNoteId]) ? cachedDrawings[loadedNoteId] : [];
+    // An empty compatibility entry is not authoritative: it is commonly
+    // created before the IndexedDB drawing record has hydrated after refresh.
+    // Only non-empty local ink may be newer than an asynchronous IDB read.
+    const hasCachedDrawing = cachedStrokes.length > 0;
+    drawingsCache = cachedStrokes; selectedStroke = -1;
     clearRenderedChunks(); invalidateGeometry(); markDrawingChanged();
     // IndexedDB is the canonical drawing store. The old localStorage record
     // supplies an immediate first paint, then a note-scoped read upgrades it
@@ -161,19 +201,19 @@
     window.chengmoStorage?.getDrawing(requestedId).then(strokes => {
       // An asynchronous old-record read must never overwrite ink created
       // immediately after switching into this note.
-      if (!Array.isArray(strokes) || requestedId !== loadedNoteId || activeStroke || drawingRevision !== requestedRevision) return;
+      if (!Array.isArray(strokes) || hasCachedDrawing || requestedId !== loadedNoteId || activeStroke || drawingRevision !== requestedRevision) return;
       drawingsCache = strokes; selectedStroke = -1;
       const data = read(); data[requestedId] = strokes;
       markDrawingChanged(); scheduleRedraw();
     }).catch(() => {});
   };
   const scheduleRedraw = () => {
-    if (!canvas) return;
+    if (!canvas || pendingNoteSwitchId) return;
     if (redrawFrame) return;
     redrawFrame = requestAnimationFrame(() => { redrawFrame = 0; redraw(); });
   };
   const redraw = () => {
-    if (!canvas) return;
+    if (!canvas || pendingNoteSwitchId) return;
     const root = canvas.parentElement;
     const ratio = window.devicePixelRatio || 1;
     // Scrolling does not change a note's dimensions. Cache the expensive
@@ -187,7 +227,7 @@
     const visibleRange = `${first}:${last}`;
     // Most scroll events stay within the same buffered chunk range. In that
     // case every canvas is already correct, so skip indexing and repainting.
-    if (!activeStroke && renderedNoteId === loadedNoteId && lastCanvasGeometry === geometry && renderedRevision === drawingRevision && lastVisibleRange === visibleRange) {
+    if (!activeStroke && renderedNoteId === loadedNoteId && lastCanvasGeometry === geometry && renderedRevision === drawingRevision && renderedSelectedStroke === selectedStroke && lastVisibleRange === visibleRange) {
       if (state.selecting || !selectionDelete?.hidden) updateSelectionDelete(canvas.getBoundingClientRect());
       return;
     }
@@ -216,7 +256,7 @@
     });
     context = null;
     if (state.selecting || !selectionDelete?.hidden) updateSelectionDelete(canvas.getBoundingClientRect());
-    lastCanvasGeometry = geometry; lastVisibleRange = visibleRange; renderedNoteId = loadedNoteId; renderedRevision = drawingRevision;
+    lastCanvasGeometry = geometry; lastVisibleRange = visibleRange; renderedNoteId = loadedNoteId; renderedRevision = drawingRevision; renderedSelectedStroke = selectedStroke;
   };
   const paintStroke = (stroke, rect) => {
     if (!stroke.points?.length || !context) return;
@@ -245,18 +285,18 @@
   };
   const updateSelectionDelete = rect => {
     if (!selectionDelete) {
-      selectionDelete = document.createElement('button'); selectionDelete.type = 'button'; selectionDelete.className = 'drawing-selection-delete'; selectionDelete.textContent = '删除笔迹'; selectionDelete.hidden = true;
+      selectionDelete = document.createElement('button'); selectionDelete.type = 'button'; selectionDelete.className = 'drawing-selection-delete'; selectionDelete.title = '删除所选笔迹'; selectionDelete.setAttribute('aria-label', '删除所选笔迹'); selectionDelete.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 7h14M10 11v6m4-6v6M9 7l.8-2h4.4l.8 2M7.5 7l.7 12h7.6l.7-12" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>';
       selectionDelete.addEventListener('click', deleteSelectedStroke); document.body.append(selectionDelete);
     }
     const stroke = drawingsCache[selectedStroke];
     if (!state.selecting || !stroke?.points?.length) { selectionDelete.hidden = true; return; }
-    const point = stroke.points[stroke.points.length - 1];
+    const point = selectionAnchor || stroke.points[stroke.points.length - 1];
     const x = rect.left + point[0] * rect.width, y = rect.top + point[1] * rect.height;
     const readerRect = canvas.parentElement?.getBoundingClientRect();
     const visible = x >= Math.max(0, readerRect?.left || 0) && x <= Math.min(window.innerWidth, readerRect?.right || window.innerWidth) && y >= Math.max(0, readerRect?.top || 0) && y <= Math.min(window.innerHeight, readerRect?.bottom || window.innerHeight);
     if (!visible) { selectionDelete.hidden = true; return; }
-    selectionDelete.style.left = `${Math.max(8, Math.min(window.innerWidth - 80, x + 8))}px`;
-    selectionDelete.style.top = `${Math.max(8, y - 30)}px`;
+    selectionDelete.style.left = `${Math.max(8, Math.min(window.innerWidth - 36, x + 10))}px`;
+    selectionDelete.style.top = `${Math.max(8, y - 34)}px`;
     selectionDelete.hidden = false;
   };
   const paintSegment = (stroke, previous, current, rect) => {
@@ -319,7 +359,7 @@
   };
   const deleteSelectedStroke = () => {
     if (selectedStroke < 0) return;
-    drawingsCache.splice(selectedStroke, 1); selectedStroke = -1; markDrawingChanged();
+    drawingsCache.splice(selectedStroke, 1); selectedStroke = -1; selectionAnchor = null; markDrawingChanged();
     if (selectionDelete) selectionDelete.hidden = true;
     // Deletion must be immediate: do not leave the old canvas pixels visible
     // while a debounced persistence/update cycle is waiting to run.
@@ -364,9 +404,13 @@
     if ((!state.drawing && !state.selecting && !state.eraser) || event.button !== 0) return;
     event.preventDefault(); event.stopPropagation();
     if (state.selecting) {
-      selectedStroke = nearestStroke(pointFor(event));
+      const point = pointFor(event);
+      selectedStroke = nearestStroke(point);
+      selectionAnchor = selectedStroke >= 0 ? point : null;
       if (selectedStroke < 0 && selectionDelete) selectionDelete.hidden = true;
-      if (selectedStroke >= 0) { dragStart = { point: pointFor(event), strokes: drawingsCache[selectedStroke].points.map(p => [...p]) }; canvas.classList.add('is-dragging'); canvas.setPointerCapture?.(event.pointerId); }
+      // Selecting is a click. Only turn it into a move after a small movement
+      // threshold, so a normal click cannot accidentally shift handwriting.
+      if (selectedStroke >= 0) { dragStart = { point, strokes: drawingsCache[selectedStroke].points.map(p => [...p]), moved: false }; canvas.setPointerCapture?.(event.pointerId); }
       scheduleRedraw(); return;
     }
     if (state.eraser) {
@@ -382,7 +426,10 @@
   const move = event => {
     if (state.selecting && dragStart && selectedStroke >= 0) {
       event.preventDefault(); const point = pointFor(event); const dx = point[0] - dragStart.point[0], dy = point[1] - dragStart.point[1];
-      drawingsCache[selectedStroke].points = dragStart.strokes.map(p => [Math.max(0, Math.min(1, p[0] + dx)), Math.max(0, Math.min(1, p[1] + dy))]); markDrawingChanged(); scheduleRedraw(); return;
+      const movedPixels = Math.hypot(dx * canvas.clientWidth, dy * canvas.clientHeight);
+      if (!dragStart.moved && movedPixels < 4) return;
+      dragStart.moved = true; canvas.classList.add('is-dragging');
+      drawingsCache[selectedStroke].points = dragStart.strokes.map(p => [Math.max(0, Math.min(1, p[0] + dx)), Math.max(0, Math.min(1, p[1] + dy))]); selectionAnchor = point; markDrawingChanged(); scheduleRedraw(); return;
     }
     if (state.eraser) {
       if (!eraserPointerActive) return;
@@ -401,7 +448,7 @@
     if (!paintLiveSegments(activeStroke, points)) scheduleRedraw();
   };
   const end = event => {
-    if (state.selecting && dragStart) { event.preventDefault(); dragStart = null; canvas.classList.remove('is-dragging'); queueSave(); return; }
+    if (state.selecting && dragStart) { event.preventDefault(); const moved = dragStart.moved; dragStart = null; canvas.classList.remove('is-dragging'); if (moved) queueSave(); return; }
     if (state.eraser) {
       event.preventDefault();
       if (eraseFrame) { cancelAnimationFrame(eraseFrame); eraseFrame = 0; const points = pendingErasePoints; pendingErasePoints = []; const changed = erasePoints(points, state.eraserSize / 2); if (changed) { queueSave(); scheduleRedraw(); } }
@@ -416,7 +463,21 @@
   };
   const syncCanvas = () => {
     const root = drawingRoot(); if (!root) return;
-    if (loadedNoteId !== noteId()) {
+    const activeNoteId = noteId();
+    // Do not accept the old selected card while React is still committing the
+    // click. The switch coordinator below releases this as soon as the chosen
+    // card becomes the real selected note.
+    if (pendingNoteSwitchId && activeNoteId !== pendingNoteSwitchId) return;
+    if (pendingNoteSwitchId === activeNoteId) pendingNoteSwitchId = '';
+    if (!activeNoteId) {
+      if (saveTimer || saveIdle || pendingDrawingSave) flushDrawingSave();
+      if (loadedNoteId || drawingsCache.length) {
+        loadedNoteId = ''; drawingsCache = []; selectedStroke = -1;
+        clearRenderedChunks(); invalidateGeometry();
+      }
+      return;
+    }
+    if (loadedNoteId !== activeNoteId) {
       // Persist the outgoing note before replacing its in-memory stroke cache.
       if (saveTimer || saveIdle || pendingDrawingSave) flushDrawingSave();
       loadDrawing();
@@ -465,8 +526,8 @@
         canvas.classList.toggle('is-erasing', state.eraser);
       }
     };
-    drawButton.addEventListener('click', () => { state.drawing = !state.drawing; state.selecting = false; selectedStroke = -1; dragStart = null; if (selectionDelete) selectionDelete.hidden = true; closeMenu(); syncCanvas(); update(); });
-    selectButton.addEventListener('click', () => { state.selecting = !state.selecting; state.drawing = false; selectedStroke = -1; dragStart = null; if (selectionDelete) selectionDelete.hidden = true; closeMenu(); syncCanvas(); update(); });
+    drawButton.addEventListener('click', () => { if (!noteId()) return; state.drawing = !state.drawing; state.selecting = false; selectedStroke = -1; selectionAnchor = null; dragStart = null; if (selectionDelete) selectionDelete.hidden = true; closeMenu(); syncCanvas(); update(); });
+    selectButton.addEventListener('click', () => { if (!noteId()) return; state.selecting = !state.selecting; state.drawing = false; selectedStroke = -1; selectionAnchor = null; dragStart = null; if (selectionDelete) selectionDelete.hidden = true; closeMenu(); syncCanvas(); update(); });
     colorButton.addEventListener('click', event => { event.stopPropagation(); buildMenu(colorButton, update); });
     actions.prepend(control); update();
   };
@@ -488,10 +549,63 @@
   });
   const scheduleMountAndSync = () => {
     const run = () => { mount(); syncCanvas(); };
-    window.chengmoSchedule ? window.chengmoSchedule('drawing-ui', run) : requestAnimationFrame(run);
+    enqueue('drawing-ui', run);
   };
   document.addEventListener('chengmo:ui-mounted', scheduleMountAndSync);
+  // IDs are attached by the note-list enhancer after React commits the list.
+  document.addEventListener('chengmo:note-list-ready', scheduleMountAndSync);
+  const clearOutgoingDrawing = () => {
+    if (saveTimer || saveIdle || pendingDrawingSave) flushDrawingSave();
+    activeStroke = null; eraserPointerActive = false; pendingErasePoints = [];
+    if (redrawFrame) { cancelAnimationFrame(redrawFrame); redrawFrame = 0; }
+    loadedNoteId = ''; drawingsCache = []; selectedStroke = -1;
+    clearRenderedChunks(); invalidateGeometry(); markDrawingChanged();
+  };
+  const beginNoteSwitch = card => {
+    const ids = noteIds();
+    const nextId = reactKey(card, ids) || card?.dataset.noteId || '';
+    if (!nextId || !ids.has(nextId) || nextId === loadedNoteId) return;
+    pendingNoteSwitchId = nextId;
+    clearOutgoingDrawing();
+    if (noteSwitchFrame) cancelAnimationFrame(noteSwitchFrame);
+    let attempts = 0;
+    const settle = () => {
+      noteSwitchFrame = 0;
+      const selectedId = noteId();
+      if (selectedId === pendingNoteSwitchId) {
+        pendingNoteSwitchId = '';
+        scheduleMountAndSync();
+        return;
+      }
+      attempts += 1;
+      if (attempts < 12) noteSwitchFrame = requestAnimationFrame(settle);
+      else {
+        // A failed reconciliation must leave the layer blank rather than
+        // resurrecting an outgoing note's ink.
+        pendingNoteSwitchId = '';
+        scheduleMountAndSync();
+      }
+    };
+    noteSwitchFrame = requestAnimationFrame(settle);
+  };
+  document.addEventListener('click', event => {
+    const card = event.target.closest?.('.compact-note');
+    if (card && !event.target.closest('.compact-note__delete')) beginNoteSwitch(card);
+  }, true);
+  document.addEventListener('chengmo:note-selected', () => {
+    // Some navigation paths invoke a note card programmatically. Recheck on
+    // the next frame after React has committed the reader.
+    requestAnimationFrame(scheduleMountAndSync);
+  });
   window.addEventListener('storage', event => { if (event.key === storageKey) { drawingStore = null; if (!activeStroke) loadDrawing(); scheduleRedraw(); } });
-  window.addEventListener('resize', () => { closeMenu(); window.chengmoSchedule ? window.chengmoSchedule('drawing-redraw', scheduleRedraw) : scheduleRedraw(); });
+  window.addEventListener('resize', () => { closeMenu(); enqueue('drawing-redraw', scheduleRedraw); });
+  const persistBeforeLeave = () => {
+    flushDrawingSave();
+    if (loadedNoteId) saveDrawing(loadedNoteId, drawingsCache);
+    // flushBootCache happens synchronously before this promise waits on IDB.
+    window.chengmoStorage?.flush?.().catch(() => {});
+  };
+  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') persistBeforeLeave(); }, { capture: true });
+  window.addEventListener('pagehide', persistBeforeLeave, { capture: true });
   window.addEventListener('load', () => { window.setTimeout(scheduleMountAndSync, 80); });
 })();

@@ -1,5 +1,7 @@
 
 (() => {
+  const runtime = window.chengmoRuntime;
+  const enqueue = runtime?.schedule || window.chengmoSchedule || ((_, task) => window.requestAnimationFrame(task));
   const storageKey = 'chengmo-text-selection-annotations-v1';
   const colors = ['#f8d84b', '#ff6b6b', '#72b64a', '#3ca8df', '#a687e8', '#d86ee8', '#f39a3e', '#a7aaa5'];
   let selected = null;
@@ -121,7 +123,8 @@
   }
   function scheduleAnnotationRender() {
     if (renderFrame) return;
-    renderFrame = requestAnimationFrame(() => { renderFrame = 0; renderAnnotations(); });
+    renderFrame = 1;
+    enqueue('text-annotation-render', () => { renderFrame = 0; renderAnnotations(); });
   }
   function renderAnnotations() {
     const root = readerContent();
@@ -157,6 +160,9 @@
   }
   function watch(root) {
     if (!window.MutationObserver) return;
+    // A new render pass can leave the same reader node in place. Always retire
+    // its old watcher before attaching the replacement to avoid duplicate work.
+    observer?.disconnect();
     observer = new MutationObserver(() => {
       window.clearTimeout(applyTimer);
       applyTimer = window.setTimeout(scheduleAnnotationRender, 80);

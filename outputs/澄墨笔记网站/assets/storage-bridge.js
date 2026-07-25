@@ -91,12 +91,24 @@
     return { color: colorFromNumber(stroke?.color), size: Number(stroke?.size) || 2, eraser: Boolean(stroke?.eraser), points };
   };
   let dbPromise = null;
+  let databaseWritePromise = Promise.resolve();
+  let databaseWriteRevision = 0;
   let noteWritePromise = Promise.resolve();
+  let pendingNotesState = null;
+  let notesRetryTimer = 0;
   let drawingTimer = 0;
   let drawingIdle = 0;
   const drawingQueue = new Map();
+  let drawingFlushPromise = null;
+  let drawingWritePromise = Promise.resolve();
+  let drawingRetryTimer = 0;
   let metaTimer = 0;
+  let metaRetryTimer = 0;
   const metaQueue = new Map();
+  let metaWritePromise = Promise.resolve();
+  let annotationWritePromise = Promise.resolve();
+  let pendingAnnotations = null;
+  let annotationRetryTimer = 0;
   const database = () => dbPromise || (dbPromise = open().catch(error => {
     console.warn('澄墨 IndexedDB 不可用，将继续使用浏览器本地缓存。', error);
     return null;
@@ -105,49 +117,102 @@
     if ('requestIdleCallback' in window) return window.requestIdleCallback(callback, { timeout: 1600 });
     return window.setTimeout(callback, 420);
   };
+  const enqueueDatabaseWrite = operation => {
+    databaseWriteRevision += 1;
+    databaseWritePromise = databaseWritePromise.catch(() => {}).then(operation);
+    return databaseWritePromise;
+  };
+  const scheduleNotesRetry = () => {
+    if (notesRetryTimer || !pendingNotesState) return;
+    notesRetryTimer = window.setTimeout(() => {
+      notesRetryTimer = 0;
+      // Rebuild this store so deletions are retried too.
+      saveNotes(pendingNotesState, true);
+    }, 2400);
+  };
+  const scheduleAnnotationsRetry = () => {
+    if (annotationRetryTimer || !pendingAnnotations) return;
+    annotationRetryTimer = window.setTimeout(() => {
+      annotationRetryTimer = 0;
+      saveAnnotations(pendingAnnotations, true);
+    }, 2400);
+  };
+  const scheduleMetaRetry = () => {
+    if (metaRetryTimer || !metaQueue.size) return;
+    metaRetryTimer = window.setTimeout(() => {
+      metaRetryTimer = 0;
+      flushMeta().catch(() => scheduleMetaRetry());
+    }, 2400);
+  };
   const flushMeta = async () => {
     metaTimer = 0;
     const entries = [...metaQueue.entries()];
-    metaQueue.clear();
-    const db = await database();
-    if (!db || !entries.length) return;
-    const transaction = db.transaction('meta', 'readwrite');
-    const store = transaction.objectStore('meta');
-    entries.forEach(([key, value]) => store.put(value, key));
-    await complete(transaction);
+    if (!entries.length) return;
+    metaWritePromise = enqueueDatabaseWrite(async () => {
+      const db = await database();
+      if (!db) throw new Error('IndexedDB is unavailable');
+      const transaction = db.transaction('meta', 'readwrite');
+      const store = transaction.objectStore('meta');
+      entries.forEach(([key, value]) => store.put(value, key));
+      await complete(transaction);
+      // Do not discard values queued while this transaction was in flight.
+      entries.forEach(([key, value]) => { if (metaQueue.get(key) === value) metaQueue.delete(key); });
+    });
+    try { await metaWritePromise; } catch (error) { scheduleMetaRetry(); throw error; }
+    if (metaQueue.size) window.setTimeout(() => flushMeta().catch(() => scheduleMetaRetry()), 0);
+  };
+  const scheduleDrawingRetry = () => {
+    if (drawingRetryTimer || !drawingQueue.size) return;
+    drawingRetryTimer = window.setTimeout(() => {
+      drawingRetryTimer = 0;
+      flushDrawings().catch(() => {});
+    }, 2400);
   };
   const flushDrawings = async () => {
+    if (drawingFlushPromise) return drawingFlushPromise;
     drawingIdle = 0;
     const entries = [...drawingQueue.entries()];
-    drawingQueue.clear();
-    const db = await database();
-    if (!db || !entries.length) return;
-    const transaction = db.transaction('drawings', 'readwrite');
-    const store = transaction.objectStore('drawings');
-    entries.forEach(([id, strokes]) => store.put({ id, strokes: strokes.map(packStroke), updatedAt: Date.now() }));
-    await complete(transaction);
+    if (!entries.length) return;
+    drawingFlushPromise = drawingWritePromise = enqueueDatabaseWrite(async () => {
+      const db = await database();
+      if (!db) throw new Error('IndexedDB is unavailable');
+      const transaction = db.transaction('drawings', 'readwrite');
+      const store = transaction.objectStore('drawings');
+      entries.forEach(([id, strokes]) => store.put({ id, strokes: strokes.map(packStroke), updatedAt: Date.now() }));
+      await complete(transaction);
+      // A newer save may have replaced this queue entry while the write ran.
+      entries.forEach(([id, strokes]) => { if (drawingQueue.get(id) === strokes) drawingQueue.delete(id); });
+    }).catch(error => {
+      scheduleDrawingRetry();
+      throw error;
+    }).finally(() => {
+      drawingFlushPromise = null;
+      // Flush anything added while the previous transaction was pending after
+      // releasing the single-flight guard.
+      if (drawingQueue.size) window.setTimeout(() => flushDrawings().catch(() => scheduleDrawingRetry()), 0);
+    });
+    return drawingFlushPromise;
   };
-  const saveNotes = state => {
+  const saveNotes = (state, replace = false) => {
     if (!state || typeof state !== 'object' || !Array.isArray(state.notes)) return;
-    const currentIds = new Set(state.notes.map(note => note?.id).filter(Boolean));
+    pendingNotesState = state;
     const { notes: ignoredNotes, ...stateMeta } = state;
     // Keep an explicit manifest. Older records can remain in IndexedDB after
     // an interrupted write, but they must never be restored as live notes.
     const meta = { ...stateMeta, noteIds: state.notes.map(note => note?.id).filter(Boolean) };
-    const previous = saveNotes.previous || new Map();
-    const removed = [...previous.keys()].filter(id => !currentIds.has(id));
-    const changed = state.notes.filter(note => note?.id && previous.get(note.id) !== note);
-    saveNotes.previous = new Map(state.notes.filter(note => note?.id).map(note => [note.id, note]));
-    noteWritePromise = noteWritePromise.catch(() => {}).then(async () => {
+    noteWritePromise = enqueueDatabaseWrite(async () => {
       const db = await database();
       if (!db) return;
       const transaction = db.transaction(['meta', 'notes'], 'readwrite');
       transaction.objectStore('meta').put(meta, 'notes-state');
       const notes = transaction.objectStore('notes');
-      changed.forEach(note => notes.put({ ...note }));
-      removed.forEach(id => notes.delete(id));
+      // A full replacement makes consecutive create/delete operations safe even
+      // when both changes are queued before either IndexedDB transaction runs.
+      notes.clear();
+      state.notes.forEach(note => note?.id && notes.put({ ...note }));
       await complete(transaction);
-    }).catch(() => {});
+      saveNotes.previous = new Map(state.notes.filter(note => note?.id).map(note => [note.id, note]));
+    }).catch(() => { scheduleNotesRetry(); });
     return noteWritePromise;
   };
   const saveNotesFromObject = state => {
@@ -155,20 +220,23 @@
     queueNoteBootCache(state);
     document.dispatchEvent(new CustomEvent('chengmo:notes-state-updated'));
   };
-  const saveAnnotations = items => {
+  const saveAnnotations = (items, replace = false) => {
     if (!Array.isArray(items)) return;
-    const previous = saveAnnotations.previous || new Set();
+    pendingAnnotations = items;
     const next = new Set(items.map(item => item?.id).filter(Boolean));
-    const removed = [...previous].filter(id => !next.has(id));
-    saveAnnotations.previous = next;
-    database().then(db => {
+    annotationWritePromise = enqueueDatabaseWrite(async () => {
+      const db = await database();
       if (!db) return;
       const transaction = db.transaction('textAnnotations', 'readwrite');
       const store = transaction.objectStore('textAnnotations');
+      // Match the synchronous annotation list exactly to avoid orphan records
+      // from rapid add/remove operations.
+      store.clear();
       items.forEach(item => item?.id && store.put({ ...item }));
-      removed.forEach(id => store.delete(id));
-      return complete(transaction);
-    }).catch(() => {});
+      await complete(transaction);
+      saveAnnotations.previous = next;
+    }).catch(() => { scheduleAnnotationsRetry(); });
+    return annotationWritePromise;
   };
   const flushBootCache = () => {
     bootCacheTimer = 0;
@@ -203,7 +271,7 @@
   const queueMeta = (key, value) => {
     metaQueue.set(key, value);
     if (metaTimer) return;
-    metaTimer = window.setTimeout(() => { flushMeta().catch(() => {}); }, 480);
+    metaTimer = window.setTimeout(() => { flushMeta().catch(() => scheduleMetaRetry()); }, 480);
   };
   const queueDrawing = (id, strokes) => {
     if (!id) return;
@@ -215,6 +283,7 @@
       drawingIdle = waitForIdle(() => { flushDrawings().catch(() => {}); });
     }, 680);
   };
+  let drawingRevision = 0;
   const saveDrawing = (id, strokes) => {
     if (!id) return;
     const current = drawingStateCache || readJson(KEYS.drawings, {});
@@ -223,20 +292,41 @@
     // Without this assignment, every completed stroke reparses the complete
     // drawing JSON while the deferred cache write is still pending.
     drawingStateCache = current;
+    drawingRevision += 1;
     queueDrawingsCache(current);
     queueDrawing(id, strokes);
   };
   const removeDrawing = id => {
     if (!id) return;
     drawingQueue.delete(id);
-    database().then(db => {
+    drawingRevision += 1;
+    // Serialize deletes after an in-flight put so an old delayed write cannot
+    // recreate ink for a note that has already been deleted.
+    drawingWritePromise = enqueueDatabaseWrite(async () => {
+      const db = await database();
       if (!db) return;
       const transaction = db.transaction('drawings', 'readwrite');
       transaction.objectStore('drawings').delete(id);
-      return complete(transaction);
-    }).catch(() => {});
+      await complete(transaction);
+    });
+    return drawingWritePromise;
   };
-  const flush = () => {
+  const flushDrawingsUntilStable = async () => {
+    while (true) {
+      const revision = drawingRevision;
+      await flushDrawings();
+      await drawingWritePromise;
+      if (revision === drawingRevision && !drawingQueue.size && !drawingFlushPromise) return;
+    }
+  };
+  const flushDatabaseUntilStable = async () => {
+    while (true) {
+      const revision = databaseWriteRevision;
+      await databaseWritePromise;
+      if (revision === databaseWriteRevision) return;
+    }
+  };
+  const flush = async () => {
     if (drawingTimer) { window.clearTimeout(drawingTimer); drawingTimer = 0; }
     if (drawingIdle) {
       if ('cancelIdleCallback' in window) window.cancelIdleCallback(drawingIdle); else window.clearTimeout(drawingIdle);
@@ -245,7 +335,8 @@
     if (metaTimer) { window.clearTimeout(metaTimer); metaTimer = 0; }
     if (bootCacheTimer) { window.clearTimeout(bootCacheTimer); bootCacheTimer = 0; }
     flushBootCache();
-    return Promise.all([noteWritePromise, flushMeta().catch(() => {}), flushDrawings().catch(() => {})]);
+    await Promise.all([flushMeta(), flushDrawingsUntilStable()]);
+    await flushDatabaseUntilStable();
   };
   const migrate = async () => {
     if (local.getItem(migrationKey) === '1') return;
@@ -315,6 +406,46 @@
     const records = await requestValue(transaction.objectStore('drawings').getAll());
     return Object.fromEntries(records.map(record => [record.id, (record.strokes || []).map(unpackStroke)]));
   };
+  const replaceSnapshot = async snapshot => {
+    if (!snapshot || typeof snapshot !== 'object') return;
+    return enqueueDatabaseWrite(async () => {
+      window.clearTimeout(drawingTimer); drawingTimer = 0;
+      if (drawingIdle) {
+        if ('cancelIdleCallback' in window) window.cancelIdleCallback(drawingIdle); else window.clearTimeout(drawingIdle);
+        drawingIdle = 0;
+      }
+      window.clearTimeout(metaTimer); metaTimer = 0;
+      drawingQueue.clear(); metaQueue.clear();
+      const db = await database();
+      if (!db) return;
+      const notesState = snapshot.notes && typeof snapshot.notes === 'object' ? snapshot.notes : {};
+      const notes = Array.isArray(notesState.notes) ? notesState.notes : [];
+      const annotations = Array.isArray(snapshot.annotations) ? snapshot.annotations : [];
+      const drawings = snapshot.drawings && typeof snapshot.drawings === 'object' ? snapshot.drawings : {};
+      const transaction = db.transaction(['meta', 'notes', 'drawings', 'textAnnotations'], 'readwrite');
+      const meta = transaction.objectStore('meta');
+      const noteStore = transaction.objectStore('notes');
+      const drawingStore = transaction.objectStore('drawings');
+      const annotationStore = transaction.objectStore('textAnnotations');
+      const { notes: ignoredNotes, ...stateMeta } = notesState;
+      meta.put({ ...stateMeta, noteIds: notes.map(note => note?.id).filter(Boolean) }, 'notes-state');
+      if (snapshot.recent) meta.put(snapshot.recent, KEYS.recent);
+      if (snapshot.preferences) meta.put(snapshot.preferences, KEYS.preferences);
+      noteStore.clear(); drawingStore.clear(); annotationStore.clear();
+      notes.forEach(note => note?.id && noteStore.put({ ...note }));
+      annotations.forEach(item => item?.id && annotationStore.put({ ...item }));
+      Object.entries(drawings).forEach(([id, strokes]) => {
+        if (Array.isArray(strokes)) drawingStore.put({ id, strokes: strokes.map(packStroke), updatedAt: Date.now() });
+      });
+      await complete(transaction);
+      saveNotes.previous = new Map(notes.filter(note => note?.id).map(note => [note.id, note]));
+      saveAnnotations.previous = new Set(annotations.map(item => item?.id).filter(Boolean));
+      pendingNotesState = notesState;
+      pendingAnnotations = annotations;
+      drawingStateCache = drawings;
+      drawingRevision += 1;
+    });
+  };
   const mirrorStorageWrite = () => {
     storagePrototype.getItem = function patchedGetItem(key) {
       if (this === local && bootCache.has(key)) return bootCache.get(key);
@@ -359,9 +490,12 @@
     };
   };
   mirrorStorageWrite();
-  window.addEventListener('pagehide', flush, { capture: true });
+  // IndexedDB is asynchronous, so begin persistence when the page becomes
+  // hidden instead of waiting until the final pagehide event.
+  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') flush().catch(() => {}); }, { capture: true });
+  window.addEventListener('pagehide', () => { flush().catch(() => {}); }, { capture: true });
   const peekNotes = () => noteStateCache || latestNotesState || readJson(KEYS.notes, {});
-  window.chengmoStorage = { database, saveNotes: saveNotesFromObject, queueNoteBootCache, peekNotes, saveDrawing, queueDrawing, removeDrawing, getDrawing, getAllDrawings, flush, unpackStroke, packStroke, version: 2 };
+  window.chengmoStorage = { database, saveNotes: saveNotesFromObject, queueNoteBootCache, peekNotes, saveDrawing, queueDrawing, removeDrawing, getDrawing, getAllDrawings, replaceSnapshot, flush, unpackStroke, packStroke, version: 2 };
   document.documentElement.dataset.chengmoPersistence = 'loading';
   window.chengmoStorageReady = database()
     .then(migrate)
