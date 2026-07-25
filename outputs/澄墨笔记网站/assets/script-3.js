@@ -102,7 +102,7 @@
   // outgoing ink hidden during that hand-off so it can never be painted on the
   // incoming note, even for two notes with the same visible title.
   let pendingNoteSwitchId = '', noteSwitchFrame = 0;
-  let geometryRoot = null, geometryDirty = true, cachedGeometry = { width: 0, height: 0 };
+  let geometryRoot = null, geometryDirty = true, cachedGeometry = { width: 0, height: 0 }, observedGeometrySignature = '';
   let chunkStrokeIndex = null, chunkIndexSignature = '', segmentHitIndex = null, segmentHitSignature = '';
   let strokeBounds = new WeakMap();
   const clearRenderedChunks = () => {
@@ -118,7 +118,19 @@
     });
   };
   const markDrawingChanged = () => { drawingRevision += 1; strokeBounds = new WeakMap(); chunkStrokeIndex = null; chunkIndexSignature = ''; segmentHitIndex = null; segmentHitSignature = ''; };
-  const invalidateGeometry = () => { geometryDirty = true; chunkStrokeIndex = null; chunkIndexSignature = ''; segmentHitIndex = null; segmentHitSignature = ''; };
+  const invalidateGeometry = () => { geometryDirty = true; observedGeometrySignature = ''; chunkStrokeIndex = null; chunkIndexSignature = ''; segmentHitIndex = null; segmentHitSignature = ''; };
+  const refreshGeometryIfNeeded = () => {
+    const root = drawingRoot();
+    if (!root) return;
+    const content = observedDrawContent;
+    // ResizeObserver can fire several times for one React commit. Only discard
+    // the page/chunk cache when the drawable rectangle really changed.
+    const signature = `${root.clientWidth}:${root.clientHeight}:${content?.offsetTop || 0}:${content?.offsetHeight || 0}:${content?.scrollHeight || 0}`;
+    if (signature === observedGeometrySignature) return;
+    observedGeometrySignature = signature;
+    geometryDirty = true; chunkStrokeIndex = null; chunkIndexSignature = ''; segmentHitIndex = null; segmentHitSignature = '';
+    scheduleRedraw();
+  };
   const boundsFor = (stroke, cache = true) => {
     if (cache && strokeBounds.has(stroke)) return strokeBounds.get(stroke);
     const points = stroke?.points || [];
@@ -512,7 +524,7 @@
       if (scrollRoot && scrollRoot !== root) scrollRoot.removeEventListener('scroll', scheduleRedraw);
       if (scrollRoot !== root) { root.addEventListener('scroll', scheduleRedraw, { passive: true }); scrollRoot = root; }
       resizeObserver?.disconnect(); observedDrawContent = null;
-      resizeObserver = new ResizeObserver(() => { invalidateGeometry(); scheduleRedraw(); }); resizeObserver.observe(root);
+      resizeObserver = new ResizeObserver(refreshGeometryIfNeeded); resizeObserver.observe(root);
     }
     const content = [...root.children].find(node => !node.classList.contains('drawing-layer')) || null;
     if (content !== observedDrawContent) {
@@ -520,6 +532,7 @@
       observedDrawContent = content;
       if (content) resizeObserver?.observe(content);
       invalidateGeometry();
+      refreshGeometryIfNeeded();
     }
     canvas.classList.toggle('is-drawing', state.drawing); canvas.classList.toggle('is-selecting', state.selecting); canvas.classList.toggle('is-erasing', state.eraser); canvas.classList.toggle('is-ink-hidden', !state.inkVisible); scheduleRedraw();
   };
@@ -552,7 +565,7 @@
     control.innerHTML = `<button type="button" class="zotero-draw-control__button" title="绘图" aria-label="绘图">${icon}</button><button type="button" class="zotero-draw-control__select" title="选择笔迹" aria-label="选择笔迹">${selectIcon}</button><button type="button" class="zotero-draw-control__visibility" title="隐藏笔迹" aria-label="隐藏笔迹" aria-pressed="true">${visibilityIcon}</button><button type="button" class="zotero-draw-control__color" title="选择绘图颜色" aria-label="选择绘图颜色" aria-expanded="false"><span class="zotero-draw-control__swatch"></span><span class="zotero-draw-control__chevron"></span></button>`;
     const drawButton = control.querySelector('.zotero-draw-control__button'); const selectButton = control.querySelector('.zotero-draw-control__select'); const visibilityButton = control.querySelector('.zotero-draw-control__visibility'); colorButton = control.querySelector('.zotero-draw-control__color'); const swatch = control.querySelector('.zotero-draw-control__swatch');
     const update = () => {
-      swatch.style.background = state.color; control.classList.toggle('is-active', state.drawing); selectButton.classList.toggle('is-active', state.selecting);
+      swatch.style.background = state.color; control.classList.toggle('is-active', state.drawing); drawButton.classList.toggle('is-active', state.drawing); drawButton.setAttribute('aria-pressed', String(state.drawing)); selectButton.classList.toggle('is-active', state.selecting);
       visibilityButton.classList.toggle('is-hidden', !state.inkVisible);
       visibilityButton.title = state.inkVisible ? '隐藏笔迹' : '显示笔迹';
       visibilityButton.setAttribute('aria-label', visibilityButton.title);

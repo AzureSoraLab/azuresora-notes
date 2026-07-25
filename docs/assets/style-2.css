@@ -1,7 +1,7 @@
 
 /* Text-selection annotations, styled after the Zotero reader toolbar. */
 .reader-body > .drawing-canvas { position: absolute; z-index: 18; inset: 0 auto auto 0; display: block; width: var(--draw-page-width, 100%) !important; height: var(--draw-page-height, 100%) !important; max-width: none !important; pointer-events: none; touch-action: none; }
-.reader-body .drawing-layer { position: absolute; z-index: 18; inset: 0 auto auto 0; width: var(--draw-page-width, 100%); height: var(--draw-page-height, 100%); max-width: none; overflow: hidden; pointer-events: none; touch-action: none; }
+.reader-body .drawing-layer { position: absolute; z-index: 18; inset: 0 auto auto 0; width: var(--draw-page-width, 100%); height: var(--draw-page-height, 100%); max-width: none !important; overflow: hidden; pointer-events: none; touch-action: none; }
 .drawing-layer .drawing-canvas { position: absolute; left: 0; display: block; width: 100% !important; height: var(--draw-chunk-height) !important; max-width: none !important; pointer-events: none; }
 .drawing-layer.is-ink-hidden { pointer-events: none !important; }
 .drawing-layer.is-ink-hidden .drawing-canvas { visibility: hidden; }

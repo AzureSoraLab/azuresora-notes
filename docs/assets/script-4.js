@@ -5,6 +5,7 @@
   const listen = runtime?.on || ((type, _, listener) => { document.addEventListener(type, listener); return () => document.removeEventListener(type, listener); });
   const storageKey = 'chengmo-text-selection-annotations-v1';
   const colors = ['#f8d84b', '#ff6b6b', '#72b64a', '#3ca8df', '#a687e8', '#d86ee8', '#f39a3e', '#a7aaa5'];
+  const displayColor = color => color || colors[0];
   let selected = null;
   let kind = 'highlight';
   let menu = null;
@@ -114,7 +115,7 @@
       if (before) fragment.append(before);
       const mark = document.createElement('mark');
       mark.className = `selection-annotation selection-annotation--${item.kind}`;
-      mark.style.setProperty('--selection-annotation-color', item.color);
+      mark.style.setProperty('--selection-annotation-color', displayColor(item.color));
       mark.dataset.annotationId = item.id;
       mark.textContent = middle;
       fragment.append(mark);
@@ -210,7 +211,7 @@
     selectionBox = document.createElement('div'); selectionBox.className = 'selection-annotation-selection-box';
     document.body.append(selectionBox);
     menu = document.createElement('div'); menu.className = 'selection-annotation-menu selection-annotation-menu--card';
-    menu.dataset.annotationId = id; menu.style.setProperty('--selection-annotation-color', item.color);
+    menu.dataset.annotationId = id; menu.style.setProperty('--selection-annotation-color', displayColor(item.color));
     const header = document.createElement('div'); header.className = 'selection-annotation-card__header';
     const icon = document.createElement('b'); icon.textContent = 'A'; const page = document.createElement('span'); page.textContent = '标注详情'; const close = document.createElement('button'); close.textContent = '×'; close.title = '关闭'; close.addEventListener('click', removeMenu); header.append(icon, page, close);
     const saveComment = () => { window.clearTimeout(commentSaveTimer); commentSaveTimer = 0; write(read().map(annotation => annotation.id === id ? { ...annotation, comment: item.comment || '' } : annotation), { type: 'update', id, changes: { comment: item.comment || '' } }); };
@@ -263,7 +264,7 @@
     menu.append(title);
     colors.forEach((color, index) => {
       const button = document.createElement('button');
-      button.className = `selection-annotation-menu__item ${item.color === color ? 'is-current' : ''}`;
+      button.className = `selection-annotation-menu__item ${displayColor(item.color) === color ? 'is-current' : ''}`;
       const swatch = document.createElement('i');
       swatch.style.backgroundColor = color;
       button.append(swatch, ['黄色', '红色', '绿色', '蓝色', '紫色', '洋红', '橙色', '灰色'][index]);
