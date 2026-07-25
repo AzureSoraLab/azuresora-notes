@@ -846,10 +846,9 @@ body,
   letter-spacing: .12em;
 }
 
-/* Highlights should mark a passage without turning it into a coloured block. */
+/* Use the exact selected swatch so text marks and their palette agree. */
 mark.selection-annotation--highlight {
-  /* Retain the original clear marker tint instead of muting it with white. */
-  background: color-mix(in srgb, var(--selection-annotation-color) 55%, transparent) !important;
+  background: var(--selection-annotation-color) !important;
   border-radius: 2px;
   box-shadow: none;
   box-decoration-break: clone;
