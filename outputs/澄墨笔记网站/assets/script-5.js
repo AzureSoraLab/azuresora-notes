@@ -154,8 +154,27 @@
       const position = shelfPosition(rect.left, rect.top, rect.width, rect.height);
       setPosition(shelf, position.left, position.top);
     };
-    const positionToggle = () => { const header = document.querySelector('.reader-header'); if (!header) return; const rect = header.getBoundingClientRect(); setPosition(toggle, Math.max(8, rect.left + 13), rect.top + Math.max(5, (rect.height - 30) / 2)); };
-    const positionShelf = () => { const toggleRect = toggle.getBoundingClientRect(); const shelfRect = shelf.getBoundingClientRect(); const position = shelfPosition(toggleRect.left, toggleRect.bottom + 1, shelfRect.width, shelfRect.height); setPosition(shelf, position.left, position.top); };
+    let observedHeader = null;
+    let lastToggleAnchor = '';
+    const positionToggle = () => {
+      if (!observedHeader?.isConnected) return null;
+      const rect = observedHeader.getBoundingClientRect();
+      const left = Math.max(8, rect.left + 13);
+      const top = rect.top + Math.max(5, (rect.height - 30) / 2);
+      const anchor = `${left}:${top}`;
+      if (anchor !== lastToggleAnchor) {
+        setPosition(toggle, left, top);
+        lastToggleAnchor = anchor;
+      }
+      return { left, bottom: top + 30 };
+    };
+    const positionShelf = togglePosition => {
+      if (!togglePosition) return;
+      const shelfRect = shelf.getBoundingClientRect();
+      if (!shelfRect.width || !shelfRect.height) return;
+      const position = shelfPosition(togglePosition.left, togglePosition.bottom + 1, shelfRect.width, shelfRect.height);
+      setPosition(shelf, position.left, position.top);
+    };
     let shelfWasDragged = false;
     let dragFrame = 0;
     let pendingDragPosition = null;
@@ -192,20 +211,20 @@
       if (positionFrame) return;
       positionFrame = window.requestAnimationFrame(() => {
         positionFrame = 0;
-        positionToggle();
+        const togglePosition = positionToggle();
         if (shelf.classList.contains('is-hidden')) return;
         if (shelfWasDragged) keepShelfInViewport();
-        else positionShelf();
+        else positionShelf(togglePosition);
       });
     };
-    const headerResizeObserver = window.ResizeObserver ? new ResizeObserver(schedulePosition) : null;
-    let observedHeader = null;
+    const headerResizeObserver = window.ResizeObserver ? new ResizeObserver(() => schedulePosition(true)) : null;
     const watchHeader = () => {
       const header = document.querySelector('.reader-header');
       if (header !== observedHeader) {
         if (headerResizeObserver && observedHeader) headerResizeObserver.unobserve(observedHeader);
         if (headerResizeObserver && header) headerResizeObserver.observe(header);
         observedHeader = header;
+        lastToggleAnchor = '';
       }
       schedulePosition(true);
     };
@@ -213,7 +232,7 @@
     // Rebinding the header is enough; observing the entire root caused needless work.
     listen('chengmo:ui-mounted', 'annotation-shelf-position', () => { outlineCache = { root: null, items: [] }; outlineDirty = true; watchHeader(); });
     watchHeader();
-    toggle.addEventListener('click', () => { const hidden = shelf.classList.toggle('is-hidden'); toggle.classList.toggle('is-open', !hidden); toggle.title = hidden ? '\u663e\u793a\u6807\u6ce8' : '\u9690\u85cf\u6807\u6ce8'; if (!hidden) { positionToggle(); positionShelf(); render(); } });
+    toggle.addEventListener('click', () => { const hidden = shelf.classList.toggle('is-hidden'); toggle.classList.toggle('is-open', !hidden); toggle.title = hidden ? '\u663e\u793a\u6807\u6ce8' : '\u9690\u85cf\u6807\u6ce8'; if (!hidden) { schedulePosition(true); render(); } });
     window.addEventListener('resize', () => schedulePosition(true), { passive: true });
     document.addEventListener('scroll', () => schedulePosition(false), { capture: true, passive: true });
   }
