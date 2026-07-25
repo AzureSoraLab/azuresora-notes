@@ -1,0 +1,84 @@
+
+/* Text-selection annotations, styled after the Zotero reader toolbar. */
+.reader-body > .drawing-canvas { position: absolute; z-index: 18; inset: 0 auto auto 0; display: block; width: var(--draw-page-width, 100%) !important; height: var(--draw-page-height, 100%) !important; max-width: none !important; pointer-events: none; touch-action: none; }
+.reader-body .drawing-layer { position: absolute; z-index: 18; inset: 0 auto auto 0; width: var(--draw-page-width, 100%); height: var(--draw-page-height, 100%); max-width: none; overflow: hidden; pointer-events: none; touch-action: none; }
+.drawing-layer .drawing-canvas { position: absolute; left: 0; display: block; width: 100% !important; height: var(--draw-chunk-height) !important; max-width: none !important; pointer-events: none; }
+.drawing-layer.is-ink-hidden { pointer-events: none !important; }
+.drawing-layer.is-ink-hidden .drawing-canvas { visibility: hidden; }
+.drawing-layer.is-drawing, .drawing-layer.is-selecting { pointer-events: auto; }
+.drawing-canvas.is-drawing, .drawing-layer.is-drawing { pointer-events: auto; cursor: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='19' height='19' viewBox='0 0 19 19'%3E%3Cpath d='M9.5 1v17M1 9.5h17' stroke='%23fff' stroke-width='2.8'/%3E%3Cpath d='M9.5 1v17M1 9.5h17' stroke='%23000' stroke-width='1'/%3E%3C/svg%3E") 9 9, crosshair; }
+.drawing-canvas.is-drawing.is-erasing, .drawing-layer.is-drawing.is-erasing { cursor: var(--draw-eraser-cursor, crosshair); }
+/* The old ink toolbar is replaced with one compact, functional Zotero-style control. */
+.annotation-toolbar { display: none !important; }
+/* This bundled reader's legacy “标注” button has no usable action. Drawing and text
+   annotations each have their own working entry, so keep this obsolete control hidden. */
+.reader-actions .annotate { display: none !important; }
+.zotero-draw-control { position: relative; display: inline-flex; align-items: center; height: 30px; margin-right: 4px; border-right: 1px solid #e1e5e1; padding-right: 7px; font-family: Arial, "Microsoft YaHei", sans-serif; }
+.zotero-draw-control__button { width: 31px; height: 30px; padding: 0; border: 0; border-radius: 6px; background: transparent; color: #61706a; cursor: pointer; }
+.zotero-draw-control__button:hover, .zotero-draw-control.is-active .zotero-draw-control__button { background: #e6ece8; color: #365f53; }
+.zotero-draw-control__button svg { width: 19px; height: 19px; vertical-align: middle; }
+.zotero-draw-control__select { width: 28px; height: 30px; margin-left: 2px; padding: 0; border: 0; border-radius: 6px; background: transparent; color: #687570; cursor: pointer; }
+.zotero-draw-control__select:hover, .zotero-draw-control__select.is-active { background: #e6ece8; color: #365f53; }
+.zotero-draw-control__select svg { width: 17px; height: 17px; vertical-align: middle; }
+.zotero-draw-control__visibility { width: 28px; height: 30px; margin-left: 1px; padding: 0; border: 0; border-radius: 6px; background: transparent; color: #687570; cursor: pointer; }
+.zotero-draw-control__visibility:hover { background: #e6ece8; color: #365f53; }
+.zotero-draw-control__visibility.is-hidden { color: #a1aaa5; }
+.zotero-draw-control__visibility svg { width: 18px; height: 18px; vertical-align: middle; }
+.drawing-canvas.is-selecting { pointer-events: auto; cursor: default; }
+.drawing-canvas.is-selecting.is-dragging { cursor: grabbing; }
+.drawing-selection-delete { position: fixed; z-index: 10036; height: 26px; padding: 0 8px; border: 1px solid #d6ded9; border-radius: 5px; background: #fffefa; box-shadow: 0 3px 10px rgba(37,58,50,.14); color: #5c6862; font: 12px/24px Arial, "Microsoft YaHei", sans-serif; cursor: pointer; }
+.drawing-selection-delete:hover { border-color: #c9a7a0; background: #faf3f1; color: #9b5147; }
+.drawing-selection-delete[hidden] { display: none; }
+.zotero-draw-control__color { display: inline-flex; align-items: center; gap: 4px; height: 28px; margin-left: 5px; padding: 0 4px 0 5px; border: 0; border-radius: 5px; background: transparent; color: #69736f; cursor: pointer; }
+.zotero-draw-control__color:hover, .zotero-draw-control__color[aria-expanded="true"] { background: #eef1ef; }
+.zotero-draw-control__swatch { width: 17px; height: 17px; border-radius: 3px; box-shadow: inset 0 0 0 1px rgba(0,0,0,.08); }
+.zotero-draw-control__chevron { width: 7px; height: 7px; border-right: 1.5px solid currentColor; border-bottom: 1.5px solid currentColor; transform: rotate(45deg) translateY(-2px); }
+.zotero-draw-menu { position: fixed; z-index: 10035; width: 236px; padding: 7px 0 8px; border: 1px solid #d7ded9; border-radius: 8px; background: #fffefa; box-shadow: 0 7px 20px rgba(37,58,50,.18); color: #34433e; font: 13px/1.25 Arial, "Microsoft YaHei", sans-serif; }
+.zotero-draw-menu[hidden] { display: none; }
+.zotero-draw-menu__color { display: flex; align-items: center; width: 100%; min-height: 35px; box-sizing: border-box; padding: 0 16px; border: 0; background: transparent; color: inherit; text-align: left; cursor: pointer; }
+.zotero-draw-menu__color:hover, .zotero-draw-menu__color.is-selected { background: #eef2ee; }
+.zotero-draw-menu__color b { width: 8px; margin-right: 8px; opacity: 0; font-size: 14px; }
+.zotero-draw-menu__color.is-selected b { opacity: 1; }
+.zotero-draw-menu__color i { width: 17px; height: 17px; margin-right: 10px; border-radius: 3px; box-shadow: inset 0 0 0 1px rgba(0,0,0,.08); }
+.zotero-draw-menu__divider { height: 1px; margin: 7px 0; background: #e5e9e5; }
+.zotero-draw-menu__eraser { display: flex; align-items: center; gap: 10px; width: 100%; min-height: 35px; box-sizing: border-box; padding: 0 17px; border: 0; background: transparent; color: #3e4c47; text-align: left; cursor: pointer; }
+.zotero-draw-menu__eraser:hover, .zotero-draw-menu__eraser.is-active { background: #eef2ee; color: #315f52; }
+.zotero-draw-menu__eraser svg { width: 19px; height: 19px; }
+.zotero-draw-menu__size { display: flex; align-items: center; gap: 9px; padding: 8px 17px 0; border-top: 1px solid #e5e9e5; }
+.zotero-draw-menu__size input { width: 103px; accent-color: #5d8d7c; }
+.zotero-draw-menu__value { min-width: 27px; text-align: right; color: #52615b; }
+.selection-annotation-menu { position: fixed; z-index: 10000; width: 238px; overflow: hidden; border: 1px solid #d7d7d3; border-radius: 8px; background: #fff; box-shadow: 0 5px 18px rgba(27, 33, 30, .24); transform: translateX(-50%); user-select: none; }
+.selection-annotation-menu__colors { display: grid; grid-template-columns: repeat(8, 1fr); gap: 10px; padding: 10px 12px 9px; }
+.selection-annotation-menu__color { width: 18px; height: 18px; border: 0; border-radius: 3px; box-shadow: inset 0 0 0 1px rgba(0,0,0,.08); cursor: pointer; }
+.selection-annotation-menu__color:hover, .selection-annotation-menu__color:focus-visible { outline: 2px solid #57635e; outline-offset: 2px; }
+.selection-annotation-menu__actions { display: grid; grid-template-columns: 1fr 1fr; border-top: 1px solid #e5e4e0; background: #fafaf8; }
+.selection-annotation-menu__action { height: 31px; border: 0; background: transparent; color: #6b6f6b; font-family: Georgia, "Songti SC", serif; font-size: 20px; line-height: 1; cursor: pointer; }
+.selection-annotation-menu__action + .selection-annotation-menu__action { border-left: 1px solid #e5e4e0; }
+.selection-annotation-menu__action.is-active { background: #f0f1ed; color: #39433f; }
+.selection-annotation-menu__action--underline { text-decoration: underline 2px currentColor; text-underline-offset: 3px; }
+.selection-annotation-menu--manage { width: 220px; transform: none; }
+.selection-annotation-menu__title, .selection-annotation-menu__item { display: block; width: 100%; padding: 8px 24px; border: 0; border-bottom: 1px solid #e7e6e2; background: #fff; color: #282d2a; text-align: left; font: 13px/1.2 "PingFang SC", "Microsoft YaHei", sans-serif; }
+.selection-annotation-menu__title { color: #8a8d89; }
+.selection-annotation-menu__item { position: relative; cursor: pointer; }
+.selection-annotation-menu__item:hover { background: #f5f5f1; }
+.selection-annotation-menu__item i { display: inline-block; width: 16px; height: 16px; margin-right: 8px; border-radius: 3px; vertical-align: -3px; }
+.selection-annotation-menu__item.is-current:before { position: absolute; left: 8px; content: '✓'; }
+.selection-annotation-menu__item--danger { border-top: 1px solid #e7e6e2; border-bottom: 0; color: #4e5350; }
+mark.selection-annotation { padding: 0; color: inherit; }
+mark.selection-annotation--highlight { background: color-mix(in srgb, var(--selection-annotation-color) 55%, transparent); box-decoration-break: clone; -webkit-box-decoration-break: clone; }
+mark.selection-annotation--underline { background: transparent; text-decoration: underline 3px var(--selection-annotation-color); text-decoration-skip-ink: none; text-underline-offset: 3px; }
+.selection-annotation-menu--card { width: 254px; transform: none; border: 1px solid #d9e1db; border-radius: 8px; background: #fffefa; box-shadow: 0 8px 22px rgba(37, 58, 50, .16); }
+.selection-annotation-card__header { display: flex; align-items: center; gap: 6px; height: 32px; box-sizing: border-box; padding: 0 10px; border-bottom: 1px solid #e4e9e4; color: #43584f; font: 13px/1.2 "Microsoft YaHei", Arial, sans-serif; }
+.selection-annotation-card__header b { color: var(--selection-annotation-color); font-family: Georgia, serif; font-size: 17px; line-height: 14px; }
+.selection-annotation-card__header button { width: 20px; height: 20px; margin-left: auto; border: 0; border-radius: 4px; background: transparent; color: #7a8780; font-size: 17px; cursor: pointer; }
+.selection-annotation-card__header button:hover { background: #f0e7e5; color: #98544c; }
+.selection-annotation-card__comment { display: block; width: 100%; min-height: 70px; box-sizing: border-box; resize: vertical; border: 0; outline: 0; padding: 10px; background: #fffefa; color: #506259; font: 13px/1.55 "Microsoft YaHei", Arial, sans-serif; }
+.selection-annotation-card__comment:focus, .selection-annotation-card__comment:focus-visible { outline: 0 !important; background: #fffefa; }
+.selection-annotation-card__comment::placeholder { color: #98a39d; }
+.selection-annotation-card__tags { display: flex; gap: 5px; flex-wrap: wrap; padding: 7px 10px; border-top: 1px solid #edf0ec; background: #fbfcf9; }
+.selection-annotation-card__tags:empty { display: none; }
+.selection-annotation-card__tag-chip { border: 0; border-radius: 999px; padding: 3px 7px; background: #edf3ee; color: #557367; font-size: 11px; cursor: pointer; }
+.selection-annotation-card__tag-chip:hover { background: #e0ece3; }
+.selection-annotation-card__tag { width: 100%; box-sizing: border-box; border: 0; outline: 0; padding: 8px 10px; background: #fbfcf9; color: #66786f; font: 12px/1.3 "Microsoft YaHei", Arial, sans-serif; }
+.selection-annotation-card__tag:focus, .selection-annotation-card__tag:focus-visible { outline: 0 !important; background: #fbfcf9; color: #3f7465; }
+.selection-annotation-selection-box { position: fixed; z-index: 9999; border: 2px dashed #6f9df5; pointer-events: none; }

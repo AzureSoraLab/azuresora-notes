@@ -1,0 +1,11 @@
+
+/* Small, local feedback keeps routine actions understandable without dialogs. */
+.chengmo-toast { position: fixed; z-index: 10060; left: 50%; bottom: 22px; max-width: min(360px, calc(100vw - 32px)); padding: 9px 13px; border: 1px solid #d8e5dc; border-radius: 8px; background: #f9fcf9; box-shadow: 0 7px 22px rgba(40, 63, 52, .13); color: #466056; font: 13px/1.45 "Microsoft YaHei", Arial, sans-serif; opacity: 0; pointer-events: none; transform: translate(-50%, 8px); transition: opacity .18s ease, transform .18s ease; }
+.chengmo-toast.is-visible { opacity: 1; transform: translate(-50%, 0); }
+.search { position: relative; }
+.search__clear { display: none; position: absolute; z-index: 2; top: 50%; right: 7px; width: 23px; height: 23px; padding: 0; border: 0; border-radius: 6px; background: transparent; color: #819088; font: 18px/21px Arial, sans-serif; cursor: pointer; transform: translateY(-50%); }
+.search.has-query .search__clear { display: block; }
+.search__clear:hover, .search__clear:focus-visible { outline: 0; background: #edf3ee; color: #3d6a5b; }
+.search-results-tip { margin: -2px 15px 8px; color: #89948f; font-size: 11px; line-height: 1.4; }
+.search-results-tip button { margin-left: 5px; padding: 0; border: 0; background: transparent; color: #3e7161; cursor: pointer; font: inherit; }
+.search-results-tip button:hover, .search-results-tip button:focus-visible { outline: 0; color: #254f43; text-decoration: underline; }

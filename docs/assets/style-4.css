@@ -1,0 +1,8 @@
+
+.recent-notes { margin: 20px 0 0; padding-top: 15px; border-top: 1px solid #e5e8e5; }
+.recent-notes__title { margin: 0 0 8px; color: #6d7775; font-size: 12px; }
+.recent-notes__item { display: block; width: 100%; overflow: hidden; padding: 7px 8px; border: 0; border-radius: 5px; background: transparent; color: #34423e; text-align: left; text-overflow: ellipsis; white-space: nowrap; font: 13px Arial, "Microsoft YaHei", sans-serif; cursor: pointer; }
+.recent-notes__item:hover { background: #edf2ed; }
+.recent-notes__empty { margin: 2px 8px 0; color: #98a29d; font-size: 12px; line-height: 1.5; }
+.recent-notes__item::before { content: '·'; margin-right: 7px; color: #427a6c; font-size: 17px; vertical-align: -1px; }
+/* React owns .app-shell classes, so keep this cross-category handoff flag on <html>. */

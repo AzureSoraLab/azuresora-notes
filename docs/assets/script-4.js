@@ -1,0 +1,393 @@
+
+(() => {
+  const runtime = window.chengmoRuntime;
+  const enqueue = runtime?.schedule || window.chengmoSchedule || ((_, task) => window.requestAnimationFrame(task));
+  const listen = runtime?.on || ((type, _, listener) => { document.addEventListener(type, listener); return () => document.removeEventListener(type, listener); });
+  const storageKey = 'chengmo-text-selection-annotations-v1';
+  const colors = ['#f8d84b', '#ff6b6b', '#72b64a', '#3ca8df', '#a687e8', '#d86ee8', '#f39a3e', '#a7aaa5'];
+  let selected = null;
+  let kind = 'highlight';
+  let menu = null;
+  let selectionBox = null;
+  let observer = null;
+  let applyTimer = 0;
+  let longPressTimer = 0;
+  let longPressTarget = null;
+  let longPressPoint = null;
+  let longPressOpened = false;
+  let consumeAnnotationClick = false;
+  let commentSaveTimer = 0;
+  let cachedItems = null;
+  let renderFrame = 0;
+  let lastRoot = null;
+  let lastSourceText = '';
+  let renderedSignature = '';
+  let annotationsByNote = null;
+  let resolvedAnchors = new Map();
+  let anchorTextSignature = '';
+
+  const reader = () => document.querySelector('.reader-body');
+  const readerContent = () => reader()?.firstElementChild || null;
+  const currentNoteId = () => document.querySelector('.compact-note.selected')?.dataset.noteId || '';
+  const read = () => cachedItems || (cachedItems = (() => { try { return JSON.parse(localStorage.getItem(storageKey) || '[]'); } catch { return []; } })());
+  const noteAnnotations = noteId => {
+    if (!annotationsByNote) {
+      annotationsByNote = new Map();
+      read().forEach(item => { const items = annotationsByNote.get(item.noteId) || []; items.push(item); annotationsByNote.set(item.noteId, items); });
+    }
+    return annotationsByNote.get(noteId) || [];
+  };
+  // This is the single persistence gateway for text annotations. Every consumer
+  // (the reader, detail card and annotation shelf) receives the same change signal.
+  const write = (items, detail = {}) => {
+    cachedItems = items;
+    annotationsByNote = null;
+    localStorage.setItem(storageKey, JSON.stringify(items));
+    document.dispatchEvent(new CustomEvent('chengmo:annotations-changed', { detail: { ...detail, source: 'reader' } }));
+  };
+  const offsetOf = (root, container, offset) => {
+    const range = document.createRange();
+    range.selectNodeContents(root);
+    range.setEnd(container, offset);
+    return range.toString().length;
+  };
+  const rootText = root => root === lastRoot ? lastSourceText : (root?.textContent || '');
+  const makeAnchor = (root, start, end) => {
+    const text = rootText(root);
+    return {
+      quote: text.slice(start, end),
+      prefix: text.slice(Math.max(0, start - 48), start),
+      suffix: text.slice(end, Math.min(text.length, end + 48))
+    };
+  };
+  const resolveAnchor = (root, item, sourceText = rootText(root)) => {
+    const text = sourceText;
+    const quote = item.quote || item.text || '';
+    if (!quote) return null;
+    const cacheKey = `${item.id}:${item.start}:${item.end}:${item.quote || ''}:${item.prefix || ''}:${item.suffix || ''}`;
+    if (anchorTextSignature === text && resolvedAnchors.has(cacheKey)) return resolvedAnchors.get(cacheKey);
+    // Fast path: retain the original offsets when the surrounding source agrees.
+    if (text.slice(item.start, item.end) === quote) {
+      const resolved = { start: item.start, end: item.end, migrated: !item.quote };
+      resolvedAnchors.set(cacheKey, resolved); return resolved;
+    }
+    let best = null, from = 0;
+    while (from <= text.length) {
+      const start = text.indexOf(quote, from);
+      if (start < 0) break;
+      const end = start + quote.length;
+      const prefix = item.prefix || '', suffix = item.suffix || '';
+      let score = 0;
+      if (prefix) { const available = text.slice(Math.max(0, start - prefix.length), start); score += available === prefix ? prefix.length * 2 : 0; }
+      if (suffix) { const available = text.slice(end, end + suffix.length); score += available === suffix ? suffix.length * 2 : 0; }
+      // When context has been edited, retain the candidate nearest its original location.
+      score -= Math.min(80, Math.abs(start - (item.start || 0)) / 12);
+      if (!best || score > best.score) best = { start, end, score };
+      from = start + Math.max(1, quote.length);
+    }
+    const resolved = best ? { start: best.start, end: best.end, migrated: true } : null;
+    resolvedAnchors.set(cacheKey, resolved); return resolved;
+  };
+  const annotationId = () => `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+
+  function clearMarks(root) {
+    root.querySelectorAll('mark.selection-annotation').forEach(mark => mark.replaceWith(...mark.childNodes));
+    root.normalize();
+  }
+  function applyOne(root, item) {
+    const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+    const nodes = [];
+    let node;
+    while ((node = walker.nextNode())) nodes.push(node);
+    let position = 0;
+    nodes.forEach(textNode => {
+      const start = position;
+      const end = start + textNode.data.length;
+      position = end;
+      const from = Math.max(start, item.start);
+      const to = Math.min(end, item.end);
+      if (from >= to || !textNode.parentNode) return;
+      const before = textNode.data.slice(0, from - start);
+      const middle = textNode.data.slice(from - start, to - start);
+      const after = textNode.data.slice(to - start);
+      const fragment = document.createDocumentFragment();
+      if (before) fragment.append(before);
+      const mark = document.createElement('mark');
+      mark.className = `selection-annotation selection-annotation--${item.kind}`;
+      mark.style.setProperty('--selection-annotation-color', item.color);
+      mark.dataset.annotationId = item.id;
+      mark.textContent = middle;
+      fragment.append(mark);
+      if (after) fragment.append(after);
+      textNode.parentNode.replaceChild(fragment, textNode);
+    });
+  }
+  function scheduleAnnotationRender() {
+    if (renderFrame) return;
+    renderFrame = 1;
+    enqueue('text-annotation-render', () => { renderFrame = 0; renderAnnotations(); });
+  }
+  function renderAnnotations() {
+    const root = readerContent();
+    if (!root) return;
+    observer && observer.disconnect();
+    const noteId = currentNoteId();
+    const allItems = read();
+    const currentText = root.textContent || '';
+    const noteItems = noteAnnotations(noteId);
+    const signature = `${noteId}\u0000${currentText}\u0000${noteItems.map(item => `${item.id}:${item.start}:${item.end}:${item.color}:${item.kind}`).join('|')}`;
+    // React can announce a UI mount without replacing the article. Avoid tearing
+    // down every mark when both the text and its visual annotation state match.
+    if (root === lastRoot && signature === renderedSignature && (!noteItems.length || root.querySelector('mark.selection-annotation'))) { watch(root); return; }
+    clearMarks(root);
+    // Read source once; resolving anchors no longer repeatedly walks the long note.
+    if (anchorTextSignature !== currentText) { anchorTextSignature = currentText; resolvedAnchors = new Map(); }
+    lastRoot = root; lastSourceText = currentText;
+    let migrated = false;
+    const items = noteItems.map(item => {
+      const anchor = resolveAnchor(root, item, lastSourceText);
+      if (!anchor) return null;
+      const next = { ...item, start: anchor.start, end: anchor.end, ...(item.quote ? {} : makeAnchor(root, anchor.start, anchor.end)) };
+      migrated ||= anchor.migrated || next.start !== item.start || next.end !== item.end;
+      return next;
+    }).filter(Boolean);
+    if (migrated) {
+      const resolved = new Map(items.map(item => [item.id, item]));
+      write(allItems.map(item => resolved.get(item.id) || item), { type: 'reanchor', noteId });
+    }
+    items.sort((a, b) => b.start - a.start).forEach(item => applyOne(root, item));
+    renderedSignature = `${noteId}\u0000${lastSourceText}\u0000${items.map(item => `${item.id}:${item.start}:${item.end}:${item.color}:${item.kind}`).join('|')}`;
+    watch(root);
+  }
+  function watch(root) {
+    if (!window.MutationObserver) return;
+    // A new render pass can leave the same reader node in place. Always retire
+    // its old watcher before attaching the replacement to avoid duplicate work.
+    observer?.disconnect();
+    observer = new MutationObserver(() => {
+      window.clearTimeout(applyTimer);
+      applyTimer = window.setTimeout(scheduleAnnotationRender, 80);
+    });
+    observer.observe(root, { childList: true, subtree: true });
+  }
+  function removeMenu() { menu?.remove(); menu = null; selected = null; selectionBox?.remove(); selectionBox = null; }
+  function announce(message) { window.chengmoNotice?.(message); }
+  function positionCommentCard(id) {
+    if (!menu?.classList.contains('selection-annotation-menu--card') || !selectionBox) return;
+    const parts = [...document.querySelectorAll(`mark.selection-annotation[data-annotation-id="${id}"]`)];
+    const rects = parts.flatMap(part => [...part.getClientRects()]);
+    if (!rects.length) return removeMenu();
+    const left = Math.min(...rects.map(part => part.left)); const right = Math.max(...rects.map(part => part.right));
+    const top = Math.min(...rects.map(part => part.top)); const bottom = Math.max(...rects.map(part => part.bottom));
+    const outOfView = bottom < 0 || top > window.innerHeight || right < 0 || left > window.innerWidth;
+    selectionBox.style.display = outOfView ? 'none' : '';
+    menu.style.display = outOfView ? 'none' : '';
+    if (outOfView) return;
+    selectionBox.style.left = `${left - 4}px`; selectionBox.style.top = `${top - 4}px`; selectionBox.style.width = `${right - left + 8}px`; selectionBox.style.height = `${bottom - top + 8}px`;
+    const menuHeight = menu.offsetHeight || 164;
+    const menuWidth = menu.offsetWidth || 254;
+    const menuTop = bottom + menuHeight + 4 <= window.innerHeight
+      ? bottom + 4
+      : Math.max(8, top - menuHeight - 4);
+    menu.style.left = `${Math.min(window.innerWidth - menuWidth - 8, Math.max(8, left + (right - left - menuWidth) / 2))}px`;
+    menu.style.top = `${menuTop}px`;
+  }
+  function updateAnnotation(id, changes) {
+    write(read().map(item => item.id === id ? { ...item, ...changes } : item), { type: 'update', id, changes });
+    removeMenu();
+    renderAnnotations();
+  }
+  function deleteAnnotation(id) {
+    write(read().filter(item => item.id !== id), { type: 'delete', id });
+    removeMenu();
+    renderAnnotations();
+  }
+  function showCommentCard(mark) {
+    const id = mark.dataset.annotationId;
+    const item = read().find(annotation => annotation.id === id);
+    if (!item) return;
+    removeMenu();
+    selectionBox = document.createElement('div'); selectionBox.className = 'selection-annotation-selection-box';
+    document.body.append(selectionBox);
+    menu = document.createElement('div'); menu.className = 'selection-annotation-menu selection-annotation-menu--card';
+    menu.dataset.annotationId = id; menu.style.setProperty('--selection-annotation-color', item.color);
+    const header = document.createElement('div'); header.className = 'selection-annotation-card__header';
+    const icon = document.createElement('b'); icon.textContent = 'A'; const page = document.createElement('span'); page.textContent = '标注详情'; const close = document.createElement('button'); close.textContent = '×'; close.title = '关闭'; close.addEventListener('click', removeMenu); header.append(icon, page, close);
+    const saveComment = () => { window.clearTimeout(commentSaveTimer); commentSaveTimer = 0; write(read().map(annotation => annotation.id === id ? { ...annotation, comment: item.comment || '' } : annotation), { type: 'update', id, changes: { comment: item.comment || '' } }); };
+    const comment = document.createElement('textarea'); comment.className = 'selection-annotation-card__comment'; comment.placeholder = '添加评论'; comment.value = item.comment || ''; comment.addEventListener('input', () => { item.comment = comment.value; window.clearTimeout(commentSaveTimer); commentSaveTimer = window.setTimeout(saveComment, 260); }); comment.addEventListener('blur', saveComment);
+    const tags = document.createElement('div'); tags.className = 'selection-annotation-card__tags'; const tagInput = document.createElement('input'); tagInput.className = 'selection-annotation-card__tag'; tagInput.placeholder = '添加标签…';
+    const renderTags = () => { tags.replaceChildren(...(item.tags || []).map(tag => { const chip = document.createElement('button'); chip.className = 'selection-annotation-card__tag-chip'; chip.textContent = `#${tag} ×`; chip.title = `删除标签 ${tag}`; chip.setAttribute('aria-label', `删除标签 ${tag}`); chip.addEventListener('click', () => { item.tags = (item.tags || []).filter(value => value !== tag); write(read().map(annotation => annotation.id === id ? { ...annotation, tags: item.tags } : annotation), { type: 'update', id, changes: { tags: item.tags } }); renderTags(); announce(`已删除标签 #${tag}`); }); return chip; })); };
+    tagInput.addEventListener('keydown', event => { if (event.key !== 'Enter') return; const tag = tagInput.value.trim().replace(/^#/, ''); if (!tag) return; event.preventDefault(); if ((item.tags || []).includes(tag)) { tagInput.value = ''; announce(`标签 #${tag} 已存在`); return; } item.tags = [...(item.tags || []), tag]; write(read().map(annotation => annotation.id === id ? { ...annotation, tags: item.tags } : annotation), { type: 'update', id, changes: { tags: item.tags } }); tagInput.value = ''; renderTags(); announce(`已添加标签 #${tag}`); });
+    renderTags(); menu.append(header, comment, tags, tagInput); document.body.append(menu); positionCommentCard(id);
+  }
+  function positionManageMenu(id) {
+    if (!menu?.classList.contains('selection-annotation-menu--manage')) return;
+    const parts = [...document.querySelectorAll(`mark.selection-annotation[data-annotation-id="${id}"]`)];
+    const anchor = parts[Number(menu.dataset.anchorPart || 0)] || parts[0];
+    const rect = anchor?.getBoundingClientRect();
+    if (!rect) return removeMenu();
+    const outOfView = rect.bottom < 0 || rect.top > window.innerHeight || rect.right < 0 || rect.left > window.innerWidth;
+    menu.style.display = outOfView ? 'none' : '';
+    if (outOfView) return;
+    // Use the actual long-press point when available, so a wrapped annotation
+    // opens its menu beside the text segment the user pressed.
+    const menuWidth = 220;
+    const menuHeight = menu.offsetHeight || 360;
+    const point = menu._anchorPoint;
+    const anchorLeft = point ? rect.left + point.offsetX : rect.left;
+    const anchorBottom = point ? rect.top + point.offsetY : rect.bottom;
+    const left = Math.min(window.innerWidth - menuWidth - 8, Math.max(8, anchorLeft));
+    const top = anchorBottom + menuHeight + 8 <= window.innerHeight
+      ? anchorBottom + 8
+      : Math.max(8, (point ? rect.top + point.offsetY : rect.top) - menuHeight - 8);
+    menu.style.left = `${left}px`;
+    menu.style.top = `${top}px`;
+  }
+  function showManageMenu(mark, point) {
+    const id = mark.dataset.annotationId;
+    const item = read().find(annotation => annotation.id === id);
+    if (!item) return;
+    removeMenu();
+    menu = document.createElement('div');
+    menu.className = 'selection-annotation-menu selection-annotation-menu--manage';
+    menu.dataset.annotationId = id;
+    menu.dataset.anchorPart = String([...document.querySelectorAll(`mark.selection-annotation[data-annotation-id="${id}"]`)].indexOf(mark));
+    const markRect = mark.getBoundingClientRect();
+    menu._anchorPoint = point ? {
+      offsetX: point.x - markRect.left,
+      offsetY: point.y - markRect.top
+    } : null;
+    const title = document.createElement('div');
+    title.className = 'selection-annotation-menu__title';
+    title.textContent = '\u6807\u6ce8\u7ba1\u7406';
+    menu.append(title);
+    colors.forEach((color, index) => {
+      const button = document.createElement('button');
+      button.className = `selection-annotation-menu__item ${item.color === color ? 'is-current' : ''}`;
+      const swatch = document.createElement('i');
+      swatch.style.backgroundColor = color;
+      button.append(swatch, ['黄色', '红色', '绿色', '蓝色', '紫色', '洋红', '橙色', '灰色'][index]);
+      button.addEventListener('click', () => updateAnnotation(id, { color }));
+      menu.append(button);
+    });
+    const convert = document.createElement('button');
+    convert.className = 'selection-annotation-menu__item';
+    convert.textContent = item.kind === 'highlight' ? '转换为下划线' : '转换为高亮';
+    convert.addEventListener('click', () => updateAnnotation(id, { kind: item.kind === 'highlight' ? 'underline' : 'highlight' }));
+    const remove = document.createElement('button');
+    remove.className = 'selection-annotation-menu__item selection-annotation-menu__item--danger';
+    remove.textContent = '删除标注';
+    remove.addEventListener('click', () => deleteAnnotation(id));
+    menu.append(convert, remove);
+    document.body.append(menu);
+    positionManageMenu(id);
+  }
+  function choose(color) {
+    if (!selected) return;
+    const items = read();
+    const anchor = makeAnchor(readerContent(), selected.start, selected.end);
+    const item = { id: annotationId(), noteId: currentNoteId(), start: selected.start, end: selected.end, color, kind, text: anchor.quote, quote: anchor.quote, prefix: anchor.prefix, suffix: anchor.suffix, comment: '', tags: [] };
+    items.push(item);
+    write(items, { type: 'create', id: item.id });
+    window.getSelection()?.removeAllRanges();
+    removeMenu();
+    renderAnnotations();
+    announce(kind === 'highlight' ? '已添加高亮标注' : '已添加下划线标注');
+  }
+  function showMenu() {
+    const root = readerContent();
+    const selection = window.getSelection();
+    const range = selection?.rangeCount ? selection.getRangeAt(0) : null;
+    const text = selection?.toString().trim();
+    if (!root || !range || !text || !root.contains(range.commonAncestorContainer)) return removeMenu();
+    const rect = range.getBoundingClientRect();
+    selected = { start: offsetOf(root, range.startContainer, range.startOffset), end: offsetOf(root, range.endContainer, range.endOffset) };
+    if (selected.end <= selected.start) return removeMenu();
+    removeMenu();
+    selected = { start: offsetOf(root, range.startContainer, range.startOffset), end: offsetOf(root, range.endContainer, range.endOffset) };
+    menu = document.createElement('div');
+    menu.className = 'selection-annotation-menu';
+    menu.style.left = `${rect.left + rect.width / 2}px`;
+    menu.style.top = `${Math.max(8, rect.bottom + 10)}px`;
+    const colorRow = document.createElement('div');
+    colorRow.className = 'selection-annotation-menu__colors';
+    colors.forEach(color => {
+      const button = document.createElement('button');
+      button.className = 'selection-annotation-menu__color';
+      button.style.backgroundColor = color;
+      button.title = '应用颜色';
+      button.addEventListener('mousedown', event => event.preventDefault());
+      button.addEventListener('click', () => choose(color));
+      colorRow.append(button);
+    });
+    const actionRow = document.createElement('div');
+    actionRow.className = 'selection-annotation-menu__actions';
+    [['highlight', 'A', '高亮'], ['underline', 'A', '下划线']].forEach(([value, label, title]) => {
+      const button = document.createElement('button');
+      button.className = `selection-annotation-menu__action ${value === 'underline' ? 'selection-annotation-menu__action--underline' : ''} ${kind === value ? 'is-active' : ''}`;
+      button.textContent = label;
+      button.title = title;
+      button.addEventListener('mousedown', event => event.preventDefault());
+      button.addEventListener('click', () => { kind = value; actionRow.querySelectorAll('button').forEach(item => item.classList.toggle('is-active', item === button)); });
+      actionRow.append(button);
+    });
+    menu.append(colorRow, actionRow);
+    document.body.append(menu);
+  }
+  document.addEventListener('mouseup', event => {
+    if (longPressOpened) { longPressOpened = false; return; }
+    if (event.target.closest('mark.selection-annotation')) return;
+    if (menu?.contains(event.target)) return;
+    window.setTimeout(showMenu, 0);
+  });
+  document.addEventListener('mousedown', event => { if (menu && !menu.contains(event.target)) removeMenu(); });
+  document.addEventListener('pointerdown', event => {
+    if (event.button !== 0) return;
+    const mark = event.target.closest('mark.selection-annotation');
+    if (!mark) return;
+    longPressTarget = mark;
+    longPressPoint = { x: event.clientX, y: event.clientY };
+    longPressTimer = window.setTimeout(() => {
+      if (longPressTarget === mark) { longPressOpened = true; consumeAnnotationClick = true; showManageMenu(mark, longPressPoint); }
+      longPressTimer = 0;
+    }, 500);
+  });
+  const cancelLongPress = () => { window.clearTimeout(longPressTimer); longPressTimer = 0; longPressTarget = null; longPressPoint = null; };
+  document.addEventListener('pointerup', cancelLongPress);
+  document.addEventListener('pointercancel', cancelLongPress);
+  document.addEventListener('pointermove', cancelLongPress);
+  document.addEventListener('click', event => {
+    const mark = event.target.closest('mark.selection-annotation');
+    if (!mark) return;
+    if (consumeAnnotationClick) { consumeAnnotationClick = false; return; }
+    event.preventDefault(); event.stopPropagation(); showCommentCard(mark);
+  });
+  document.addEventListener('keydown', event => {
+    if (event.key !== 'Escape' || !menu) return;
+    event.preventDefault(); removeMenu();
+  }, true);
+  window.addEventListener('resize', removeMenu);
+  // Scroll events do not bubble. Capture them at document level so the card
+  // follows marks even when the reader component swaps its scroll container.
+  let scrollPositionFrame = 0;
+  document.addEventListener('scroll', () => {
+    if (scrollPositionFrame) return;
+    scrollPositionFrame = window.requestAnimationFrame(() => {
+      scrollPositionFrame = 0;
+      const id = menu?.dataset.annotationId;
+      if (!id) return;
+      if (menu.classList.contains('selection-annotation-menu--manage')) positionManageMenu(id);
+      else positionCommentCard(id);
+    });
+  }, true);
+  window.addEventListener('load', () => window.setTimeout(scheduleAnnotationRender, 100));
+  // React may replace the reader body during a note switch; redraw only once
+  // after the existing UI lifecycle event instead of retaining a stale observer.
+  listen('chengmo:ui-mounted', 'text-annotations-ui', () => { removeMenu(); scheduleAnnotationRender(); });
+  listen('chengmo:annotations-changed', 'text-annotations-data', event => {
+    // The shelf can edit metadata directly. Drop this module's cached copy so a
+    // later reader-side edit never writes stale tags or comments back to storage.
+    if (event.detail?.source !== 'reader') { cachedItems = null; annotationsByNote = null; }
+  });
+  window.addEventListener('storage', event => { if (event.key === storageKey) { cachedItems = null; annotationsByNote = null; scheduleAnnotationRender(); } });
+})();

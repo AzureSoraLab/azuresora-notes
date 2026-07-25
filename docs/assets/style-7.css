@@ -1,0 +1,117 @@
+
+/* The table-of-contents control lives in the annotation shelf toolbar. */
+.reader-actions .outline-header-toggle { display: none; }
+/* Keep one table of contents: it is available from the annotation shelf toolbar. */
+.reading-layout > .outline { display: none !important; }
+.reading-layout { grid-template-columns: minmax(0, 1fr) !important; }
+
+/* Unified quiet-paper surface for the existing three-column reader. */
+:root { --paper: #fcfbf7; --paper-soft: #f6f5ef; --line: #e3e5de; --accent: #35675c; --ink: #263531; --muted: #74807a; }
+.app-shell { background: #f5f4ee; }
+.panel { border-color: var(--line); background: var(--paper); }
+.library { background: #f7f7f2; }
+.brand { padding-bottom: 20px; border-bottom: 1px solid var(--line); }
+.brand-mark { color: var(--accent); }
+.new-note { border-radius: 8px; background: var(--accent); box-shadow: 0 2px 5px #315b501c; }
+.new-note:hover { background: #2d584f; transform: translateY(-1px); }
+.course-section { margin-top: 24px; }
+.section-title { color: var(--muted); letter-spacing: .04em; }
+.course-button, .recent-notes__item { border-radius: 7px; transition: background .16s ease, color .16s ease; }
+.course-button:hover, .recent-notes__item:hover { background: #e7eee9; color: #234d44; }
+.course-button.active { background: #dfeae4; color: #234d44; font-weight: 600; }
+.note-list { background: #fbfaf6; }
+.note-list-header { border-bottom-color: var(--line); }
+.search { margin: 14px 15px 10px; border: 1px solid #dce2dc; border-radius: 8px; background: #fffefa; }
+.search:focus-within { border-color: #88aaa0; box-shadow: 0 0 0 3px #88aaa024; }
+.compact-note { margin: 3px 9px; border-radius: 8px; transition: background .15s ease, box-shadow .15s ease; }
+.compact-note:hover { background: #edf3ef; }
+.compact-note.selected { background: #e1ece6; box-shadow: inset 3px 0 0 var(--accent); }
+.reader { background: var(--paper); }
+.reader-header { min-height: 62px; border-bottom-color: var(--line); background: #fffefa; }
+.reader-actions button { min-height: 30px; border-radius: 7px; }
+.reader-actions .edit-switch { background: var(--accent); box-shadow: 0 1px 3px #315b5024; }
+.reader-actions .edit-switch:hover { background: #2d584f; }
+.markdown { color: var(--ink); font-size: 16px; line-height: 1.9; }
+.markdown h1, .markdown h2, .markdown h3 { color: #243f38; letter-spacing: -.01em; }
+.markdown h1 { margin-top: 0; font-size: 2em; }
+.markdown h2 { margin-top: 2.2em; padding-bottom: .48em; border-bottom-color: #dce3dd; }
+.markdown p { margin: 1.05em 0; }
+.markdown blockquote { border-left-color: #8ba99d; background: #f1f5ef; color: #53645e; }
+.markdown table th { background: #edf2ec; }
+.markdown table td, .markdown table th { border-color: #dce3dc; }
+.annotation-shelf { border-color: #d6ddd7; border-radius: 10px; background: #f4f5f0; box-shadow: 0 12px 30px rgba(37, 58, 50, .16); }
+.annotation-shelf__bar, .annotation-shelf__filters, .annotation-shelf__tag-summary { border-color: #dce3dc; background: #fbfcf8; }
+.annotation-shelf__bar { border-radius: 10px 10px 0 0; }
+.annotation-shelf__search { border-color: #9ab8ad; background-color: #fffefa; }
+.annotation-shelf__search:focus { border-color: #527f72; box-shadow: 0 0 0 3px #527f7220; }
+.annotation-shelf__card { border-color: #e1e6e1; border-radius: 9px; background: #fffefa; box-shadow: 0 1px 2px #23352c0a; }
+.annotation-shelf__card:hover { border-color: #b8cec2; box-shadow: 0 3px 9px #23352c12; }
+.annotation-shelf__card.is-current { border-color: #83aa9b; background: #edf5ef; }
+.annotation-shelf__excerpt { color: #50665e; }
+.annotation-shelf__filter { border-radius: 5px; box-shadow: inset 0 0 0 1px #ffffff66; }
+.annotation-shelf__filter.is-active { outline-color: #5a8577; }
+.annotation-shelf__empty, .annotation-shelf__outline-empty { padding: 30px 10px; color: #81908a; }
+
+/* Final detail pass: quieter surfaces, clearer focus, and consistent controls. */
+.library { background: #f8f8f4; }
+.sidebar, .note-list { box-shadow: none; }
+.sidebar { border-right-color: #e7e8e1; }
+.note-list { border-right-color: #e7e8e1; background: #fbfaf7; }
+.storage-note, .recent-notes__title, .section-title { color: #89918c; font-size: 11px; }
+.category-add, .category-edit { color: #6d827a; }
+.new-note, .reader-actions button, .category-add, .category-edit { transition: background .15s ease, border-color .15s ease, color .15s ease, box-shadow .15s ease; }
+.new-note { min-height: 36px; border-radius: 9px; letter-spacing: .01em; }
+.course-button { min-height: 35px; padding-top: 8px; padding-bottom: 8px; color: #52605b; }
+.course-button i { opacity: .82; }
+.course-button.active { background: #e4ede7; box-shadow: inset 2px 0 0 #5d897a; }
+.recent-notes { border-top-color: #e4e7e1; }
+.recent-notes__item { color: #61706a; }
+.recent-notes__item::before { color: #7eaa99; }
+.note-list-header { padding-bottom: 13px; }
+.note-list-header p { color: #929a95; font-size: 10px; letter-spacing: .07em; text-transform: uppercase; }
+.note-list-header strong { color: #35443f; font-weight: 600; }
+.search { min-height: 36px; margin-top: 11px; margin-bottom: 12px; }
+.compact-note { min-height: 49px; padding: 10px 9px; }
+.compact-note strong { color: #46544f; font-weight: 550; }
+.compact-note small { color: #929b96; }
+.compact-note:hover { background: #f0f4f0; }
+.compact-note.selected { background: #e7f0e9; box-shadow: inset 2px 0 0 #5c8879; }
+.reader-header { background: #fffefa; }
+.reader-header .crumb { color: #60736c; font-size: 12px; letter-spacing: .01em; }
+.reader-actions { gap: 7px; }
+.reader-actions button { min-height: 31px; border: 1px solid transparent; color: #69746f; }
+.reader-actions button:not(.edit-switch):hover { border-color: #d7ded8; background: #f1f4ef; color: #34564d; }
+.reader-actions .complete { border-color: #e0e5df; background: #fffefa; }
+.reader-actions .complete.active { border-color: #a6bfb4; background: #eaf3ed; color: #35675c; }
+.reader-actions .annotate.active { background: #edf4ef; color: #35675c; }
+.progress-track { opacity: .72; }
+.markdown { max-width: none; margin: 0; text-rendering: optimizeLegibility; }
+.markdown h1 { margin-bottom: 1.25em; font-weight: 650; }
+.markdown h2 { margin-top: 2.5em; color: #2e4b43; }
+.markdown h3 { margin-top: 1.8em; color: #49625b; }
+.markdown hr { border-color: #e0e4de; margin: 2.3em 0; }
+.markdown a { color: #397464; text-underline-offset: 3px; }
+.markdown mark.selection-annotation { border-radius: 2px; }
+.annotation-shelf-toggle { border-color: #e0e5df; background: #fffefa; color: #6f7d77; }
+.annotation-shelf-toggle:hover, .annotation-shelf-toggle.is-open { background: #edf3ee; color: #315e52; }
+.annotation-shelf__bar { padding-left: 14px; padding-right: 12px; }
+.annotation-shelf__tabs { gap: 7px; }
+.annotation-shelf__outline { margin-left: 7px; }
+.annotation-shelf__close { color: #8a9691; }
+.annotation-shelf__close:hover { background: #edf3ee; color: #315e52; }
+.annotation-shelf__search { width: 118px; border-radius: 8px; }
+.annotation-shelf__list { padding: 10px; }
+.annotation-shelf__card { margin-bottom: 9px; padding: 9px 11px 10px; }
+.annotation-shelf__card.is-current { padding: 8px 10px 9px; }
+.annotation-shelf__card-head { color: #53615c; font-size: 12px; }
+.annotation-shelf__excerpt { font-family: Georgia, "Times New Roman", serif; line-height: 1.48; }
+.annotation-shelf__inline-comment, .annotation-shelf__add-tag { color: #537068; }
+.annotation-shelf__add-tag { border-top-color: #e1e7e1; }
+.annotation-shelf__filters { gap: 10px; padding-left: 15px; }
+.annotation-shelf__filter { width: 19px; height: 19px; }
+.annotation-shelf__tag-summary { padding-left: 15px; color: #68756f; }
+.compact-note { position: relative; padding-right: 39px !important; }
+.compact-note__delete { position: absolute; z-index: 2; top: 50%; right: 8px; display: grid; width: 24px; height: 24px; place-items: center; border: 1px solid transparent; border-radius: 7px; background: transparent; color: #bd918a; cursor: pointer; font: 19px/1 Arial, sans-serif; opacity: 0; transform: translateY(-50%); transition: opacity .16s ease, color .16s ease, background .16s ease, border-color .16s ease; user-select: none; }
+.compact-note:hover .compact-note__delete, .compact-note.selected .compact-note__delete, .compact-note__delete:focus-visible { opacity: 1; }
+.compact-note__delete:hover, .compact-note__delete:focus-visible { border-color: #efd8d3; outline: 0; background: #fff7f5; color: #9d5148; }
+.compact-note.selected .compact-note__delete { color: #a46b63; }
