@@ -31,81 +31,77 @@
   const noteTitle = note => note?.title?.trim() || '未命名笔记';
   const noteSubtitle = note => (Array.isArray(note?.tags) ? note.tags.slice(0, 2).map(tag => `#${tag}`).join('  ') : '') || '未添加标签';
   const recentRecord = note => ({ id: note.id, courseId: note.courseId || '', title: noteTitle(note), subtitle: noteSubtitle(note) });
+  const sameRecentRecord = (left, right) => left?.id === right.id && left?.courseId === right.courseId && left?.title === right.title && left?.subtitle === right.subtitle;
+  const notesById = state => new Map((Array.isArray(state.notes) ? state.notes : []).filter(note => note?.id).map(note => [note.id, note]));
 
   // React does not expose course IDs in attributes, so resolve them through
   // its keyed list and retain an index fallback for the static layout.
-  const courseButtonForId = (courseId, state) => {
-    const courses = state.courses || [];
+  const courseContext = (state, buttons = [...document.querySelectorAll('.course-button')]) => {
+    const courses = Array.isArray(state.courses) ? state.courses : [];
     const ids = new Set(courses.map(course => course.id));
-    const buttons = [...document.querySelectorAll('.course-button')];
-    const keyed = buttons.find(button => {
+    const buttonById = new Map();
+    const idByButton = new Map();
+    buttons.forEach((button, index) => {
       const fiberKey = Object.keys(button).find(key => key.startsWith('__reactFiber$'));
       const fiber = fiberKey && button[fiberKey];
-      const id = fiber?.key ?? fiber?.alternate?.key;
-      return typeof id === 'string' && ids.has(id) && id === courseId;
+      const keyed = fiber?.key ?? fiber?.alternate?.key;
+      const id = typeof keyed === 'string' && ids.has(keyed) ? keyed : courses[index]?.id || '';
+      if (!id) return;
+      idByButton.set(button, id); buttonById.set(id, button);
     });
-    if (keyed) return keyed;
-    const index = courses.findIndex(course => course.id === courseId);
-    return index < 0 ? null : buttons[index] || null;
+    return { buttonById, idByButton };
   };
-  const activeCourseId = state => {
+  const courseButtonForId = (courseId, context) => {
+    return context.buttonById.get(courseId) || null;
+  };
+  const activeCourseId = context => {
     const active = document.querySelector('.course-button.active');
-    if (!active) return '';
-    const courses = state.courses || [];
-    // Resolve the selected React key directly. The old implementation called
-    // courseButtonForId once per course, which repeated the same DOM scan when
-    // recent reading navigated across a large category library.
-    const ids = new Set(courses.map(course => course.id));
-    const fiberKey = Object.keys(active).find(key => key.startsWith('__reactFiber$'));
-    const fiber = fiberKey && active[fiberKey];
-    const keyed = fiber?.key ?? fiber?.alternate?.key;
-    if (typeof keyed === 'string' && ids.has(keyed)) return keyed;
-    const index = [...document.querySelectorAll('.course-button')].indexOf(active);
-    return index < 0 ? '' : courses[index]?.id || '';
+    return active ? context.idByButton.get(active) || '' : '';
   };
-  const noteButtonForId = (noteId, state) => {
-    const direct = [...document.querySelectorAll('.compact-note')].find(button => button.dataset.noteId === noteId);
+  const noteButtonForId = (noteId, state, cards = [...document.querySelectorAll('.compact-note')]) => {
+    const direct = cards.find(button => button.dataset.noteId === noteId);
     if (direct) return direct;
     const note = (state.notes || []).find(item => item.id === noteId);
     if (!note) return null;
     const title = noteTitle(note); const subtitle = noteSubtitle(note);
-    const matches = [...document.querySelectorAll('.compact-note')].filter(button => button.querySelector('strong')?.textContent?.trim() === title && button.querySelector('small')?.textContent?.trim() === subtitle);
+    const matches = cards.filter(button => button.querySelector('strong')?.textContent?.trim() === title && button.querySelector('small')?.textContent?.trim() === subtitle);
     return matches.length === 1 ? matches[0] : null;
   };
-  function selectedNote(state) {
+  function selectedNote(state, index = notesById(state)) {
     const button = document.querySelector('.compact-note.selected');
     const noteId = button?.dataset.noteId;
     const notes = state.notes || [];
-    const note = noteId ? notes.find(item => item.id === noteId) : null;
+    const note = noteId ? index.get(noteId) : null;
     if (note) return note;
     const title = button?.querySelector('strong')?.textContent?.trim();
     if (!title) return null;
     const matches = notes.filter(item => noteTitle(item) === title);
     return matches.length === 1 ? matches[0] : null;
   }
-  function validRecentNotes(state) {
-    const notesById = new Map((state.notes || []).map(note => [note.id, note]));
+  function validRecentNotes(state, index = notesById(state)) {
     const seen = new Set();
     const notes = [];
     for (const item of readRecent()) {
-      const note = notesById.get(item?.id);
+      const note = index.get(item?.id);
       if (note && !seen.has(note.id)) { seen.add(note.id); notes.push(note); }
     }
     return notes.slice(0, maxRecent);
   }
   function remember(note) {
     if (!note?.id) return;
-    const items = readRecent().filter(item => item?.id !== note.id);
-    saveRecent([recentRecord(note), ...items]);
+    const record = recentRecord(note); const current = readRecent();
+    if (sameRecentRecord(current[0], record)) return;
+    saveRecent([record, ...current.filter(item => item?.id !== note.id)]);
   }
   function closeListIfNeeded(courseButton) {
     if (document.querySelector('.app-shell')?.classList.contains('note-list-open')) courseButton?.click();
   }
   let activeNavigation = null;
   function navigate(noteId) {
-    const state = noteState(); const note = (state.notes || []).find(item => item.id === noteId);
+    const state = noteState(); const index = notesById(state); const note = index.get(noteId);
     if (!note) { render(state, true); return; }
-    const courseButton = courseButtonForId(note.courseId, state);
+    const courses = courseContext(state);
+    const courseButton = courseButtonForId(note.courseId, courses);
     if (!courseButton) return;
     // A new recent-note click supersedes any pending category/list retry.
     activeNavigation?.finish();
@@ -135,7 +131,7 @@
       finish();
     };
     const timeout = window.setTimeout(finish, 1600);
-    if (activeCourseId(state) === note.courseId) { tryOpen(); return; }
+    if (activeCourseId(courses) === note.courseId) { tryOpen(); return; }
     // The core course handler reads this marker and changes categories while
     // preserving a closed note list. No temporary panel is ever rendered.
     window.chengmoSilentCourseSwitch = note.courseId;
@@ -143,7 +139,7 @@
     courseButton.click();
     window.requestAnimationFrame(tryOpen);
   }
-  function render(state = noteState(), force = false) {
+  function render(state = noteState(), force = false, index = notesById(state)) {
     const content = document.querySelector('.library-content'); if (!content) return;
     let section = content.querySelector('.recent-notes');
     if (!section) {
@@ -154,7 +150,7 @@
       });
       const storage = content.querySelector('.storage-note'); content.insertBefore(section, storage || null);
     }
-    const items = validRecentNotes(state);
+    const items = validRecentNotes(state, index);
     const currentId = document.querySelector('.compact-note.selected')?.dataset.noteId || '';
     const signature = `${currentId}\u001e${items.map(note => `${note.id}|${noteTitle(note)}|${noteSubtitle(note)}`).join('\u001f')}`;
     if (!force && section.dataset.recentSignature === signature) return;
@@ -173,9 +169,9 @@
   let previous = ''; let syncFrame = 0; let syncForce = false;
   const sync = force => {
     syncFrame = 0;
-    const state = noteState(); const note = selectedNote(state); const token = note?.id || '';
+    const state = noteState(); const index = notesById(state); const note = selectedNote(state, index); const token = note?.id || '';
     if (token && token !== previous) { previous = token; remember(note); }
-    render(state, force || !document.querySelector('.recent-notes'));
+    render(state, force || !document.querySelector('.recent-notes'), index);
   };
   const scheduleSync = force => {
     syncForce ||= Boolean(force);
