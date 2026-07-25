@@ -1848,12 +1848,13 @@ html .reader-header .data-tools__actions button {
   .library.mobile-active .mobile-course-notes {
     display: grid;
     gap: 5px;
-    max-height: 176px;
+    /* The category list owns scrolling on mobile. Keeping this list natural
+       prevents two stacked scrollbars and clipped notes when it is expanded. */
+    max-height: none;
     margin: 6px 0 2px 10px;
     padding: 6px 4px 6px 10px;
-    overflow-y: auto;
+    overflow: visible;
     border-left: 2px solid #d8e2e7;
-    overscroll-behavior: contain;
   }
   .library.mobile-active .mobile-course-note {
     display: grid;
