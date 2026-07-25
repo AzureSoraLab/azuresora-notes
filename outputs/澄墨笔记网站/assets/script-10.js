@@ -1,4 +1,3 @@
-
 (() => {
   const stateKey = 'chengmo-notes-v1';
   const recentKey = 'chengmo-recent-notes-v1';
@@ -6,7 +5,11 @@
   const drawingKey = 'chengmo-freehand-annotations-v1';
   const keepListOpenKey = 'chengmo-keep-note-list-open';
   const readingSessionKey = 'chengmo-reading-session-v1';
-  const readState = () => { try { return JSON.parse(localStorage.getItem(stateKey) || '{}'); } catch { return {}; } };
+  const readState = () => {
+    const pending = window.chengmoStorage?.peekNotes?.();
+    if (pending && typeof pending === 'object') return pending;
+    try { return JSON.parse(localStorage.getItem(stateKey) || '{}'); } catch { return {}; }
+  };
   const readArray = key => { try { const value = JSON.parse(localStorage.getItem(key) || '[]'); return Array.isArray(value) ? value : null; } catch { return null; } };
   const readRecord = key => { try { const value = JSON.parse(localStorage.getItem(key) || '{}'); return value && typeof value === 'object' && !Array.isArray(value) ? value : null; } catch { return null; } };
   const noteTitle = note => note?.title?.trim() || '\u672a\u547d\u540d\u7b14\u8bb0';
@@ -45,17 +48,16 @@
     return (query ? true : note.courseId === courseId) && haystack.includes(query);
   });
   const fallbackCardIds = (cards, notes) => {
-    // Use DOM order only when it matches all visible note metadata exactly.
-    // A renderer change can then disable deletion, but never delete a wrong note.
-    if (cards.length !== notes.length) return new Map();
+    // Each card comes from a keyed React item. Matching its visible metadata is
+    // only a fallback for the bundled build, and never relies on list order.
     const resolved = new Map();
-    for (let index = 0; index < cards.length; index += 1) {
-      const card = cards[index]; const note = notes[index];
+    const remaining = [...notes];
+    cards.forEach(card => {
       const title = card.querySelector('strong')?.textContent?.trim() || '';
       const subtitle = card.querySelector('small')?.textContent?.trim() || '';
-      if (title !== noteTitle(note) || subtitle !== noteSubtitle(note)) return new Map();
-      resolved.set(card, note.id);
-    }
+      const index = remaining.findIndex(note => noteTitle(note) === title && noteSubtitle(note) === subtitle);
+      if (index >= 0) resolved.set(card, remaining.splice(index, 1)[0].id);
+    });
     return resolved;
   };
   const applyDeleteControls = () => {
@@ -67,7 +69,10 @@
     const knownIds = new Set((state.notes || []).map(note => note.id));
     const fallbackIds = fallbackCardIds(cards, matchingNotes);
     cards.forEach(noteButton => {
-      const noteId = reactKey(noteButton, knownIds) || fallbackIds.get(noteButton) || '';
+      // Current builds put the canonical ID on the card. Keep it through the
+      // brief gap before React's debounced localStorage save is visible.
+      const renderedId = noteButton.dataset.noteId || '';
+      const noteId = reactKey(noteButton, knownIds) || fallbackIds.get(noteButton) || renderedId || (noteButton.classList.contains('selected') ? pendingCreatedNoteId : '');
       if (noteId) noteButton.dataset.noteId = noteId;
       else delete noteButton.dataset.noteId;
       const existing = noteButton.querySelector('.compact-note__delete');
@@ -107,6 +112,7 @@
     let observedList = null;
     let restoreScheduled = false;
     let sessionRestoreScheduled = false;
+    let pendingCreatedNoteId = '';
     const watchList = () => {
       const list = document.querySelector('.note-index-scroll');
       if (!list) return false;
@@ -189,6 +195,8 @@
       watchHost.current = listHost;
     };
     document.addEventListener('chengmo:ui-mounted', () => { watchHost(); sync(); });
+    document.addEventListener('chengmo:note-created', event => { pendingCreatedNoteId = event.detail?.id || ''; sync(); });
+    document.addEventListener('chengmo:notes-state-updated', sync);
     watchHost();
     window.addEventListener('pagehide', saveSession);
     document.addEventListener('click', event => {

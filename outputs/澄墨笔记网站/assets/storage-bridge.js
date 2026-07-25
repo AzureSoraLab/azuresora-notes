@@ -37,6 +37,8 @@
   const nativeRemoveItem = storagePrototype.removeItem;
   const bootCache = new Map();
   let noteStateCache = null;
+  let latestNotesState = null;
+  let notesRevision = 0;
   let drawingStateCache = null;
   let bootCacheTimer = 0;
   const toJson = value => {
@@ -145,6 +147,7 @@
   const saveNotesFromObject = state => {
     saveNotes(state);
     queueNoteBootCache(state);
+    document.dispatchEvent(new CustomEvent('chengmo:notes-state-updated'));
   };
   const saveAnnotations = items => {
     if (!Array.isArray(items)) return;
@@ -183,6 +186,8 @@
   };
   const queueNoteBootCache = state => {
     noteStateCache = state;
+    latestNotesState = state;
+    notesRevision += 1;
     scheduleBootCacheFlush();
   };
   const queueDrawingsCache = drawings => {
@@ -262,14 +267,18 @@
     local.setItem(migrationKey, '1');
   };
   const hydrateNotes = async () => {
+    const requestedRevision = notesRevision;
     const db = await database();
     if (!db) return;
     const transaction = db.transaction(['meta', 'notes'], 'readonly');
     const meta = await requestValue(transaction.objectStore('meta').get('notes-state'));
     const notes = await requestValue(transaction.objectStore('notes').getAll());
-    if (!meta || !notes.length) return;
+    // The reader is ready before IndexedDB finishes. Never let a delayed
+    // hydration replace notes created or edited during that short window.
+    if (!meta || !notes.length || notesRevision !== requestedRevision) return;
     const state = { ...meta, notes };
     nativeSetItem.call(local, KEYS.notes, JSON.stringify(state));
+    latestNotesState = state;
     saveNotes.previous = new Map(notes.filter(note => note?.id).map(note => [note.id, note]));
   };
   const restoreDrawings = async () => {
@@ -305,8 +314,12 @@
     storagePrototype.setItem = function patchedSetItem(key, value) {
       if (this !== local) { nativeSetItem.call(this, key, value); return; }
       if (key === KEYS.notes) {
-        saveNotes(toJson(value));
+        const state = toJson(value);
+        saveNotes(state);
+        latestNotesState = state && typeof state === 'object' ? state : null;
+        notesRevision += 1;
         queueBootCache(key, value);
+        document.dispatchEvent(new CustomEvent('chengmo:notes-state-updated'));
         return;
       }
       if (key === KEYS.annotations) {
@@ -330,6 +343,7 @@
     storagePrototype.removeItem = function patchedRemoveItem(key) {
       if (this === local) {
         bootCache.delete(key);
+        if (key === KEYS.notes) { latestNotesState = null; notesRevision += 1; }
         if (key === KEYS.drawings) drawingStateCache = {};
       }
       nativeRemoveItem.call(this, key);
@@ -337,7 +351,8 @@
   };
   mirrorStorageWrite();
   window.addEventListener('pagehide', flush, { capture: true });
-  window.chengmoStorage = { database, saveNotes: saveNotesFromObject, queueNoteBootCache, saveDrawing, queueDrawing, removeDrawing, getDrawing, getAllDrawings, flush, unpackStroke, packStroke, version: 2 };
+  const peekNotes = () => noteStateCache || latestNotesState || readJson(KEYS.notes, {});
+  window.chengmoStorage = { database, saveNotes: saveNotesFromObject, queueNoteBootCache, peekNotes, saveDrawing, queueDrawing, removeDrawing, getDrawing, getAllDrawings, flush, unpackStroke, packStroke, version: 2 };
   document.documentElement.dataset.chengmoPersistence = 'loading';
   window.chengmoStorageReady = database()
     .then(migrate)
