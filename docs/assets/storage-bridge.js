@@ -41,12 +41,18 @@
   let latestNotesState = null;
   let notesRevision = 0;
   let drawingStateCache = null;
+  let drawingBootCacheDirty = false;
   let bootCacheTimer = 0;
+  const jsonCache = new Map();
   const toJson = value => {
     try { return JSON.parse(value); } catch { return undefined; }
   };
   const readJson = (key, fallback) => {
-    const value = toJson(local.getItem(key));
+    const raw = local.getItem(key);
+    const cached = jsonCache.get(key);
+    if (cached?.raw === raw) return cached.value === undefined ? fallback : cached.value;
+    const value = toJson(raw);
+    jsonCache.set(key, { raw, value });
     return value === undefined ? fallback : value;
   };
   const open = () => new Promise((resolve, reject) => {
@@ -103,6 +109,7 @@
   let drawingFlushPromise = null;
   let drawingWritePromise = Promise.resolve();
   let drawingRetryTimer = 0;
+  const drawingReads = new Map();
   let metaTimer = 0;
   let metaRetryTimer = 0;
   const metaQueue = new Map();
@@ -245,8 +252,9 @@
       bootCache.set(KEYS.notes, JSON.stringify(noteStateCache));
       noteStateCache = null;
     }
-    if (drawingStateCache) {
+    if (drawingStateCache && drawingBootCacheDirty) {
       bootCache.set(KEYS.drawings, JSON.stringify(drawingStateCache));
+      drawingBootCacheDirty = false;
     }
     bootCache.forEach((value, key) => nativeSetItem.call(local, key, value));
     bootCache.clear();
@@ -267,6 +275,7 @@
   };
   const queueDrawingsCache = drawings => {
     drawingStateCache = drawings;
+    drawingBootCacheDirty = true;
     scheduleBootCacheFlush();
   };
   const queueMeta = (key, value) => {
@@ -408,9 +417,14 @@
   const getDrawing = async id => {
     const db = await database();
     if (!db || !id) return null;
-    const transaction = db.transaction('drawings', 'readonly');
-    const record = await requestValue(transaction.objectStore('drawings').get(id));
-    return record ? (record.strokes || []).map(unpackStroke) : null;
+    if (drawingReads.has(id)) return drawingReads.get(id);
+    const request = (async () => {
+      const transaction = db.transaction('drawings', 'readonly');
+      const record = await requestValue(transaction.objectStore('drawings').get(id));
+      return record ? (record.strokes || []).map(unpackStroke) : null;
+    })().finally(() => drawingReads.delete(id));
+    drawingReads.set(id, request);
+    return request;
   };
   const getAllDrawings = async () => {
     const db = await database();
@@ -456,6 +470,7 @@
       pendingNotesState = notesState;
       pendingAnnotations = annotations;
       drawingStateCache = drawings;
+      drawingBootCacheDirty = false;
       drawingRevision += 1;
     });
   };
@@ -486,6 +501,7 @@
         // imports and deletions. This avoids reparsing all drawing JSON on the
         // next stroke without allowing an older snapshot to overwrite data.
         drawingStateCache = drawings && typeof drawings === 'object' ? drawings : {};
+        drawingBootCacheDirty = false;
         if (drawings && typeof drawings === 'object') Object.entries(drawings).forEach(([id, strokes]) => Array.isArray(strokes) && queueDrawing(id, strokes));
         queueBootCache(key, value);
         return;
@@ -497,7 +513,7 @@
       if (this === local) {
         bootCache.delete(key);
         if (key === KEYS.notes) { latestNotesState = null; notesRevision += 1; }
-        if (key === KEYS.drawings) drawingStateCache = {};
+        if (key === KEYS.drawings) { drawingStateCache = {}; drawingBootCacheDirty = false; }
       }
       nativeRemoveItem.call(this, key);
     };
@@ -513,7 +529,6 @@
   window.chengmoStorageReady = database()
     .then(migrate)
     .then(hydrateNotes)
-    .then(restoreDrawings)
     .then(() => { document.documentElement.dataset.chengmoPersistence = 'ready'; })
     .catch(() => { document.documentElement.dataset.chengmoPersistence = 'fallback'; });
 })();
