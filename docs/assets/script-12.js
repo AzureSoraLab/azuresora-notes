@@ -8,6 +8,10 @@
   const drawingsKey = 'chengmo-freehand-annotations-v1';
   const drawingPreferencesKey = 'chengmo-freehand-drawing-preferences-v1';
   const pendingNoticeKey = 'chengmo-pending-notice';
+  const backupIcons = {
+    import: '<svg viewBox="0 0 1024 1024" aria-hidden="true"><path d="M878.933333 273.066667L896 256H128l85.333333 85.333333 298.666667 298.666667 64-64 302.933333-302.933333zM682.666667 341.333333l-170.666667 166.4L341.333333 341.333333h341.333334zM149.333333 768h725.333334v-85.333333h-725.333334v85.333333z"></path></svg>',
+    export: '<svg viewBox="0 0 1024 1024" aria-hidden="true"><path d="M878.933333 750.933333l17.066667 17.066667H128l85.333333-85.333333 298.666667-298.666667 64 64 302.933333 302.933333zM682.666667 682.666667l-170.666667-166.4L341.333333 682.666667h341.333334zM149.333333 256h725.333334v85.333333h-725.333334V256z"></path></svg>'
+  };
   const parse = key => { try { return JSON.parse(localStorage.getItem(key) || (key === notesKey ? '{}' : '[]')); } catch { return key === notesKey ? {} : []; } };
   const makeArray = value => Array.isArray(value) ? value : [];
   const makeRecord = value => value && typeof value === 'object' && !Array.isArray(value) ? value : {};
@@ -18,8 +22,8 @@
     const section = document.createElement('section'); section.className = 'data-tools';
     const title = document.createElement('p'); title.className = 'data-tools__title'; title.textContent = '\u6570\u636e\u7ba1\u7406';
     const toolActions = document.createElement('div'); toolActions.className = 'data-tools__actions';
-    const exportButton = document.createElement('button'); exportButton.type = 'button'; exportButton.textContent = '\u5bfc\u51fa\u5907\u4efd'; exportButton.title = '\u5bfc\u51fa\u5907\u4efd'; exportButton.setAttribute('aria-label', '\u5bfc\u51fa\u5907\u4efd');
-    const importButton = document.createElement('button'); importButton.type = 'button'; importButton.textContent = '\u5bfc\u5165\u5907\u4efd'; importButton.title = '\u5bfc\u5165\u5907\u4efd'; importButton.setAttribute('aria-label', '\u5bfc\u5165\u5907\u4efd');
+    const exportButton = document.createElement('button'); exportButton.type = 'button'; exportButton.className = 'data-tools__icon-button'; exportButton.innerHTML = backupIcons.export; exportButton.title = '\u5bfc\u51fa\u5907\u4efd'; exportButton.setAttribute('aria-label', '\u5bfc\u51fa\u5907\u4efd');
+    const importButton = document.createElement('button'); importButton.type = 'button'; importButton.className = 'data-tools__icon-button'; importButton.innerHTML = backupIcons.import; importButton.title = '\u5bfc\u5165\u5907\u4efd'; importButton.setAttribute('aria-label', '\u5bfc\u5165\u5907\u4efd');
     const file = document.createElement('input'); file.type = 'file'; file.accept = 'application/json,.json'; file.hidden = true;
     const notice = document.createElement('p'); notice.className = 'data-tools__notice'; notice.textContent = '\u5907\u4efd\u4ec5\u4fdd\u5b58\u5728\u6b64\u6d4f\u89c8\u5668\u4e2d';
     const show = (message, error = false) => { notice.textContent = message; notice.classList.toggle('is-error', error); window.chengmoNotice?.(message); };

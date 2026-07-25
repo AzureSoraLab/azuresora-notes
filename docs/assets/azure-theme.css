@@ -316,6 +316,16 @@ body,
   color: #54738a !important;
   box-shadow: none !important;
 }
+.data-tools__actions .data-tools__icon-button {
+  width: 30px !important;
+  min-width: 30px !important;
+  padding: 0 !important;
+}
+.data-tools__icon-button svg {
+  width: 16px;
+  height: 16px;
+  fill: currentColor;
+}
 .reader-actions { gap: 6px; }
 .reader-actions .complete,
 .reader-actions .annotate,
