@@ -19,6 +19,7 @@
   let selectionBox = null;
   let observer = null;
   let applyTimer = 0;
+  let touchSelectionTimer = 0;
   const longPressDelay = 500;
   const longPressMoveTolerance = 8;
   let annotationPointer = null;
@@ -346,6 +347,16 @@
     renderAnnotations();
     announce(kind === 'highlight' ? '已添加高亮标注' : '已添加下划线标注');
   }
+  const isMobileViewport = () => window.matchMedia('(max-width: 760px)').matches;
+  function positionSelectionMenu(rect) {
+    if (!menu || menu.classList.contains('selection-annotation-menu--card') || menu.classList.contains('selection-annotation-menu--manage')) return;
+    const menuWidth = menu.offsetWidth || 238;
+    const menuHeight = menu.offsetHeight || 88;
+    const left = Math.min(Math.max(rect.left + rect.width / 2, menuWidth / 2 + 8), window.innerWidth - menuWidth / 2 - 8);
+    const below = rect.bottom + 10;
+    menu.style.left = `${left}px`;
+    menu.style.top = `${below + menuHeight <= window.innerHeight - 8 ? below : Math.max(8, rect.top - menuHeight - 10)}px`;
+  }
   function showMenu() {
     const root = readerContent();
     const selection = window.getSelection();
@@ -356,12 +367,14 @@
     const start = offsetOf(root, range.startContainer, range.startOffset);
     const end = offsetOf(root, range.endContainer, range.endOffset);
     if (end <= start) return removeMenu();
+    if (menu && !menu.classList.contains('selection-annotation-menu--card') && !menu.classList.contains('selection-annotation-menu--manage') && selected?.start === start && selected?.end === end) {
+      positionSelectionMenu(rect);
+      return;
+    }
     removeMenu();
     selected = { start, end };
     menu = document.createElement('div');
     menu.className = 'selection-annotation-menu';
-    menu.style.left = `${rect.left + rect.width / 2}px`;
-    menu.style.top = `${Math.max(8, rect.bottom + 10)}px`;
     const colorRow = document.createElement('div');
     colorRow.className = 'selection-annotation-menu__colors';
     colors.forEach(color => {
@@ -386,12 +399,33 @@
     });
     menu.append(colorRow, actionRow);
     document.body.append(menu);
+    positionSelectionMenu(rect);
+  }
+  function scheduleTouchSelectionMenu() {
+    if (!isMobileViewport()) return;
+    window.clearTimeout(touchSelectionTimer);
+    // Mobile browsers finalize a handle drag after touchend. Waiting one short
+    // turn reads the completed native selection instead of a partial range.
+    touchSelectionTimer = window.setTimeout(() => {
+      touchSelectionTimer = 0;
+      const selection = window.getSelection();
+      if (selection?.isCollapsed || !selection?.toString().trim()) return;
+      showMenu();
+    }, 80);
   }
   document.addEventListener('mouseup', event => {
     if (suppressSelectionMenuOnce) { suppressSelectionMenuOnce = false; return; }
     if (event.target.closest('mark.selection-annotation')) return;
     if (menu?.contains(event.target)) return;
     window.setTimeout(showMenu, 0);
+  });
+  document.addEventListener('touchend', event => {
+    if (event.target.closest?.('mark.selection-annotation, .selection-annotation-menu')) return;
+    if (readerContent()?.contains(event.target)) scheduleTouchSelectionMenu();
+  }, true);
+  document.addEventListener('selectionchange', () => {
+    const selection = window.getSelection();
+    if (isMobileViewport() && selection && !selection.isCollapsed && selection.toString().trim()) scheduleTouchSelectionMenu();
   });
   document.addEventListener('mousedown', event => { if (menu && !menu.contains(event.target)) removeMenu(); });
   const clearAnnotationPointer = () => {
@@ -439,6 +473,12 @@
       // Click follows pointerup synchronously. Clear the guard afterwards so a
       // missing synthetic click cannot suppress a later normal activation.
       window.setTimeout(() => { if (suppressAnnotationClickId === annotationId) suppressAnnotationClickId = ''; }, 0);
+    } else if (event.pointerType === 'touch') {
+      // Some mobile browsers omit the synthetic click after a text interaction.
+      // Resolve a normal tap directly, then ignore any duplicate synthetic click.
+      suppressAnnotationClickId = pointer.target.dataset.annotationId || '';
+      showCommentCard(pointer.target);
+      window.setTimeout(() => { if (suppressAnnotationClickId === pointer.target.dataset.annotationId) suppressAnnotationClickId = ''; }, 0);
     }
     clearAnnotationPointer();
   });
@@ -450,6 +490,10 @@
     if (!mark) return;
     if (suppressAnnotationClickId && mark.dataset.annotationId === suppressAnnotationClickId) { suppressAnnotationClickId = ''; return; }
     event.preventDefault(); event.stopPropagation(); showCommentCard(mark);
+  });
+  document.addEventListener('contextmenu', event => {
+    // Long-press already opens this app's annotation controls on touch devices.
+    if (event.target.closest?.('mark.selection-annotation')) event.preventDefault();
   });
   document.addEventListener('keydown', event => {
     if (event.key !== 'Escape' || !menu) return;

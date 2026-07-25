@@ -2004,3 +2004,21 @@ html .reader-header .data-tools__actions button {
   .library.mobile-active .course-list-scroll { max-height: min(37vh, 276px); }
   .library.mobile-active .recent-notes { min-height: 118px; }
 }
+
+@media (max-width: 760px) {
+  .selection-annotation-menu:not(.selection-annotation-menu--card):not(.selection-annotation-menu--manage) {
+    width: min(238px, calc(100vw - 24px));
+    border-radius: 10px;
+    box-shadow: 0 9px 24px rgba(37, 58, 50, .2);
+  }
+  .selection-annotation-menu__colors { gap: 9px; padding: 11px 13px 10px; }
+  .selection-annotation-menu__color {
+    width: 22px;
+    height: 22px;
+  }
+  .selection-annotation-menu__action { height: 36px; }
+  .selection-annotation-menu--card,
+  .selection-annotation-menu--manage {
+    max-width: calc(100vw - 24px);
+  }
+}
