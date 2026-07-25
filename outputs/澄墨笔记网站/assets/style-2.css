@@ -3,6 +3,8 @@
 .reader-body > .drawing-canvas { position: absolute; z-index: 18; inset: 0 auto auto 0; display: block; width: var(--draw-page-width, 100%) !important; height: var(--draw-page-height, 100%) !important; max-width: none !important; pointer-events: none; touch-action: none; }
 .reader-body .drawing-layer { position: absolute; z-index: 18; inset: 0 auto auto 0; width: var(--draw-page-width, 100%); height: var(--draw-page-height, 100%); max-width: none; overflow: hidden; pointer-events: none; touch-action: none; }
 .drawing-layer .drawing-canvas { position: absolute; left: 0; display: block; width: 100% !important; height: var(--draw-chunk-height) !important; max-width: none !important; pointer-events: none; }
+.drawing-layer.is-ink-hidden { pointer-events: none !important; }
+.drawing-layer.is-ink-hidden .drawing-canvas { visibility: hidden; }
 .drawing-layer.is-drawing, .drawing-layer.is-selecting { pointer-events: auto; }
 .drawing-canvas.is-drawing, .drawing-layer.is-drawing { pointer-events: auto; cursor: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='19' height='19' viewBox='0 0 19 19'%3E%3Cpath d='M9.5 1v17M1 9.5h17' stroke='%23fff' stroke-width='2.8'/%3E%3Cpath d='M9.5 1v17M1 9.5h17' stroke='%23000' stroke-width='1'/%3E%3C/svg%3E") 9 9, crosshair; }
 .drawing-canvas.is-drawing.is-erasing, .drawing-layer.is-drawing.is-erasing { cursor: var(--draw-eraser-cursor, crosshair); }
@@ -18,6 +20,10 @@
 .zotero-draw-control__select { width: 28px; height: 30px; margin-left: 2px; padding: 0; border: 0; border-radius: 6px; background: transparent; color: #687570; cursor: pointer; }
 .zotero-draw-control__select:hover, .zotero-draw-control__select.is-active { background: #e6ece8; color: #365f53; }
 .zotero-draw-control__select svg { width: 17px; height: 17px; vertical-align: middle; }
+.zotero-draw-control__visibility { width: 28px; height: 30px; margin-left: 1px; padding: 0; border: 0; border-radius: 6px; background: transparent; color: #687570; cursor: pointer; }
+.zotero-draw-control__visibility:hover { background: #e6ece8; color: #365f53; }
+.zotero-draw-control__visibility.is-hidden { color: #a1aaa5; }
+.zotero-draw-control__visibility svg { width: 18px; height: 18px; vertical-align: middle; }
 .drawing-canvas.is-selecting { pointer-events: auto; cursor: default; }
 .drawing-canvas.is-selecting.is-dragging { cursor: grabbing; }
 .drawing-selection-delete { position: fixed; z-index: 10036; height: 26px; padding: 0 8px; border: 1px solid #d6ded9; border-radius: 5px; background: #fffefa; box-shadow: 0 3px 10px rgba(37,58,50,.14); color: #5c6862; font: 12px/24px Arial, "Microsoft YaHei", sans-serif; cursor: pointer; }

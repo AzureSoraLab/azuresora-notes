@@ -1,6 +1,7 @@
 (() => {
   const runtime = window.chengmoRuntime;
   const enqueue = runtime?.schedule || window.chengmoSchedule || ((_, task) => window.requestAnimationFrame(task));
+  const listen = runtime?.on || ((type, _, listener) => { document.addEventListener(type, listener); return () => document.removeEventListener(type, listener); });
   const stateKey = 'chengmo-notes-v1';
   const recentKey = 'chengmo-recent-notes-v1';
   const annotationKey = 'chengmo-text-selection-annotations-v1';
@@ -39,6 +40,13 @@
     const index = [...document.querySelectorAll('.course-button')].indexOf(active);
     return index < 0 ? '' : state.courses?.[index]?.id || '';
   };
+  const courseIdForButton = (button, state = readState()) => {
+    const ids = new Set((state.courses || []).map(course => course.id));
+    const keyed = reactKey(button, ids);
+    if (keyed) return keyed;
+    const index = [...document.querySelectorAll('.course-button')].indexOf(button);
+    return index < 0 ? '' : state.courses?.[index]?.id || '';
+  };
   const readSession = () => { try { return JSON.parse(localStorage.getItem(readingSessionKey) || 'null'); } catch { return null; } };
   const saveSession = () => {
     const state = readState();
@@ -66,11 +74,15 @@
     return resolved;
   };
   const applyDeleteControls = () => {
+    const cards = [...document.querySelectorAll('.compact-note')];
+    // Most observer callbacks are caused by a small React text update. When
+    // every rendered card is already bound, avoid rebuilding note metadata and
+    // notifying the other reader enhancements again.
+    if (!cards.some(card => !card.dataset.noteId || !card.querySelector(':scope > .compact-note__delete'))) return false;
     const state = readState();
     const courseId = activeCourseId(state);
     const query = document.querySelector('.search input')?.value?.toLowerCase() || '';
     const matchingNotes = visibleNotes(state, courseId, query);
-    const cards = [...document.querySelectorAll('.compact-note')];
     const knownIds = new Set((state.notes || []).map(note => note.id));
     const fallbackIds = fallbackCardIds(cards, matchingNotes);
     cards.forEach(noteButton => {
@@ -86,6 +98,30 @@
       const close = document.createElement('span'); close.className = 'compact-note__delete'; close.textContent = '\u00d7'; close.title = '\u5220\u9664\u7b14\u8bb0'; close.setAttribute('role', 'button'); close.setAttribute('aria-label', '\u5220\u9664\u7b14\u8bb0'); close.tabIndex = 0;
       close.addEventListener('pointerdown', event => event.stopPropagation()); close.addEventListener('keydown', event => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); event.currentTarget.click(); } }); noteButton.append(close);
     });
+    return true;
+  };
+  const applyCourseDeleteControls = () => {
+    const groups = [...document.querySelectorAll('.course-group')];
+    if (!groups.some(group => !group.dataset.courseId || !group.querySelector(':scope > .course-group__delete'))) return false;
+    const state = readState();
+    groups.forEach(group => {
+      const button = group.querySelector('.course-button');
+      const courseId = button && courseIdForButton(button, state);
+      const existing = group.querySelector('.course-group__delete');
+      if (!courseId) { existing?.remove(); return; }
+      group.dataset.courseId = courseId;
+      if (existing) return;
+      const remove = document.createElement('span');
+      remove.className = 'course-group__delete'; remove.textContent = '\u00d7';
+      remove.title = '\u5220\u9664\u5206\u7c7b'; remove.setAttribute('role', 'button');
+      remove.setAttribute('aria-label', '\u5220\u9664\u5206\u7c7b'); remove.tabIndex = 0;
+      remove.addEventListener('pointerdown', event => event.stopPropagation());
+      remove.addEventListener('keydown', event => {
+        if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); event.currentTarget.click(); }
+      });
+      group.append(remove);
+    });
+    return true;
   };
   const writeDeletion = ({ state, targetId, nextId, courseId }) => {
     const notes = Array.isArray(state.notes) ? state.notes : [];
@@ -137,9 +173,12 @@
       queued = true;
       const run = () => {
         queued = false;
-        applyDeleteControls();
+        const notesChanged = applyDeleteControls();
+        const coursesChanged = applyCourseDeleteControls();
         watchList();
-        document.dispatchEvent(new CustomEvent('chengmo:note-list-ready'));
+        // Other modules use this event to resolve freshly rendered list nodes.
+        // Do not wake them for observer noise when nothing in the list changed.
+        if (notesChanged || coursesChanged) document.dispatchEvent(new CustomEvent('chengmo:note-list-ready'));
         if (!sessionRestoreScheduled && !sessionStorage.getItem(keepListOpenKey)) {
           const session = readSession(); const state = readState();
           const savedNote = session?.noteId && (state.notes || []).find(note => note.id === session.noteId);
@@ -198,12 +237,39 @@
       hostObserver.observe(listHost, { childList: true });
       watchHost.current = listHost;
     };
-    document.addEventListener('chengmo:ui-mounted', () => { watchHost(); sync(); });
-    document.addEventListener('chengmo:note-created', event => { pendingCreatedNoteId = event.detail?.id || ''; sync(); });
-    document.addEventListener('chengmo:notes-state-updated', sync);
+    listen('chengmo:ui-mounted', 'note-controls-ui', () => { watchHost(); sync(); });
+    listen('chengmo:note-created', 'note-controls-created', event => { pendingCreatedNoteId = event.detail?.id || ''; sync(); });
+    listen('chengmo:notes-state-updated', 'note-controls-state', sync);
     watchHost();
     window.addEventListener('pagehide', saveSession);
     document.addEventListener('click', async event => {
+      const courseDelete = event.target.closest?.('.course-group__delete');
+      if (courseDelete) {
+        event.preventDefault(); event.stopPropagation();
+        const group = courseDelete.closest('.course-group'); const state = readState();
+        const courseId = group?.dataset.courseId || courseIdForButton(group?.querySelector('.course-button'), state);
+        const courses = Array.isArray(state.courses) ? state.courses : [];
+        const course = courses.find(item => item.id === courseId);
+        if (!course) { alert('\u65e0\u6cd5\u786e\u8ba4\u8fd9\u4e2a\u5206\u7c7b\u3002\u8bf7\u5237\u65b0\u540e\u91cd\u8bd5\u3002'); return; }
+        if (courses.length <= 1) { alert('\u81f3\u5c11\u4fdd\u7559\u4e00\u4e2a\u7b14\u8bb0\u5206\u7c7b\u3002'); return; }
+        const noteCount = (state.notes || []).filter(note => note?.courseId === courseId).length;
+        if (noteCount) {
+          alert(`\u300c${course.name}\u300d\u4e2d\u8fd8\u6709 ${noteCount} \u7bc7\u7b14\u8bb0\u3002\n\n\u4e3a\u4e86\u907f\u514d\u7b14\u8bb0\u88ab\u8bef\u5220\uff0c\u8bf7\u5148\u5728\u7f16\u8f91\u6a21\u5f0f\u5c06\u5b83\u4eec\u79fb\u52a8\u5230\u5176\u4ed6\u5206\u7c7b\u3002`);
+          return;
+        }
+        if (!confirm(`\u786e\u5b9a\u5220\u9664\u7a7a\u5206\u7c7b\u300c${course.name}\u300d\uff1f`)) return;
+        const remaining = courses.filter(item => item.id !== courseId);
+        try {
+          localStorage.setItem(stateKey, JSON.stringify({ ...state, courses: remaining }));
+          const session = readSession();
+          if (session?.courseId === courseId) localStorage.setItem(readingSessionKey, JSON.stringify({ ...session, courseId: remaining[0]?.id || '' }));
+          await window.chengmoStorage?.flush?.();
+          window.location.reload();
+        } catch {
+          alert('\u5220\u9664\u5206\u7c7b\u5931\u8d25\uff0c\u8bf7\u68c0\u67e5\u6d4f\u89c8\u5668\u7684\u672c\u5730\u5b58\u50a8\u540e\u91cd\u8bd5\u3002');
+        }
+        return;
+      }
       const close = event.target.closest?.('.compact-note__delete');
       if (!close) {
         if (event.target.closest?.('.compact-note, .course-button')) window.setTimeout(saveSession, 0);

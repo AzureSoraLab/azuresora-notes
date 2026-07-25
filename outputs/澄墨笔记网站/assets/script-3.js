@@ -3,16 +3,17 @@
 (() => {
   const runtime = window.chengmoRuntime;
   const enqueue = runtime?.schedule || window.chengmoSchedule || ((_, task) => window.requestAnimationFrame(task));
+  const listen = runtime?.on || ((type, _, listener) => { document.addEventListener(type, listener); return () => document.removeEventListener(type, listener); });
   const storageKey = 'chengmo-freehand-annotations-v1';
   const preferencesKey = 'chengmo-freehand-drawing-preferences-v1';
   const palette = [
     ['#f8d84b', '黄色'], ['#ff6b6b', '红色'], ['#72b64a', '绿色'], ['#3ca8df', '蓝色'],
     ['#a687e8', '紫色'], ['#d86ee8', '洋红'], ['#f39a3e', '橙色'], ['#a7aaa5', '灰色']
   ];
-  const defaultState = { color: palette[0][0], size: 2, eraserSize: 14, eraser: false, drawing: false, selecting: false };
+  const defaultState = { color: palette[0][0], size: 2, eraserSize: 14, eraser: false, drawing: false, selecting: false, inkVisible: true };
   let state = { ...defaultState };
   const chunkHeight = 900;
-  let canvas = null, context = null, activeStroke = null, selectedStroke = -1, dragStart = null, selectionAnchor = null, eraserPointerActive = false, saveTimer = 0, saveIdle = 0, pendingDrawingSave = null, redrawFrame = 0, eraseFrame = 0, pendingErasePoints = [], resizeObserver = null, scrollRoot = null, selectionDelete = null, observedDrawContent = null, colorButton = null;
+  let canvas = null, context = null, activeStroke = null, selectedStroke = -1, dragStart = null, selectionAnchor = null, eraserPointerActive = false, eraserDirty = false, saveTimer = 0, saveIdle = 0, pendingDrawingSave = null, redrawFrame = 0, eraseFrame = 0, pendingErasePoints = [], resizeObserver = null, scrollRoot = null, selectionDelete = null, observedDrawContent = null, colorButton = null;
   let chunkCanvases = new Map();
   let menu = null;
   let drawingStore = null;
@@ -61,11 +62,18 @@
   const saveDrawing = (id, strokes) => {
     if (!id) return;
     const data = read(); data[id] = strokes;
-    window.chengmoStorage?.saveDrawing?.(id, strokes);
-    // Retain a synchronous recovery snapshot as well. Refresh and tab close do
-    // not wait for IndexedDB, while localStorage can preserve this completed
-    // stroke immediately for the next reader boot.
-    write(data);
+    if (window.chengmoStorage?.saveDrawing) {
+      window.chengmoStorage.saveDrawing(id, strokes);
+    }
+    else write(data);
+  };
+  const persistRecoverySnapshot = (id = loadedNoteId, strokes = drawingsCache) => {
+    if (!id) return;
+    // Store each completed interaction synchronously. The full IndexedDB save
+    // remains batched below, but Ctrl+R immediately after lifting the pen must
+    // never lose a completed stroke.
+    if (window.chengmoStorage?.persistDrawingSnapshot) window.chengmoStorage.persistDrawingSnapshot(id, strokes);
+    else { const data = read(); data[id] = strokes; write(data); }
   };
   const flushDrawingSave = () => {
     if (!pendingDrawingSave) return;
@@ -187,11 +195,15 @@
     // The synchronous cache is written before deferred IndexedDB work. If it
     // already has this note, it may be newer after a quick close/reload.
     const cachedStrokes = Array.isArray(cachedDrawings[loadedNoteId]) ? cachedDrawings[loadedNoteId] : [];
+    // The recovery entry is intentionally scoped to one note, so completing a
+    // stroke never serializes another note's ink. It is newer than the boot
+    // cache when the page was refreshed before the deferred IndexedDB write.
+    const recoveryStrokes = window.chengmoStorage?.getDrawingRecovery?.(loadedNoteId);
     // An empty compatibility entry is not authoritative: it is commonly
     // created before the IndexedDB drawing record has hydrated after refresh.
     // Only non-empty local ink may be newer than an asynchronous IDB read.
-    const hasCachedDrawing = cachedStrokes.length > 0;
-    drawingsCache = cachedStrokes; selectedStroke = -1;
+    const hasCachedDrawing = Array.isArray(recoveryStrokes) || cachedStrokes.length > 0;
+    drawingsCache = Array.isArray(recoveryStrokes) ? recoveryStrokes : cachedStrokes; selectedStroke = -1;
     clearRenderedChunks(); invalidateGeometry(); markDrawingChanged();
     // IndexedDB is the canonical drawing store. The old localStorage record
     // supplies an immediate first paint, then a note-scoped read upgrades it
@@ -364,6 +376,7 @@
     // Deletion must be immediate: do not leave the old canvas pixels visible
     // while a debounced persistence/update cycle is waiting to run.
     window.clearTimeout(saveTimer); saveTimer = 0;
+    persistRecoverySnapshot();
     saveDrawing(loadedNoteId, drawingsCache);
     lastCanvasGeometry = ''; renderedRevision = -1;
     redraw();
@@ -397,7 +410,7 @@
       eraseFrame = 0;
       const points = pendingErasePoints; pendingErasePoints = [];
       const changed = erasePoints(points, state.eraserSize / 2);
-      if (changed) { queueSave(); scheduleRedraw(); }
+      if (changed) { eraserDirty = true; queueSave(); scheduleRedraw(); }
     });
   };
   const begin = event => {
@@ -416,7 +429,7 @@
     if (state.eraser) {
       // One click erases at that point; subsequent movement keeps erasing
       // until the pointer is released. Hovering alone never changes ink.
-      eraserPointerActive = true; queueErase(pointFor(event));
+      eraserPointerActive = true; eraserDirty = false; queueErase(pointFor(event));
       canvas.setPointerCapture?.(event.pointerId); return;
     }
     activeStroke = { color: state.color, size: state.size, eraser: false, points: [pointFor(event)] };
@@ -448,16 +461,17 @@
     if (!paintLiveSegments(activeStroke, points)) scheduleRedraw();
   };
   const end = event => {
-    if (state.selecting && dragStart) { event.preventDefault(); const moved = dragStart.moved; dragStart = null; canvas.classList.remove('is-dragging'); if (moved) queueSave(); return; }
+    if (state.selecting && dragStart) { event.preventDefault(); const moved = dragStart.moved; dragStart = null; canvas.classList.remove('is-dragging'); if (moved) { persistRecoverySnapshot(); queueSave(); } return; }
     if (state.eraser) {
       event.preventDefault();
-      if (eraseFrame) { cancelAnimationFrame(eraseFrame); eraseFrame = 0; const points = pendingErasePoints; pendingErasePoints = []; const changed = erasePoints(points, state.eraserSize / 2); if (changed) { queueSave(); scheduleRedraw(); } }
+      if (eraseFrame) { cancelAnimationFrame(eraseFrame); eraseFrame = 0; const points = pendingErasePoints; pendingErasePoints = []; const changed = erasePoints(points, state.eraserSize / 2); if (changed) { eraserDirty = true; queueSave(); scheduleRedraw(); } }
       eraserPointerActive = false; pendingErasePoints = [];
+      if (eraserDirty) persistRecoverySnapshot();
       return;
     }
     if (!activeStroke) return;
     event.preventDefault();
-    if (activeStroke.points.length) { drawingsCache.push(activeStroke); markDrawingChanged(); queueSave(); }
+    if (activeStroke.points.length) { drawingsCache.push(activeStroke); markDrawingChanged(); persistRecoverySnapshot(); queueSave(); }
     activeStroke = null;
     scheduleRedraw();
   };
@@ -505,29 +519,54 @@
       if (content) resizeObserver?.observe(content);
       invalidateGeometry();
     }
-    canvas.classList.toggle('is-drawing', state.drawing); canvas.classList.toggle('is-selecting', state.selecting); canvas.classList.toggle('is-erasing', state.eraser); scheduleRedraw();
+    canvas.classList.toggle('is-drawing', state.drawing); canvas.classList.toggle('is-selecting', state.selecting); canvas.classList.toggle('is-erasing', state.eraser); canvas.classList.toggle('is-ink-hidden', !state.inkVisible); scheduleRedraw();
   };
   const closeMenu = () => { if (menu) menu.hidden = true; if (colorButton) colorButton.setAttribute('aria-expanded', 'false'); };
+  const refreshInteractionUi = () => {
+    const control = document.querySelector('.zotero-draw-control');
+    control?.classList.toggle('is-active', state.drawing);
+    control?.querySelector('.zotero-draw-control__select')?.classList.toggle('is-active', state.selecting);
+    canvas?.classList.toggle('is-drawing', state.drawing);
+    canvas?.classList.toggle('is-selecting', state.selecting);
+    canvas?.classList.toggle('is-erasing', state.eraser);
+    canvas?.classList.toggle('is-ink-hidden', !state.inkVisible);
+  };
+  const leaveInteractionMode = () => {
+    if (!state.drawing && !state.selecting && !state.eraser) return false;
+    state.drawing = false; state.selecting = false; state.eraser = false;
+    selectedStroke = -1; selectionAnchor = null; dragStart = null;
+    if (selectionDelete) selectionDelete.hidden = true;
+    closeMenu(); refreshInteractionUi(); scheduleRedraw();
+    window.chengmoNotice?.('已退出绘图模式');
+    return true;
+  };
   const icon = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5.4 18.7 4 22l3.4-1.4L18 10a3.1 3.1 0 0 0-4.4-4.4L3 16.2l2.4 2.5Z" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/><path d="m12.2 7 4.7 4.7" fill="none" stroke="currentColor" stroke-width="1.7"/></svg>';
   const selectIcon = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 4v5M5 5h5M19 4v5m0-4h-5M5 20v-5m0 4h5m9 1v-5m0 4h-5" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="m10 9 5 4-2.8.5L11 16z" fill="currentColor"/></svg>';
+  const visibilityIcon = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2.8 12s3.3-5.3 9.2-5.3 9.2 5.3 9.2 5.3-3.3 5.3-9.2 5.3S2.8 12 2.8 12Z" fill="none" stroke="currentColor" stroke-width="1.65" stroke-linejoin="round"/><circle cx="12" cy="12" r="2.35" fill="none" stroke="currentColor" stroke-width="1.65"/></svg>';
   const eraserIcon = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m7 18 7.6-10.1a2.1 2.1 0 0 1 3.3 2.6L11.8 18H7Z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/><path d="M4 18h16" fill="none" stroke="currentColor" stroke-width="1.6"/></svg>';
   const mount = () => {
     const actions = document.querySelector('.reader-actions'); if (!actions || actions.querySelector('.zotero-draw-control')) return;
     const control = document.createElement('div'); control.className = 'zotero-draw-control';
-    control.innerHTML = `<button type="button" class="zotero-draw-control__button" title="绘图" aria-label="绘图">${icon}</button><button type="button" class="zotero-draw-control__select" title="选择笔迹" aria-label="选择笔迹">${selectIcon}</button><button type="button" class="zotero-draw-control__color" title="选择绘图颜色" aria-label="选择绘图颜色" aria-expanded="false"><span class="zotero-draw-control__swatch"></span><span class="zotero-draw-control__chevron"></span></button>`;
-    const drawButton = control.querySelector('.zotero-draw-control__button'); const selectButton = control.querySelector('.zotero-draw-control__select'); colorButton = control.querySelector('.zotero-draw-control__color'); const swatch = control.querySelector('.zotero-draw-control__swatch');
+    control.innerHTML = `<button type="button" class="zotero-draw-control__button" title="绘图" aria-label="绘图">${icon}</button><button type="button" class="zotero-draw-control__select" title="选择笔迹" aria-label="选择笔迹">${selectIcon}</button><button type="button" class="zotero-draw-control__visibility" title="隐藏笔迹" aria-label="隐藏笔迹" aria-pressed="true">${visibilityIcon}</button><button type="button" class="zotero-draw-control__color" title="选择绘图颜色" aria-label="选择绘图颜色" aria-expanded="false"><span class="zotero-draw-control__swatch"></span><span class="zotero-draw-control__chevron"></span></button>`;
+    const drawButton = control.querySelector('.zotero-draw-control__button'); const selectButton = control.querySelector('.zotero-draw-control__select'); const visibilityButton = control.querySelector('.zotero-draw-control__visibility'); colorButton = control.querySelector('.zotero-draw-control__color'); const swatch = control.querySelector('.zotero-draw-control__swatch');
     const update = () => {
       swatch.style.background = state.color; control.classList.toggle('is-active', state.drawing); selectButton.classList.toggle('is-active', state.selecting);
+      visibilityButton.classList.toggle('is-hidden', !state.inkVisible);
+      visibilityButton.title = state.inkVisible ? '隐藏笔迹' : '显示笔迹';
+      visibilityButton.setAttribute('aria-label', visibilityButton.title);
+      visibilityButton.setAttribute('aria-pressed', String(state.inkVisible));
       if (canvas) {
         const diameter = Math.max(12, Math.min(35, state.eraserSize));
         const center = Math.round(diameter / 2);
         const circle = `<svg xmlns="http://www.w3.org/2000/svg" width="${diameter}" height="${diameter}" viewBox="0 0 ${diameter} ${diameter}"><circle cx="${center}" cy="${center}" r="${Math.max(4, center - 1)}" fill="none" stroke="#000" stroke-width="1.25"/></svg>`;
         canvas.style.setProperty('--draw-eraser-cursor', `url("data:image/svg+xml,${encodeURIComponent(circle)}") ${center} ${center}, crosshair`);
         canvas.classList.toggle('is-erasing', state.eraser);
+        canvas.classList.toggle('is-ink-hidden', !state.inkVisible);
       }
     };
-    drawButton.addEventListener('click', () => { if (!noteId()) return; state.drawing = !state.drawing; state.selecting = false; selectedStroke = -1; selectionAnchor = null; dragStart = null; if (selectionDelete) selectionDelete.hidden = true; closeMenu(); syncCanvas(); update(); });
-    selectButton.addEventListener('click', () => { if (!noteId()) return; state.selecting = !state.selecting; state.drawing = false; selectedStroke = -1; selectionAnchor = null; dragStart = null; if (selectionDelete) selectionDelete.hidden = true; closeMenu(); syncCanvas(); update(); });
+    drawButton.addEventListener('click', () => { if (!noteId()) return; state.inkVisible = true; state.drawing = !state.drawing; state.selecting = false; state.eraser = false; selectedStroke = -1; selectionAnchor = null; dragStart = null; if (selectionDelete) selectionDelete.hidden = true; closeMenu(); syncCanvas(); update(); });
+    selectButton.addEventListener('click', () => { if (!noteId()) return; state.inkVisible = true; state.selecting = !state.selecting; state.drawing = false; state.eraser = false; selectedStroke = -1; selectionAnchor = null; dragStart = null; if (selectionDelete) selectionDelete.hidden = true; closeMenu(); syncCanvas(); update(); });
+    visibilityButton.addEventListener('click', () => { state.inkVisible = !state.inkVisible; if (!state.inkVisible) { state.drawing = false; state.selecting = false; state.eraser = false; selectedStroke = -1; selectionAnchor = null; dragStart = null; if (selectionDelete) selectionDelete.hidden = true; closeMenu(); } syncCanvas(); update(); });
     colorButton.addEventListener('click', event => { event.stopPropagation(); buildMenu(colorButton, update); });
     actions.prepend(control); update();
   };
@@ -545,15 +584,19 @@
   };
   document.addEventListener('click', event => { if (!event.target.closest('.zotero-draw-control, .zotero-draw-menu')) closeMenu(); });
   document.addEventListener('keydown', event => {
+    if (event.key === 'Escape' && !event.target.matches('input, textarea, [contenteditable="true"]')) {
+      if (leaveInteractionMode()) { event.preventDefault(); return; }
+      closeMenu();
+    }
     if ((event.key === 'Delete' || event.key === 'Backspace') && state.selecting && selectedStroke >= 0 && !event.target.matches('input, textarea, [contenteditable="true"]')) { event.preventDefault(); deleteSelectedStroke(); }
   });
   const scheduleMountAndSync = () => {
     const run = () => { mount(); syncCanvas(); };
     enqueue('drawing-ui', run);
   };
-  document.addEventListener('chengmo:ui-mounted', scheduleMountAndSync);
+  listen('chengmo:ui-mounted', 'drawing-ui', scheduleMountAndSync);
   // IDs are attached by the note-list enhancer after React commits the list.
-  document.addEventListener('chengmo:note-list-ready', scheduleMountAndSync);
+  listen('chengmo:note-list-ready', 'drawing-note-list', scheduleMountAndSync);
   const clearOutgoingDrawing = () => {
     if (saveTimer || saveIdle || pendingDrawingSave) flushDrawingSave();
     activeStroke = null; eraserPointerActive = false; pendingErasePoints = [];
@@ -592,7 +635,7 @@
     const card = event.target.closest?.('.compact-note');
     if (card && !event.target.closest('.compact-note__delete')) beginNoteSwitch(card);
   }, true);
-  document.addEventListener('chengmo:note-selected', () => {
+  listen('chengmo:note-selected', 'drawing-note-selected', () => {
     // Some navigation paths invoke a note card programmatically. Recheck on
     // the next frame after React has committed the reader.
     requestAnimationFrame(scheduleMountAndSync);

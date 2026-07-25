@@ -2,6 +2,7 @@
 (() => {
   const runtime = window.chengmoRuntime;
   const enqueue = runtime?.schedule || window.chengmoSchedule || ((_, task) => window.requestAnimationFrame(task));
+  const listen = runtime?.on || ((type, _, listener) => { document.addEventListener(type, listener); return () => document.removeEventListener(type, listener); });
   const storageKey = 'chengmo-text-selection-annotations-v1';
   const colors = ['#f8d84b', '#ff6b6b', '#72b64a', '#3ca8df', '#a687e8', '#d86ee8', '#f39a3e', '#a7aaa5'];
   let selected = null;
@@ -382,8 +383,8 @@
   window.addEventListener('load', () => window.setTimeout(scheduleAnnotationRender, 100));
   // React may replace the reader body during a note switch; redraw only once
   // after the existing UI lifecycle event instead of retaining a stale observer.
-  document.addEventListener('chengmo:ui-mounted', () => { removeMenu(); scheduleAnnotationRender(); });
-  document.addEventListener('chengmo:annotations-changed', event => {
+  listen('chengmo:ui-mounted', 'text-annotations-ui', () => { removeMenu(); scheduleAnnotationRender(); });
+  listen('chengmo:annotations-changed', 'text-annotations-data', event => {
     // The shelf can edit metadata directly. Drop this module's cached copy so a
     // later reader-side edit never writes stale tags or comments back to storage.
     if (event.detail?.source !== 'reader') { cachedItems = null; annotationsByNote = null; }

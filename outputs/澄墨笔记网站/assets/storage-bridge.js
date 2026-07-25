@@ -23,6 +23,7 @@
     notes: 'chengmo-notes-v1',
     annotations: 'chengmo-text-selection-annotations-v1',
     drawings: 'chengmo-freehand-annotations-v1',
+    drawingRecovery: 'chengmo-freehand-recovery-v1',
     preferences: 'chengmo-freehand-drawing-preferences-v1',
     recent: 'chengmo-recent-notes-v1',
     session: 'chengmo-reading-session-v1'
@@ -296,6 +297,18 @@
     queueDrawingsCache(current);
     queueDrawing(id, strokes);
   };
+  const persistDrawingSnapshot = (id, strokes) => {
+    if (!id || !Array.isArray(strokes)) return;
+    // Keep only the just-finished note synchronous. Writing the complete ink
+    // library for every pen-up made long notes stutter, while this small
+    // recovery record still survives an immediate Ctrl+R.
+    try { nativeSetItem.call(local, KEYS.drawingRecovery, JSON.stringify({ id, strokes, updatedAt: Date.now() })); } catch {}
+  };
+  const getDrawingRecovery = id => {
+    if (!id) return null;
+    const record = readJson(KEYS.drawingRecovery, null);
+    return record?.id === id && Array.isArray(record.strokes) ? record.strokes : null;
+  };
   const removeDrawing = id => {
     if (!id) return;
     drawingQueue.delete(id);
@@ -495,7 +508,7 @@
   document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') flush().catch(() => {}); }, { capture: true });
   window.addEventListener('pagehide', () => { flush().catch(() => {}); }, { capture: true });
   const peekNotes = () => noteStateCache || latestNotesState || readJson(KEYS.notes, {});
-  window.chengmoStorage = { database, saveNotes: saveNotesFromObject, queueNoteBootCache, peekNotes, saveDrawing, queueDrawing, removeDrawing, getDrawing, getAllDrawings, replaceSnapshot, flush, unpackStroke, packStroke, version: 2 };
+  window.chengmoStorage = { database, saveNotes: saveNotesFromObject, queueNoteBootCache, peekNotes, saveDrawing, persistDrawingSnapshot, getDrawingRecovery, queueDrawing, removeDrawing, getDrawing, getAllDrawings, replaceSnapshot, flush, unpackStroke, packStroke, version: 2 };
   document.documentElement.dataset.chengmoPersistence = 'loading';
   window.chengmoStorageReady = database()
     .then(migrate)

@@ -2,6 +2,7 @@
 (() => {
   const runtime = window.chengmoRuntime;
   const enqueue = runtime?.schedule || window.chengmoSchedule || ((_, task) => window.requestAnimationFrame(task));
+  const listen = runtime?.on || ((type, _, listener) => { document.addEventListener(type, listener); return () => document.removeEventListener(type, listener); });
   const key = 'chengmo-text-selection-annotations-v1';
   const palette = ['#f8d84b', '#ff6b6b', '#72b64a', '#3ca8df', '#a687e8', '#d86ee8', '#f39a3e', '#a7aaa5'];
   let filter = null;
@@ -140,7 +141,7 @@
     };
     // The data-tools module emits this only when React replaces a major UI region.
     // Rebinding the header is enough; observing the entire root caused needless work.
-    document.addEventListener('chengmo:ui-mounted', () => { outlineCache = { root: null, signature: '', items: [] }; watchHeader(); });
+    listen('chengmo:ui-mounted', 'annotation-shelf-position', () => { outlineCache = { root: null, signature: '', items: [] }; watchHeader(); });
     watchHeader();
     toggle.addEventListener('click', () => { const hidden = shelf.classList.toggle('is-hidden'); toggle.classList.toggle('is-open', !hidden); toggle.title = hidden ? '\u663e\u793a\u6807\u6ce8' : '\u9690\u85cf\u6807\u6ce8'; if (!hidden) { positionToggle(); positionShelf(); render(); } });
     window.addEventListener('resize', () => schedulePosition(true), { passive: true });
@@ -188,8 +189,8 @@
     });
   }
   window.addEventListener('load', () => { build(); render(); });
-  document.addEventListener('chengmo:ui-mounted', () => { closeTagPopover(); invalidateShelfIndex(true); scheduleRender(); });
-  document.addEventListener('chengmo:annotations-changed', event => {
+  listen('chengmo:ui-mounted', 'annotation-shelf-ui', () => { closeTagPopover(); invalidateShelfIndex(true); scheduleRender(); });
+  listen('chengmo:annotations-changed', 'annotation-shelf-data', event => {
     cachedItems = null;
     const detail = event.detail || {};
     const changes = detail.changes || {};

@@ -2,6 +2,7 @@
 (() => {
   const runtime = window.chengmoRuntime;
   const enqueue = runtime?.schedule || window.chengmoSchedule || ((_, task) => window.requestAnimationFrame(task));
+  const listen = runtime?.on || ((type, _, listener) => { document.addEventListener(type, listener); return () => document.removeEventListener(type, listener); });
   let observedSearch = null;
   let observer = null;
   let queued = false;
@@ -40,5 +41,5 @@
     const input = document.querySelector('.search input'); if (!input) return;
     event.preventDefault(); input.focus(); input.select();
   }, true);
-  document.addEventListener('chengmo:ui-mounted', schedule); window.addEventListener('load', schedule); schedule();
+  listen('chengmo:ui-mounted', 'note-search-ui', schedule); window.addEventListener('load', schedule); schedule();
 })();

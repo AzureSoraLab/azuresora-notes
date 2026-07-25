@@ -5,6 +5,7 @@
   const maxRecent = 6;
   const runtime = window.chengmoRuntime;
   const enqueue = runtime?.schedule || window.chengmoSchedule || ((_, task) => window.requestAnimationFrame(task));
+  const listen = runtime?.on || ((type, _, listener) => { document.addEventListener(type, listener); return () => document.removeEventListener(type, listener); });
   const readRecent = () => { try { const value = JSON.parse(localStorage.getItem(recentKey) || '[]'); return Array.isArray(value) ? value : []; } catch { return []; } };
   const saveRecent = items => localStorage.setItem(recentKey, JSON.stringify(items.slice(0, maxRecent)));
   const noteState = () => { try { const value = JSON.parse(localStorage.getItem(stateKey) || '{}'); return value && typeof value === 'object' ? value : {}; } catch { return {}; } };
@@ -77,10 +78,11 @@
     const courseButton = courseButtonForId(note.courseId, state);
     if (!courseButton) return;
     let complete = false;
+    let stopWaitingForList = null;
     const finish = () => {
       if (complete) return;
       complete = true;
-      document.removeEventListener('chengmo:note-list-ready', tryOpen);
+      stopWaitingForList?.(); stopWaitingForList = null;
       window.clearTimeout(timeout);
       if (window.chengmoSilentCourseSwitch === note.courseId) window.chengmoSilentCourseSwitch = '';
     };
@@ -103,7 +105,7 @@
     // The core course handler reads this marker and changes categories while
     // preserving a closed note list. No temporary panel is ever rendered.
     window.chengmoSilentCourseSwitch = note.courseId;
-    document.addEventListener('chengmo:note-list-ready', tryOpen);
+    stopWaitingForList = listen('chengmo:note-list-ready', 'recent-notes-navigation', tryOpen);
     courseButton.click();
     window.requestAnimationFrame(tryOpen);
   }
@@ -119,14 +121,18 @@
       const storage = content.querySelector('.storage-note'); content.insertBefore(section, storage || null);
     }
     const items = validRecentNotes(state);
-    const signature = items.map(note => `${note.id}|${noteTitle(note)}|${noteSubtitle(note)}`).join('\u001f');
+    const currentId = document.querySelector('.compact-note.selected')?.dataset.noteId || '';
+    const signature = `${currentId}\u001e${items.map(note => `${note.id}|${noteTitle(note)}|${noteSubtitle(note)}`).join('\u001f')}`;
     if (!force && section.dataset.recentSignature === signature) return;
     section.replaceChildren();
     const title = document.createElement('p'); title.className = 'recent-notes__title'; title.textContent = '最近阅读笔记'; section.append(title);
     if (!items.length) { const empty = document.createElement('p'); empty.className = 'recent-notes__empty'; empty.textContent = '\u6253\u5f00\u8fc7\u7684\u7b14\u8bb0\u4f1a\u663e\u793a\u5728\u8fd9\u91cc\u3002'; section.append(empty); return; }
     items.forEach(note => {
       const button = document.createElement('button'); button.type = 'button'; button.className = 'recent-notes__item';
-      button.dataset.noteId = note.id; button.title = noteTitle(note); button.textContent = noteTitle(note); section.append(button);
+      const isCurrent = note.id === currentId;
+      button.dataset.noteId = note.id; button.title = isCurrent ? `正在阅读：${noteTitle(note)}` : noteTitle(note);
+      button.classList.toggle('is-current', isCurrent); button.setAttribute('aria-current', isCurrent ? 'page' : 'false');
+      button.textContent = noteTitle(note); section.append(button);
     });
     section.dataset.recentSignature = signature;
   }
@@ -159,8 +165,8 @@
       observedContent = content;
     };
     const syncAndWatch = () => { watchContent(); scheduleSync(true); };
-    document.addEventListener('chengmo:ui-mounted', syncAndWatch);
-    document.addEventListener('chengmo:note-selected', scheduleSync);
+    listen('chengmo:ui-mounted', 'recent-notes-ui', syncAndWatch);
+    listen('chengmo:note-selected', 'recent-notes-selection', scheduleSync);
     window.addEventListener('storage', event => { if (event.key === stateKey || event.key === recentKey) scheduleSync(true); });
     syncAndWatch();
   };

@@ -69,8 +69,8 @@
 .markdown :is(pre, .katex-display)::-webkit-scrollbar-thumb { border-radius: 99px; background: #83958a; }
 
 .zotero-draw-control { border-right-color: #e7ebe6; }
-.zotero-draw-control__button, .zotero-draw-control__select { color: #65756e; }
-.zotero-draw-control__button:focus-visible, .zotero-draw-control__select:focus-visible,
+.zotero-draw-control__button, .zotero-draw-control__select, .zotero-draw-control__visibility { color: #65756e; }
+.zotero-draw-control__button:focus-visible, .zotero-draw-control__select:focus-visible, .zotero-draw-control__visibility:focus-visible,
 .zotero-draw-control__color:focus-visible { outline: 2px solid #7ba895; outline-offset: 1px; }
 .zotero-draw-menu { border-color: #dce4dd; border-radius: 9px; box-shadow: 0 10px 26px rgba(37, 58, 50, .14); }
 .zotero-draw-menu__color, .zotero-draw-menu__eraser { border-left: 2px solid transparent; }
@@ -148,8 +148,22 @@
 .section-title { padding-bottom: 9px; }
 .course-button { min-height: 33px; margin: 2px 0; padding: 7px 8px; border-radius: 6px; }
 .course-button.active { background: #e3ede7; box-shadow: inset 2px 0 0 #5d897a; }
+.course-section { min-height: 0; }
+.course-section .course-group { position: relative; }
+.course-section .course-button { width: 100%; padding-right: 82px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.course-group .category-edit { position: absolute; z-index: 1; top: 50%; right: 34px; margin: 0; padding: 3px 5px; transform: translateY(-50%); }
+.course-group__delete { position: absolute; z-index: 1; top: 50%; right: 7px; display: grid; width: 22px; height: 22px; place-items: center; border-radius: 5px; color: #94a09a; font: 18px/1 Arial, sans-serif; cursor: pointer; opacity: 0; transform: translateY(-50%); transition: opacity .14s ease, background .14s ease, color .14s ease; }
+.course-group:hover .course-group__delete, .course-group:focus-within .course-group__delete { opacity: 1; }
+.course-group__delete:hover, .course-group__delete:focus-visible { outline: 0; background: #f5e9e6; color: #a55e55; }
+/* Let a long category list breathe without pushing recent notes off-screen. */
+.course-section:has(.course-group:nth-of-type(7)) { max-height: min(34vh, 252px); padding-right: 2px; overflow-y: auto; overscroll-behavior: contain; }
+.course-section:has(.course-group:nth-of-type(7))::-webkit-scrollbar { width: 6px; }
+.course-section:has(.course-group:nth-of-type(7))::-webkit-scrollbar-thumb { border-radius: 99px; background: #c7d1c9; }
+.course-section:has(.course-group:nth-of-type(7)) .section-title { position: sticky; z-index: 1; top: 0; background: #f7f8f3; }
 .recent-notes { margin-top: 20px; padding-top: 14px; }
 .recent-notes__item { min-height: 29px; padding: 6px 8px; border-radius: 6px; }
+.recent-notes__item.is-current { color: #315e52; background: #e8f1eb; box-shadow: inset 2px 0 0 #5d897a; font-weight: 600; }
+.recent-notes__item.is-current::after { position: absolute; right: 8px; color: #719182; content: '当前'; font-size: 11px; font-weight: 500; }
 
 .note-list-header { padding: 17px 16px 12px; background: #fbfaf7; }
 .note-list-header p { margin-bottom: 3px; }
@@ -217,6 +231,7 @@
    the glyphs upward inside their buttons. */
 .zotero-draw-control__button,
 .zotero-draw-control__select,
+.zotero-draw-control__visibility,
 .reader-actions > button:has(svg) {
   display: inline-flex;
   align-items: center;
@@ -225,6 +240,7 @@
 }
 .zotero-draw-control__button svg,
 .zotero-draw-control__select svg,
+.zotero-draw-control__visibility svg,
 .reader-actions > button:has(svg) svg {
   display: block;
   flex: 0 0 auto;
