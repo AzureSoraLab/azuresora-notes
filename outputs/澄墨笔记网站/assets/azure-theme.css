@@ -1368,10 +1368,6 @@ html .reader-header .data-tools__actions button {
   background: var(--paper-surface) !important;
   border-right-color: var(--paper-line) !important;
 }
-.note-list .note-list-header {
-  background: var(--paper-header) !important;
-  border-color: var(--paper-line) !important;
-}
 .library-collapsed .sidebar-toggle,
 .note-list__close {
   border-color: var(--paper-line) !important;
