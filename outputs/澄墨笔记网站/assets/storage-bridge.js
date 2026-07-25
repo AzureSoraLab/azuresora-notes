@@ -91,6 +91,7 @@
     return { color: colorFromNumber(stroke?.color), size: Number(stroke?.size) || 2, eraser: Boolean(stroke?.eraser), points };
   };
   let dbPromise = null;
+  let noteWritePromise = Promise.resolve();
   let drawingTimer = 0;
   let drawingIdle = 0;
   const drawingQueue = new Map();
@@ -134,15 +135,17 @@
     const removed = [...previous.keys()].filter(id => !currentIds.has(id));
     const changed = state.notes.filter(note => note?.id && previous.get(note.id) !== note);
     saveNotes.previous = new Map(state.notes.filter(note => note?.id).map(note => [note.id, note]));
-    database().then(db => {
+    noteWritePromise = noteWritePromise.catch(() => {}).then(async () => {
+      const db = await database();
       if (!db) return;
       const transaction = db.transaction(['meta', 'notes'], 'readwrite');
       transaction.objectStore('meta').put(meta, 'notes-state');
       const notes = transaction.objectStore('notes');
       changed.forEach(note => notes.put({ ...note }));
       removed.forEach(id => notes.delete(id));
-      return complete(transaction);
+      await complete(transaction);
     }).catch(() => {});
+    return noteWritePromise;
   };
   const saveNotesFromObject = state => {
     saveNotes(state);
@@ -239,8 +242,7 @@
     if (metaTimer) { window.clearTimeout(metaTimer); metaTimer = 0; }
     if (bootCacheTimer) { window.clearTimeout(bootCacheTimer); bootCacheTimer = 0; }
     flushBootCache();
-    flushMeta().catch(() => {});
-    flushDrawings().catch(() => {});
+    return Promise.all([noteWritePromise, flushMeta().catch(() => {}), flushDrawings().catch(() => {})]);
   };
   const migrate = async () => {
     if (local.getItem(migrationKey) === '1') return;

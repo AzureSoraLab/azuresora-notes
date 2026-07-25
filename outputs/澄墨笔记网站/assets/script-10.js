@@ -97,9 +97,6 @@
       localStorage.setItem(stateKey, JSON.stringify({ ...state, notes: notes.filter(note => note.id !== targetId) }));
       if (nextId) localStorage.setItem(readingSessionKey, JSON.stringify({ noteId: nextId, courseId, listOpen: true }));
       else localStorage.removeItem(readingSessionKey);
-      // The storage bridge batches compatibility-cache writes. A deletion
-      // reloads immediately, so flush this transaction before navigation.
-      window.chengmoStorage?.flush?.();
       return true;
     } catch {
       try { restoreSnapshot(); } catch {}
@@ -202,7 +199,7 @@
     document.addEventListener('chengmo:notes-state-updated', sync);
     watchHost();
     window.addEventListener('pagehide', saveSession);
-    document.addEventListener('click', event => {
+    document.addEventListener('click', async event => {
       const close = event.target.closest?.('.compact-note__delete');
       if (!close) {
         if (event.target.closest?.('.compact-note, .course-button')) window.setTimeout(saveSession, 0);
@@ -237,6 +234,9 @@
       // current list and reader target, then restore them exactly once.
       sessionStorage.setItem(keepListOpenKey, JSON.stringify({ courseId, nextId, query }));
       sessionStorage.setItem('chengmo-pending-notice', JSON.stringify({ message: `\u5df2\u5220\u9664\u300c${noteTitle(target)}\u300d\u3002` }));
+      // Wait for the asynchronous note store before reloading. Otherwise a
+      // long-running IndexedDB write can restore the old note on the next page.
+      try { await window.chengmoStorage?.flush?.(); } catch {}
       window.location.reload();
     }, true);
   };
