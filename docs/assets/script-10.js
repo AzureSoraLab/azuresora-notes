@@ -2,6 +2,7 @@
   const runtime = window.chengmoRuntime;
   const enqueue = runtime?.schedule || window.chengmoSchedule || ((_, task) => window.requestAnimationFrame(task));
   const listen = runtime?.on || ((type, _, listener) => { document.addEventListener(type, listener); return () => document.removeEventListener(type, listener); });
+  const emit = runtime?.emit || ((type, detail) => document.dispatchEvent(new CustomEvent(type, { detail })));
   const stateKey = 'chengmo-notes-v1';
   const recentKey = 'chengmo-recent-notes-v1';
   const annotationKey = 'chengmo-text-selection-annotations-v1';
@@ -263,7 +264,7 @@
         watchList(listContext.list);
         // Other modules use this event to resolve freshly rendered list nodes.
         // Do not wake them for observer noise when nothing in the list changed.
-        if (notesChanged || coursesChanged) document.dispatchEvent(new CustomEvent('chengmo:note-list-ready'));
+        if (notesChanged || coursesChanged) emit('chengmo:note-list-ready');
         if (!sessionRestoreScheduled && !sessionStorage.getItem(keepListOpenKey)) {
           const session = readSession(); const state = readState();
           const savedNote = session?.noteId && (state.notes || []).find(note => note.id === session.noteId);

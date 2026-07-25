@@ -3,6 +3,7 @@
   const runtime = window.chengmoRuntime;
   const enqueue = runtime?.schedule || window.chengmoSchedule || ((_, task) => window.requestAnimationFrame(task));
   const listen = runtime?.on || ((type, _, listener) => { document.addEventListener(type, listener); return () => document.removeEventListener(type, listener); });
+  const emit = runtime?.emit || ((type, detail) => document.dispatchEvent(new CustomEvent(type, { detail })));
   const storageKey = 'chengmo-text-selection-annotations-v1';
   const colors = ['#f8d84b', '#ff6b6b', '#72b64a', '#3ca8df', '#a687e8', '#d86ee8', '#f39a3e', '#a7aaa5'];
   const displayColor = color => color || colors[0];
@@ -59,7 +60,7 @@
     cachedItems = items;
     annotationsByNote = null; annotationsById = null;
     localStorage.setItem(storageKey, JSON.stringify(items));
-    document.dispatchEvent(new CustomEvent('chengmo:annotations-changed', { detail: { ...detail, source: 'reader' } }));
+    emit('chengmo:annotations-changed', { ...detail, source: 'reader' });
   };
   const offsetOf = (root, container, offset) => {
     const range = document.createRange();

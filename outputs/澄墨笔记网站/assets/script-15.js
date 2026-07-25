@@ -1,5 +1,9 @@
 /* A lightweight reader-only paper selector that survives React header renders. */
 (() => {
+  const runtime = window.chengmoRuntime;
+  const enqueue = runtime?.schedule || window.chengmoSchedule || ((_, task) => window.requestAnimationFrame(task));
+  const listen = runtime?.on || ((type, _, listener) => { document.addEventListener(type, listener); return () => document.removeEventListener(type, listener); });
+  const emit = runtime?.emit || ((type, detail) => document.dispatchEvent(new CustomEvent(type, { detail })));
   const STORAGE_KEY = 'chengmo-paper-theme-v1';
   const themes = {
     sage: '豆沙绿',
@@ -38,7 +42,7 @@
       if (persist) {
         try { if (localStorage.getItem(STORAGE_KEY) !== value) localStorage.setItem(STORAGE_KEY, value); } catch {}
       }
-      document.dispatchEvent(new CustomEvent('chengmo:paper-theme-changed', { detail: { theme: value } }));
+      emit('chengmo:paper-theme-changed', { theme: value });
     }
     syncThemeControls();
   };
@@ -84,26 +88,29 @@
   const scheduleMount = () => {
     if (queued) return;
     queued = true;
-    mountFrame = requestAnimationFrame(mount);
+    mountFrame = enqueue('paper-theme-controls', mount);
   };
   document.addEventListener('click', event => {
     if (!event.target.closest('[data-paper-theme-control]')) document.querySelectorAll('[data-paper-theme-control]').forEach(closeMenu);
   });
   setTheme(readTheme(), false);
-  const root = document.getElementById('root') || document.body;
-  new MutationObserver(records => {
-    // Ignore canvas chunks and markdown changes; only a replaced reader header
-    // needs the lightweight presence check again.
-    if (records.some(record => {
-      const target = record.target;
-      const inHeader = target instanceof Element && (target.matches('.reader-header, .reader-actions') || target.closest('.reader-header'));
-      const addsHeader = [...record.addedNodes].some(node => node instanceof Element && (node.matches('.reader-header, .reader-actions') || node.querySelector('.reader-header, .reader-actions')));
-      return inHeader || addsHeader;
-    })) scheduleMount();
-  }).observe(root, { childList: true, subtree: true });
+  let observedHeader = null;
+  let headerObserver = null;
+  const watchHeader = () => {
+    const header = document.querySelector('.reader-header');
+    if (!header || header === observedHeader) return;
+    headerObserver?.disconnect();
+    // Watch only the compact action region. Observing the full React root made
+    // paper-control checks run for every markdown and canvas update.
+    headerObserver = new MutationObserver(scheduleMount);
+    headerObserver.observe(header, { childList: true, subtree: true });
+    observedHeader = header;
+  };
+  const syncAndWatch = () => { watchHeader(); scheduleMount(); };
+  listen('chengmo:ui-mounted', 'paper-theme-ui', syncAndWatch);
   window.addEventListener('storage', event => {
     if (event.key === STORAGE_KEY) setTheme(event.newValue, false);
   });
-  window.addEventListener('load', scheduleMount, { once: true });
-  scheduleMount();
+  window.addEventListener('load', syncAndWatch, { once: true });
+  syncAndWatch();
 })();

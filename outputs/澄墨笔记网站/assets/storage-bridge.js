@@ -7,6 +7,7 @@
  * and provides a fast recovery path when the synchronous cache is unavailable.
  */
 (() => {
+  const emit = (type, detail) => window.chengmoRuntime?.emit?.(type, detail) || document.dispatchEvent(new CustomEvent(type, { detail }));
   let local;
   try { local = window.localStorage; } catch {
     // Preview sandboxes sometimes deny storage entirely. Keep the reader
@@ -230,7 +231,7 @@
   const saveNotesFromObject = state => {
     saveNotes(state);
     queueNoteBootCache(state);
-    document.dispatchEvent(new CustomEvent('chengmo:notes-state-updated'));
+    emit('chengmo:notes-state-updated');
   };
   const flushAnnotations = async () => {
     if (annotationFlushPromise) return annotationFlushPromise;
@@ -519,7 +520,7 @@
         latestNotesState = state && typeof state === 'object' ? state : null;
         notesRevision += 1;
         queueBootCache(key, value);
-        document.dispatchEvent(new CustomEvent('chengmo:notes-state-updated'));
+        emit('chengmo:notes-state-updated');
         return;
       }
       if (key === KEYS.annotations) {

@@ -3,6 +3,7 @@
   const runtime = window.chengmoRuntime;
   const enqueue = runtime?.schedule || window.chengmoSchedule || ((_, task) => window.requestAnimationFrame(task));
   const listen = runtime?.on || ((type, _, listener) => { document.addEventListener(type, listener); return () => document.removeEventListener(type, listener); });
+  const emit = runtime?.emit || ((type, detail) => document.dispatchEvent(new CustomEvent(type, { detail })));
   const key = 'chengmo-text-selection-annotations-v1';
   const palette = ['#f8d84b', '#ff6b6b', '#72b64a', '#3ca8df', '#a687e8', '#d86ee8', '#f39a3e', '#a7aaa5'];
   const clamp = (value, min, max) => Math.max(min, Math.min(Math.max(min, max), value));
@@ -57,7 +58,7 @@
     outlineDirty = false;
     return outlineCache.items;
   };
-  const commit = (detail = {}, invalidate = true) => { if (invalidate) invalidateShelfIndex(); localStorage.setItem(key, JSON.stringify(read())); document.dispatchEvent(new CustomEvent('chengmo:annotations-changed', { detail: { ...detail, source: 'shelf' } })); };
+  const commit = (detail = {}, invalidate = true) => { if (invalidate) invalidateShelfIndex(); localStorage.setItem(key, JSON.stringify(read())); emit('chengmo:annotations-changed', { ...detail, source: 'shelf' }); };
   const saveItem = (id, changes, invalidate = true) => {
     const item = read().find(entry => entry.id === id);
     if (!item || !Object.entries(changes).some(([name, value]) => item[name] !== value)) return false;
