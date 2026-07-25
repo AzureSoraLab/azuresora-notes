@@ -8,6 +8,7 @@
   const annotationKey = 'chengmo-text-selection-annotations-v1';
   const drawingKey = 'chengmo-freehand-annotations-v1';
   const keepListOpenKey = 'chengmo-keep-note-list-open';
+  const mobileInlineRestoreKey = 'chengmo-restore-mobile-inline-course';
   const readingSessionKey = 'chengmo-reading-session-v1';
   // Kept outside start() because list hydration also runs before its observers
   // are established (for example during React's initial render).
@@ -146,7 +147,15 @@
         const text = document.createElement('span'); text.className = 'mobile-course-note__text';
         const title = document.createElement('strong'); title.textContent = noteTitle(note);
         const subtitle = document.createElement('small'); subtitle.textContent = noteSubtitle(note);
-        text.append(title, subtitle); button.append(dot, text); fragment.append(button);
+        const remove = document.createElement('span');
+        remove.className = 'mobile-course-note__delete'; remove.textContent = '\u00d7';
+        remove.title = '\u5220\u9664\u7b14\u8bb0'; remove.setAttribute('role', 'button');
+        remove.setAttribute('aria-label', `\u5220\u9664\u7b14\u8bb0\u300c${noteTitle(note)}\u300d`); remove.tabIndex = 0;
+        remove.addEventListener('pointerdown', event => event.stopPropagation());
+        remove.addEventListener('keydown', event => {
+          if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); event.currentTarget.click(); }
+        });
+        text.append(title, subtitle); button.append(dot, text, remove); fragment.append(button);
       });
     }
     list.replaceChildren(fragment);
@@ -237,7 +246,7 @@
       drawingsChanged: hasDrawing
     };
   };
-  const writeDeletion = ({ deletion, nextId, courseId }) => {
+  const writeDeletion = ({ deletion, nextId, courseId, listOpen = true }) => {
     const snapshot = new Map([stateKey, annotationKey, recentKey, drawingKey, readingSessionKey].map(key => [key, localStorage.getItem(key)]));
     const restoreSnapshot = () => snapshot.forEach((value, key) => value === null ? localStorage.removeItem(key) : localStorage.setItem(key, value));
     try {
@@ -245,7 +254,7 @@
       if (deletion.recentChanged) localStorage.setItem(recentKey, JSON.stringify(deletion.nextRecent));
       if (deletion.drawingsChanged) localStorage.setItem(drawingKey, JSON.stringify(deletion.nextDrawings));
       localStorage.setItem(stateKey, JSON.stringify(deletion.nextState));
-      if (nextId) localStorage.setItem(readingSessionKey, JSON.stringify({ noteId: nextId, courseId, listOpen: true }));
+      if (nextId) localStorage.setItem(readingSessionKey, JSON.stringify({ noteId: nextId, courseId, listOpen }));
       else localStorage.removeItem(readingSessionKey);
       // Queue the IndexedDB delete only after its synchronous source-of-truth
       // writes succeed, so a local rollback cannot race an orphan cleanup.
@@ -277,6 +286,36 @@
       return false;
     }
   };
+  const deleteNote = async ({ targetId, mobile = false }) => {
+    const state = readState(); const notes = state.notes || [];
+    const deletion = prepareNoteDeletion(state, targetId);
+    if (!deletion) { alert('\u65e0\u6cd5\u786e\u8ba4\u8fd9\u7bc7\u7b14\u8bb0\u3002\u8bf7\u5237\u65b0\u540e\u91cd\u8bd5\u3002'); return; }
+    const related = [deletion.annotationCount && `${deletion.annotationCount} \u6761\u6587\u672c\u6807\u6ce8`, deletion.drawingCount && `${deletion.drawingCount} \u6761\u7ed8\u56fe\u7b14\u8ff9`].filter(Boolean).join('\u3001');
+    const relatedHint = related ? `\n\n\u540c\u65f6\u4f1a\u5220\u9664\uff1a${related}\u3002` : '';
+    if (!confirm(`\u786e\u5b9a\u5220\u9664\u300c${noteTitle(deletion.target)}\u300d\uff1f${relatedHint}`)) return;
+    if (!confirm('\u8bf7\u518d\u6b21\u786e\u8ba4\uff1a\u5220\u9664\u540e\u65e0\u6cd5\u64a4\u9500\u3002')) return;
+    const listContext = noteListContext();
+    const buttons = courseButtons(); const context = courseContext(state, buttons);
+    applyDeleteControls(state, listContext.cards, buttons, context, listContext.searchInput?.value?.toLowerCase() || '');
+    const knownIds = new Set(notes.map(note => note.id));
+    const visibleIds = listContext.cards.map(card => card.dataset.noteId).filter(id => knownIds.has(id));
+    const courseIds = notes.filter(note => note.courseId === deletion.target.courseId).map(note => note.id);
+    const orderedIds = visibleIds.includes(deletion.target.id) ? visibleIds : courseIds;
+    const selectedId = listContext.selectedCard?.dataset.noteId || readSession()?.noteId || '';
+    const selectedIndex = orderedIds.indexOf(deletion.target.id);
+    const successorId = selectedIndex < 0 ? '' : orderedIds.slice(selectedIndex + 1).concat(orderedIds.slice(0, selectedIndex)).find(id => id !== deletion.target.id) || '';
+    const nextId = selectedId === deletion.target.id ? successorId : (notes.some(note => note.id === selectedId && note.id !== deletion.target.id) ? selectedId : '');
+    const courseId = mobile ? deletion.target.courseId : (activeCourseId(state, buttons, context) || deletion.target.courseId || '');
+    const query = listContext.searchInput?.value || '';
+    if (!writeDeletion({ deletion, nextId, courseId, listOpen: !mobile })) { alert('\u5220\u9664\u5931\u8d25\uff0c\u8bf7\u68c0\u67e5\u6d4f\u89c8\u5668\u7684\u672c\u5730\u5b58\u50a8\u7a7a\u95f4\u540e\u91cd\u8bd5\u3002'); return; }
+    // Mobile has no separate note-list panel. Restore the expanded category
+    // after reload so deletion keeps the user in the same mobile context.
+    if (mobile) sessionStorage.setItem(mobileInlineRestoreKey, JSON.stringify({ courseId, noteId: nextId }));
+    else sessionStorage.setItem(keepListOpenKey, JSON.stringify({ courseId, nextId, query }));
+    sessionStorage.setItem('chengmo-pending-notice', JSON.stringify({ message: `\u5df2\u5220\u9664\u300c${noteTitle(deletion.target)}\u300d\u3002` }));
+    try { await window.chengmoStorage?.flush?.(); } catch {}
+    window.location.reload();
+  };
   const start = () => {
     // Never leave the reader hidden if a saved session becomes unavailable mid-load.
     window.setTimeout(() => document.documentElement.classList.remove('chengmo-restoring-session'), 1800);
@@ -286,6 +325,7 @@
     let observedList = null;
     let restoreScheduled = false;
     let sessionRestoreScheduled = false;
+    let mobileRestoreScheduled = false;
     const watchList = (list = document.querySelector('.note-index-scroll')) => {
       if (!list) return false;
       if (list === observedList) return true;
@@ -316,7 +356,7 @@
         // Other modules use this event to resolve freshly rendered list nodes.
         // Do not wake them for observer noise when nothing in the list changed.
         if (notesChanged || coursesChanged) emit('chengmo:note-list-ready');
-        if (!sessionRestoreScheduled && !sessionStorage.getItem(keepListOpenKey)) {
+        if (!sessionRestoreScheduled && !sessionStorage.getItem(keepListOpenKey) && !sessionStorage.getItem(mobileInlineRestoreKey)) {
           const session = readSession(); const state = readState();
           const savedNote = session?.noteId && (state.notes || []).find(note => note.id === session.noteId);
           if (savedNote) {
@@ -339,6 +379,28 @@
               }, 140);
             }, 360);
           }
+        }
+        const mobileRestore = (() => { try { return JSON.parse(sessionStorage.getItem(mobileInlineRestoreKey) || 'null'); } catch { return null; } })();
+        if (mobileRestore && !mobileRestoreScheduled) {
+          mobileRestoreScheduled = true; sessionRestoreScheduled = true;
+          window.setTimeout(() => {
+            const restore = (() => { try { return JSON.parse(sessionStorage.getItem(mobileInlineRestoreKey) || 'null'); } catch { return null; } })();
+            if (!restore) return;
+            const library = document.querySelector('.library');
+            const libraryButton = [...document.querySelectorAll('.mobile-nav button')].find(button => button.textContent?.trim() === '\u8d44\u6599\u5e93');
+            if (!library?.classList.contains('mobile-active')) libraryButton?.click();
+            window.setTimeout(() => {
+              const state = readState(); const courseButton = courseButtonForId(restore.courseId, state);
+              if (!courseButton || !mobileLibraryIsActive()) { sessionStorage.removeItem(mobileInlineRestoreKey); return; }
+              mobileInlineCourseId = '';
+              courseButton.click();
+              sessionStorage.removeItem(mobileInlineRestoreKey);
+              if (restore.noteId) window.setTimeout(() => {
+                renderMobileInlineNotes();
+                [...document.querySelectorAll('.mobile-course-note')].find(button => button.dataset.noteId === restore.noteId)?.click();
+              }, 120);
+            }, 140);
+          }, 160);
         }
         const pending = (() => { try { return JSON.parse(sessionStorage.getItem(keepListOpenKey) || 'null'); } catch { return null; } })();
         if (!pending || restoreScheduled) return;
@@ -390,6 +452,12 @@
     watchHost();
     window.addEventListener('pagehide', saveSession);
     document.addEventListener('click', async event => {
+      const mobileClose = event.target.closest?.('.mobile-course-note__delete');
+      if (mobileClose) {
+        event.preventDefault(); event.stopPropagation();
+        await deleteNote({ targetId: mobileClose.closest('.mobile-course-note')?.dataset.noteId || '', mobile: true });
+        return;
+      }
       const inlineNote = event.target.closest?.('.mobile-course-note');
       if (inlineNote) {
         event.preventDefault(); event.stopPropagation();
@@ -471,34 +539,8 @@
       event.preventDefault(); event.stopPropagation();
       const noteButton = close.closest('.compact-note');
       if (!noteButton) return;
-      const state = readState(); const notes = state.notes || [];
-      const knownIds = new Set(notes.map(note => note.id));
-      const targetId = reactKey(noteButton, knownIds) || noteButton.dataset.noteId || '';
-      const deletion = prepareNoteDeletion(state, targetId);
-      if (!deletion) { alert('\u65e0\u6cd5\u786e\u8ba4\u8fd9\u7bc7\u7b14\u8bb0\u3002\u8bf7\u5237\u65b0\u540e\u91cd\u8bd5\u3002'); return; }
-      const related = [deletion.annotationCount && `${deletion.annotationCount} \u6761\u6587\u672c\u6807\u6ce8`, deletion.drawingCount && `${deletion.drawingCount} \u6761\u7ed8\u56fe\u7b14\u8ff9`].filter(Boolean).join('\u3001');
-      const relatedHint = related ? `\n\n\u540c\u65f6\u4f1a\u5220\u9664\uff1a${related}\u3002` : '';
-      if (!confirm(`\u786e\u5b9a\u5220\u9664\u300c${noteTitle(deletion.target)}\u300d\uff1f${relatedHint}`)) return;
-      if (!confirm('\u8bf7\u518d\u6b21\u786e\u8ba4\uff1a\u5220\u9664\u540e\u65e0\u6cd5\u64a4\u9500\u3002')) return;
-      const listContext = noteListContext();
-      const buttons = courseButtons(); const context = courseContext(state, buttons);
-      applyDeleteControls(state, listContext.cards, buttons, context, listContext.searchInput?.value?.toLowerCase() || '');
-      const visibleIds = listContext.cards.map(card => card.dataset.noteId).filter(id => knownIds.has(id));
-      const selectedId = listContext.selectedCard?.dataset.noteId || readSession()?.noteId || '';
-      const selectedIndex = visibleIds.indexOf(deletion.target.id);
-      const successorId = selectedIndex < 0 ? '' : visibleIds.slice(selectedIndex + 1).concat(visibleIds.slice(0, selectedIndex)).find(id => id !== deletion.target.id) || '';
-      const nextId = selectedId === deletion.target.id ? successorId : (notes.some(note => note.id === selectedId && note.id !== deletion.target.id) ? selectedId : '');
-      const courseId = activeCourseId(state, buttons, context) || deletion.target.courseId || '';
-      const query = listContext.searchInput?.value || '';
-      if (!writeDeletion({ deletion, nextId, courseId })) { alert('\u5220\u9664\u5931\u8d25\uff0c\u8bf7\u68c0\u67e5\u6d4f\u89c8\u5668\u7684\u672c\u5730\u5b58\u50a8\u7a7a\u95f4\u540e\u91cd\u8bd5\u3002'); return; }
-      // Reloading lets React load the changed note data cleanly. Preserve the
-      // current list and reader target, then restore them exactly once.
-      sessionStorage.setItem(keepListOpenKey, JSON.stringify({ courseId, nextId, query }));
-      sessionStorage.setItem('chengmo-pending-notice', JSON.stringify({ message: `\u5df2\u5220\u9664\u300c${noteTitle(deletion.target)}\u300d\u3002` }));
-      // Wait for the asynchronous note store before reloading. Otherwise a
-      // long-running IndexedDB write can restore the old note on the next page.
-      try { await window.chengmoStorage?.flush?.(); } catch {}
-      window.location.reload();
+      const state = readState(); const knownIds = new Set((state.notes || []).map(note => note.id));
+      await deleteNote({ targetId: reactKey(noteButton, knownIds) || noteButton.dataset.noteId || '' });
     }, true);
   };
   (runtime?.whenReady || (task => document.readyState === 'loading' ? document.addEventListener('DOMContentLoaded', task, { once: true }) : task()))(start);
