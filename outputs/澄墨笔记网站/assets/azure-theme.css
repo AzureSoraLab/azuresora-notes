@@ -1668,3 +1668,10 @@ html .reader-header .data-tools__actions button {
     left: clamp(224px, 30vw, 264px) !important;
   }
 }
+
+/* Retain the dot as the fixed brand anchor while giving both text lines a
+   little more room on its right. */
+.library .brand > span:not(.brand-mark),
+.library .brand small {
+  left: -2px;
+}
