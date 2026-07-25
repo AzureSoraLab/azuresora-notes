@@ -130,7 +130,10 @@
   const saveNotes = state => {
     if (!state || typeof state !== 'object' || !Array.isArray(state.notes)) return;
     const currentIds = new Set(state.notes.map(note => note?.id).filter(Boolean));
-    const meta = { ...state, notes: undefined };
+    const { notes: ignoredNotes, ...stateMeta } = state;
+    // Keep an explicit manifest. Older records can remain in IndexedDB after
+    // an interrupted write, but they must never be restored as live notes.
+    const meta = { ...stateMeta, noteIds: state.notes.map(note => note?.id).filter(Boolean) };
     const previous = saveNotes.previous || new Map();
     const removed = [...previous.keys()].filter(id => !currentIds.has(id));
     const changed = state.notes.filter(note => note?.id && previous.get(note.id) !== note);
@@ -257,7 +260,8 @@
     const drawingStore = transaction.objectStore('drawings');
     const annotationStore = transaction.objectStore('textAnnotations');
     SNAPSHOT_KEYS.filter(key => key !== KEYS.notes).forEach(key => meta.put(readJson(key, []), key));
-    meta.put({ ...notes, notes: undefined }, 'notes-state');
+    const { notes: legacyNotes, ...legacyMeta } = notes;
+    meta.put({ ...legacyMeta, noteIds: (Array.isArray(legacyNotes) ? legacyNotes : []).map(note => note?.id).filter(Boolean) }, 'notes-state');
     (Array.isArray(notes?.notes) ? notes.notes : []).forEach(note => note?.id && noteStore.put({ ...note }));
     (Array.isArray(annotations) ? annotations : []).forEach(item => item?.id && annotationStore.put({ ...item }));
     Object.entries(drawings && typeof drawings === 'object' ? drawings : {}).forEach(([id, strokes]) => {
@@ -274,11 +278,14 @@
     if (!db) return;
     const transaction = db.transaction(['meta', 'notes'], 'readonly');
     const meta = await requestValue(transaction.objectStore('meta').get('notes-state'));
-    const notes = await requestValue(transaction.objectStore('notes').getAll());
+    const records = await requestValue(transaction.objectStore('notes').getAll());
     // The reader is ready before IndexedDB finishes. Never let a delayed
     // hydration replace notes created or edited during that short window.
-    if (!meta || !notes.length || notesRevision !== requestedRevision) return;
-    const state = { ...meta, notes };
+    const hasManifest = Array.isArray(meta?.noteIds);
+    const notes = hasManifest ? records.filter(note => meta.noteIds.includes(note?.id)) : records;
+    if (!meta || (!notes.length && !hasManifest) || notesRevision !== requestedRevision) return;
+    const { noteIds, notes: ignoredNotes, ...stateMeta } = meta;
+    const state = { ...stateMeta, notes };
     nativeSetItem.call(local, KEYS.notes, JSON.stringify(state));
     latestNotesState = state;
     saveNotes.previous = new Map(notes.filter(note => note?.id).map(note => [note.id, note]));
