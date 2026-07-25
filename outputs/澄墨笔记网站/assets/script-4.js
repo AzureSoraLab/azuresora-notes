@@ -95,31 +95,52 @@
     root.querySelectorAll('mark.selection-annotation').forEach(mark => mark.replaceWith(...mark.childNodes));
     root.normalize();
   }
-  function applyOne(root, item) {
+  const createMark = (item, content) => {
+    const mark = document.createElement('mark');
+    const annotationKind = item.kind === 'underline' ? 'underline' : 'highlight';
+    mark.className = `selection-annotation selection-annotation--${annotationKind}`;
+    mark.style.setProperty('--selection-annotation-color', displayColor(item.color));
+    mark.dataset.annotationId = item.id;
+    mark.append(content);
+    return mark;
+  };
+  function applyAnnotations(root, items) {
     const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
     const nodes = [];
-    let node;
-    while ((node = walker.nextNode())) nodes.push(node);
-    let position = 0;
-    nodes.forEach(textNode => {
+    let node, position = 0;
+    while ((node = walker.nextNode())) {
       const start = position;
-      const end = start + textNode.data.length;
-      position = end;
-      const from = Math.max(start, item.start);
-      const to = Math.min(end, item.end);
-      if (from >= to || !textNode.parentNode) return;
-      const before = textNode.data.slice(0, from - start);
-      const middle = textNode.data.slice(from - start, to - start);
-      const after = textNode.data.slice(to - start);
+      position += node.data.length;
+      if (node.data) nodes.push({ node, start, end: position });
+    }
+    // Sweep source text once. The prior implementation scanned the entire note
+    // for every item, which became expensive as annotations accumulated.
+    const ordered = [...items].sort((a, b) => a.start - b.start || b.end - a.end);
+    const active = [];
+    let nextItem = 0;
+    nodes.forEach(({ node: textNode, start, end }) => {
+      while (nextItem < ordered.length && ordered[nextItem].start < end) active.push(ordered[nextItem++]);
+      for (let index = active.length - 1; index >= 0; index -= 1) if (active[index].end <= start) active.splice(index, 1);
+      if (!active.length || !textNode.parentNode) return;
+      const cuts = new Set([0, textNode.data.length]);
+      active.forEach(item => {
+        if (item.end <= start || item.start >= end) return;
+        cuts.add(Math.max(0, item.start - start));
+        cuts.add(Math.min(textNode.data.length, item.end - start));
+      });
+      const offsets = [...cuts].sort((a, b) => a - b);
       const fragment = document.createDocumentFragment();
-      if (before) fragment.append(before);
-      const mark = document.createElement('mark');
-      mark.className = `selection-annotation selection-annotation--${item.kind}`;
-      mark.style.setProperty('--selection-annotation-color', displayColor(item.color));
-      mark.dataset.annotationId = item.id;
-      mark.textContent = middle;
-      fragment.append(mark);
-      if (after) fragment.append(after);
+      for (let index = 0; index < offsets.length - 1; index += 1) {
+        const from = offsets[index], to = offsets[index + 1];
+        if (from === to) continue;
+        let content = document.createTextNode(textNode.data.slice(from, to));
+        // Later offsets are wrapped first so overlapping marks keep the same
+        // nesting order as the legacy descending-range renderer.
+        active.filter(item => item.start <= start + from && item.end >= start + to)
+          .sort((a, b) => b.start - a.start || a.end - b.end)
+          .forEach(item => { content = createMark(item, content); });
+        fragment.append(content);
+      }
       textNode.parentNode.replaceChild(fragment, textNode);
     });
   }
@@ -156,7 +177,7 @@
       const resolved = new Map(items.map(item => [item.id, item]));
       write(allItems.map(item => resolved.get(item.id) || item), { type: 'reanchor', noteId });
     }
-    items.sort((a, b) => b.start - a.start).forEach(item => applyOne(root, item));
+    applyAnnotations(root, items);
     renderedSignature = `${noteId}\u0000${lastSourceText}\u0000${items.map(item => `${item.id}:${item.start}:${item.end}:${item.color}:${item.kind}`).join('|')}`;
     watch(root);
   }
@@ -302,10 +323,11 @@
     const text = selection?.toString().trim();
     if (!root || !range || !text || !root.contains(range.commonAncestorContainer)) return removeMenu();
     const rect = range.getBoundingClientRect();
-    selected = { start: offsetOf(root, range.startContainer, range.startOffset), end: offsetOf(root, range.endContainer, range.endOffset) };
-    if (selected.end <= selected.start) return removeMenu();
+    const start = offsetOf(root, range.startContainer, range.startOffset);
+    const end = offsetOf(root, range.endContainer, range.endOffset);
+    if (end <= start) return removeMenu();
     removeMenu();
-    selected = { start: offsetOf(root, range.startContainer, range.startOffset), end: offsetOf(root, range.endContainer, range.endOffset) };
+    selected = { start, end };
     menu = document.createElement('div');
     menu.className = 'selection-annotation-menu';
     menu.style.left = `${rect.left + rect.width / 2}px`;
