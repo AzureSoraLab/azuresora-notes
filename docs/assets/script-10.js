@@ -148,21 +148,46 @@
     });
     return true;
   };
-  const writeDeletion = ({ state, targetId, nextId, courseId }) => {
+  const prepareNoteDeletion = (state, targetId) => {
     const notes = Array.isArray(state.notes) ? state.notes : [];
-    const annotations = readArray(annotationKey);
-    const recent = readArray(recentKey);
-    const drawings = readRecord(drawingKey);
+    const target = notes.find(note => note?.id === targetId);
+    if (!target) return null;
+    const annotations = readArray(annotationKey) || [];
+    const recent = readArray(recentKey) || [];
+    const drawings = readRecord(drawingKey) || {};
+    const nextAnnotations = annotations.filter(item => item?.noteId !== targetId);
+    const nextRecent = recent.filter(item => item?.id !== targetId);
+    const drawingCount = Array.isArray(drawings[targetId]) ? drawings[targetId].length : 0;
+    const hasDrawing = Object.prototype.hasOwnProperty.call(drawings, targetId);
+    const nextDrawings = hasDrawing ? { ...drawings } : drawings;
+    if (hasDrawing) delete nextDrawings[targetId];
+    return {
+      target,
+      targetId,
+      nextState: { ...state, notes: notes.filter(note => note.id !== targetId) },
+      nextAnnotations,
+      nextRecent,
+      nextDrawings,
+      annotationCount: annotations.length - nextAnnotations.length,
+      drawingCount,
+      annotationsChanged: annotations.length !== nextAnnotations.length,
+      recentChanged: recent.length !== nextRecent.length,
+      drawingsChanged: hasDrawing
+    };
+  };
+  const writeDeletion = ({ deletion, nextId, courseId }) => {
     const snapshot = new Map([stateKey, annotationKey, recentKey, drawingKey, readingSessionKey].map(key => [key, localStorage.getItem(key)]));
     const restoreSnapshot = () => snapshot.forEach((value, key) => value === null ? localStorage.removeItem(key) : localStorage.setItem(key, value));
     try {
-      if (annotations) localStorage.setItem(annotationKey, JSON.stringify(annotations.filter(item => item?.noteId !== targetId)));
-      if (recent) localStorage.setItem(recentKey, JSON.stringify(recent.filter(item => item?.id !== targetId)));
-      if (drawings && Object.prototype.hasOwnProperty.call(drawings, targetId)) { delete drawings[targetId]; localStorage.setItem(drawingKey, JSON.stringify(drawings)); }
-      window.chengmoStorage?.removeDrawing(targetId);
-      localStorage.setItem(stateKey, JSON.stringify({ ...state, notes: notes.filter(note => note.id !== targetId) }));
+      if (deletion.annotationsChanged) localStorage.setItem(annotationKey, JSON.stringify(deletion.nextAnnotations));
+      if (deletion.recentChanged) localStorage.setItem(recentKey, JSON.stringify(deletion.nextRecent));
+      if (deletion.drawingsChanged) localStorage.setItem(drawingKey, JSON.stringify(deletion.nextDrawings));
+      localStorage.setItem(stateKey, JSON.stringify(deletion.nextState));
       if (nextId) localStorage.setItem(readingSessionKey, JSON.stringify({ noteId: nextId, courseId, listOpen: true }));
       else localStorage.removeItem(readingSessionKey);
+      // Queue the IndexedDB delete only after its synchronous source-of-truth
+      // writes succeed, so a local rollback cannot race an orphan cleanup.
+      window.chengmoStorage?.removeDrawing(deletion.targetId);
       return true;
     } catch {
       try { restoreSnapshot(); } catch {}
@@ -313,29 +338,25 @@
       const state = readState(); const notes = state.notes || [];
       const knownIds = new Set(notes.map(note => note.id));
       const targetId = reactKey(noteButton, knownIds) || noteButton.dataset.noteId || '';
-      const target = notes.find(item => item.id === targetId);
-      if (!target) { alert('\u65e0\u6cd5\u786e\u8ba4\u8fd9\u7bc7\u7b14\u8bb0\u3002\u8bf7\u5237\u65b0\u540e\u91cd\u8bd5\u3002'); return; }
-      const annotations = readArray(annotationKey) || [];
-      const drawings = readRecord(drawingKey) || {};
-      const annotationCount = annotations.filter(item => item?.noteId === target.id).length;
-      const drawingCount = Array.isArray(drawings[target.id]) ? drawings[target.id].length : 0;
-      const related = [annotationCount && `${annotationCount} \u6761\u6587\u672c\u6807\u6ce8`, drawingCount && `${drawingCount} \u6761\u7ed8\u56fe\u7b14\u8ff9`].filter(Boolean).join('\u3001');
+      const deletion = prepareNoteDeletion(state, targetId);
+      if (!deletion) { alert('\u65e0\u6cd5\u786e\u8ba4\u8fd9\u7bc7\u7b14\u8bb0\u3002\u8bf7\u5237\u65b0\u540e\u91cd\u8bd5\u3002'); return; }
+      const related = [deletion.annotationCount && `${deletion.annotationCount} \u6761\u6587\u672c\u6807\u6ce8`, deletion.drawingCount && `${deletion.drawingCount} \u6761\u7ed8\u56fe\u7b14\u8ff9`].filter(Boolean).join('\u3001');
       const relatedHint = related ? `\n\n\u540c\u65f6\u4f1a\u5220\u9664\uff1a${related}\u3002` : '';
-      if (!confirm(`\u786e\u5b9a\u5220\u9664\u300c${noteTitle(target)}\u300d\uff1f${relatedHint}`)) return;
+      if (!confirm(`\u786e\u5b9a\u5220\u9664\u300c${noteTitle(deletion.target)}\u300d\uff1f${relatedHint}`)) return;
       if (!confirm('\u8bf7\u518d\u6b21\u786e\u8ba4\uff1a\u5220\u9664\u540e\u65e0\u6cd5\u64a4\u9500\u3002')) return;
       applyDeleteControls();
       const visibleIds = [...document.querySelectorAll('.compact-note')].map(card => card.dataset.noteId).filter(id => knownIds.has(id));
       const selectedId = document.querySelector('.compact-note.selected')?.dataset.noteId || readSession()?.noteId || '';
-      const selectedIndex = visibleIds.indexOf(target.id);
+      const selectedIndex = visibleIds.indexOf(deletion.target.id);
       const successorId = selectedIndex < 0 ? '' : visibleIds.slice(selectedIndex + 1).concat(visibleIds.slice(0, selectedIndex)).find(id => id !== target.id) || '';
-      const nextId = selectedId === target.id ? successorId : (notes.some(note => note.id === selectedId && note.id !== target.id) ? selectedId : '');
-      const courseId = activeCourseId(state) || target.courseId || '';
+      const nextId = selectedId === deletion.target.id ? successorId : (notes.some(note => note.id === selectedId && note.id !== deletion.target.id) ? selectedId : '');
+      const courseId = activeCourseId(state) || deletion.target.courseId || '';
       const query = document.querySelector('.search input')?.value || '';
-      if (!writeDeletion({ state, targetId: target.id, nextId, courseId })) { alert('\u5220\u9664\u5931\u8d25\uff0c\u8bf7\u68c0\u67e5\u6d4f\u89c8\u5668\u7684\u672c\u5730\u5b58\u50a8\u7a7a\u95f4\u540e\u91cd\u8bd5\u3002'); return; }
+      if (!writeDeletion({ deletion, nextId, courseId })) { alert('\u5220\u9664\u5931\u8d25\uff0c\u8bf7\u68c0\u67e5\u6d4f\u89c8\u5668\u7684\u672c\u5730\u5b58\u50a8\u7a7a\u95f4\u540e\u91cd\u8bd5\u3002'); return; }
       // Reloading lets React load the changed note data cleanly. Preserve the
       // current list and reader target, then restore them exactly once.
       sessionStorage.setItem(keepListOpenKey, JSON.stringify({ courseId, nextId, query }));
-      sessionStorage.setItem('chengmo-pending-notice', JSON.stringify({ message: `\u5df2\u5220\u9664\u300c${noteTitle(target)}\u300d\u3002` }));
+      sessionStorage.setItem('chengmo-pending-notice', JSON.stringify({ message: `\u5df2\u5220\u9664\u300c${noteTitle(deletion.target)}\u300d\u3002` }));
       // Wait for the asynchronous note store before reloading. Otherwise a
       // long-running IndexedDB write can restore the old note on the next page.
       try { await window.chengmoStorage?.flush?.(); } catch {}
