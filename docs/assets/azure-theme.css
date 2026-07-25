@@ -252,9 +252,46 @@ body,
 .library .section-title,
 .library .recent-notes__title {
   color: #718391 !important;
-  font-size: 10.5px;
+  font-family: "DengXian", "Microsoft YaHei UI", sans-serif;
+  font-size: 13px;
+  font-weight: 600;
   letter-spacing: 1px;
 }
+.library .category-add {
+  font-family: "DengXian", "Microsoft YaHei UI", sans-serif;
+  font-size: 12px;
+  font-weight: 600;
+}
+.library .course-button,
+.library .recent-notes__item {
+  font-family: "DengXian", "Microsoft YaHei UI", sans-serif;
+  font-weight: 500;
+}
+.note-list .note-list-header p {
+  font-family: "DengXian", "Microsoft YaHei UI", sans-serif;
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 1px;
+}
+.note-list .note-list-header strong,
+.note-list .search input,
+.note-list .compact-note,
+.note-list .empty-index {
+  font-family: "DengXian", "Microsoft YaHei UI", sans-serif;
+}
+.note-list .note-list-header strong { font-weight: 600; }
+.note-list .compact-note strong { font-weight: 550; }
+.note-list .compact-note small { font-weight: 400; }
+
+/* Make the library groups and their entries easier to scan at a glance. */
+.library .section-title,
+.library .recent-notes__title { font-size: 45px; }
+.note-list .note-list-header p {
+  font-size: 45px;
+  transform: translateY(-6px);
+}
+.library .course-button,
+.library .recent-notes__item { font-size: 35px !important; }
 .library .course-button,
 .library .recent-notes__item { color: #4d6170 !important; }
 .library .storage-note { color: #8b989f !important; }
@@ -467,7 +504,7 @@ body,
 /* A steady vertical rhythm makes repeated left-column scanning less tiring. */
 .library .brand { margin-bottom: 10px !important; }
 .library .new-note { margin-bottom: 17px !important; }
-.library .course-section { margin-top: 13px; }
+.library .course-section { margin-top: 7px; }
 .library .recent-notes { margin-top: 20px; }
 .library .storage-note { margin-top: 17px; }
 
@@ -547,7 +584,9 @@ body,
   width: 167px;
   margin-left: auto !important;
   margin-right: auto !important;
+  transform: translateY(-6px);
 }
+.library .new-note:hover { transform: translateY(-7px); }
 
 /* Keep the note-index header as one calm, aligned control row. */
 .note-list .note-list-header {
@@ -737,6 +776,29 @@ body,
 .library .brand small {
   position: relative;
   left: -8px;
+  /* Align the title's visual midpoint with the fixed blue dot. */
+  top: -3px;
+}
+
+/* Treat the library name as a compact signature, with the line beneath it
+   carrying atmosphere without competing with note navigation. */
+.library .brand > span:not(.brand-mark) {
+  color: #34565a !important;
+  font-family: Georgia, "Times New Roman", "Noto Serif SC", serif;
+  font-size: 23px;
+  font-style: italic;
+  font-weight: 600;
+  line-height: 1.12;
+  letter-spacing: .018em;
+  text-shadow: 0 1px 0 rgba(255, 255, 255, .72);
+}
+.library .brand small {
+  color: #73888a !important;
+  font-family: "Microsoft YaHei UI", "PingFang SC", sans-serif;
+  font-size: 10px;
+  font-weight: 400;
+  line-height: 1.6;
+  letter-spacing: .12em;
 }
 
 /* Highlights should mark a passage without turning it into a coloured block. */
@@ -749,8 +811,9 @@ mark.selection-annotation--highlight {
   -webkit-box-decoration-break: clone;
 }
 mark.selection-annotation--underline {
-  text-decoration-color: color-mix(in srgb, var(--selection-annotation-color) 76%, #6f8593) !important;
-  text-decoration-thickness: 1.5px !important;
+  /* Keep underline annotations in their chosen marker colour, like highlights. */
+  text-decoration-color: var(--selection-annotation-color) !important;
+  text-decoration-thickness: 2.5px !important;
   text-underline-offset: 2.5px !important;
 }
 
@@ -870,4 +933,484 @@ mark.selection-annotation--underline {
 @media (max-width: 760px) {
   .reader-body { font-size: 16px; line-height: 1.88; }
   .reader-body > div:not(.drawing-layer) { max-width: none !important; }
+}
+
+/* Green paper reader and annotation tools. Navigation intentionally keeps its
+   existing theme; only the selected reading and marking surfaces change. */
+.reader,
+.reading-layout,
+.reader-body { background: #fbfbf7 !important; }
+.reader-header { background: rgba(251, 251, 247, .96) !important; border-color: #e7e9e3 !important; }
+.reader-body { color: #37423e !important; scrollbar-color: #aebbb2 transparent; }
+.reader-body p,
+.reader-body li { color: #34423e !important; }
+.reader-body h1 { color: #243e37 !important; }
+.reader-body h2 { color: #2d403a !important; border-bottom-color: #e2e7e0 !important; }
+.reader-body h3 { color: #385047 !important; }
+.reader-body strong { color: #3d584e !important; }
+.reader-body a { color: #426e60 !important; text-decoration-color: #9eb8aa !important; }
+.reader-body li::marker { color: #719083 !important; }
+.reader-body hr { border-color: #e4e7e1 !important; }
+.reader-body blockquote {
+  background: #f3f6f1 !important;
+  border-left-color: #97ada2 !important;
+  color: #52625c !important;
+}
+.reader-body :not(pre) > code {
+  border-color: #e1e6de !important;
+  background: #f2f5f0 !important;
+  color: #3d584e !important;
+}
+.reader-body pre { background: #35413f !important; }
+.reader-body table th { background: #eff3ed !important; color: #405b51 !important; }
+.reader-body table :is(th, td) { border-color: #e0e5de !important; }
+.reader-body::-webkit-scrollbar-thumb,
+.reader-body *::-webkit-scrollbar-thumb { background: #aebbb2; }
+
+.annotation-shelf-toggle {
+  background: #fafbf8 !important;
+  border-color: #e1e7e1 !important;
+  color: #65756e !important;
+}
+.annotation-shelf-toggle:hover,
+.annotation-shelf-toggle.is-open { background: #eff5f0 !important; border-color: #cfe0d5 !important; color: #315e52 !important; }
+.annotation-shelf {
+  background: #fafbf8 !important;
+  border-color: #dce5de !important;
+  box-shadow: 0 10px 24px rgba(37, 58, 50, .13) !important;
+}
+.annotation-shelf__bar,
+.annotation-shelf__filters,
+.annotation-shelf__tag-summary { background: #fbfcf9 !important; border-color: #e1e7e1 !important; }
+.annotation-shelf__card { border-color: #e1e7e1 !important; box-shadow: none !important; }
+.annotation-shelf__card:hover { border-color: #c9dbcf !important; background: #fcfdfb !important; }
+.annotation-shelf__card.is-current { background: #eef5ef !important; border-color: #9ebaa9 !important; }
+.annotation-shelf__search {
+  border-color: #d8e3da !important;
+  color: #4a5c55 !important;
+}
+.annotation-shelf__search:focus { border-color: #91ad9f !important; box-shadow: 0 0 0 3px rgba(103, 145, 127, .12) !important; }
+.annotation-shelf__outline-item:hover { background: #eff5f0 !important; border-color: #d7e4da !important; color: #315e52 !important; }
+.annotation-shelf__inline-comment,
+.annotation-shelf__add-tag { color: #4a5c55 !important; }
+.annotation-shelf__inline-comment:focus,
+.annotation-shelf__add-tag:hover { background: #f6faf6 !important; }
+.annotation-tag-popover {
+  background: #fbfcf9 !important;
+  border-color: #dce5de !important;
+  box-shadow: 0 10px 25px rgba(37, 58, 50, .15) !important;
+}
+.annotation-shelf__tabs { border-right-color: #e1e7e1 !important; }
+.annotation-shelf__tab--grid.annotation-shelf__tab--active,
+.annotation-shelf__tab--active {
+  background: #eaf3ec !important;
+  color: #315e52 !important;
+}
+.annotation-shelf__outline,
+.annotation-shelf__close { color: #65756e !important; }
+.annotation-shelf__outline:hover,
+.annotation-shelf__outline.is-active,
+.annotation-shelf__close:hover {
+  background: #eff5f0 !important;
+  color: #315e52 !important;
+}
+.annotation-shelf :is(button, input):focus-visible {
+  outline-color: #78a393 !important;
+}
+
+.zotero-draw-control { border-right-color: #e7ebe6 !important; }
+.zotero-draw-control__button,
+.zotero-draw-control__select,
+.zotero-draw-control__visibility { color: #65756e !important; }
+.zotero-draw-control.is-active .zotero-draw-control__button {
+  border-color: #b9d0c0 !important;
+  background: #e8f1eb !important;
+  color: #315e52 !important;
+}
+.zotero-draw-menu { border-color: #dce4dd !important; box-shadow: 0 10px 26px rgba(37, 58, 50, .14) !important; }
+.zotero-draw-menu__color:hover,
+.zotero-draw-menu__color.is-selected,
+.zotero-draw-menu__eraser:hover,
+.zotero-draw-menu__eraser.is-active { border-left-color: #7ba895 !important; background: #f0f5f1 !important; }
+
+/* The reader header belongs to the same green paper system as its content. */
+.reader-header .crumb { color: #72817a !important; }
+.reader-actions button,
+.data-tools__actions button {
+  border-color: #e1e7e1 !important;
+  background: rgba(255, 255, 252, .78) !important;
+  color: #5f7169 !important;
+  box-shadow: none !important;
+}
+.reader-actions button:hover,
+.data-tools__actions button:hover {
+  border-color: #cbdacf !important;
+  background: #eff5f0 !important;
+  color: #315e52 !important;
+}
+.data-tools { border-left-color: #e6eae4 !important; }
+.reader-actions .saved,
+.reader-actions .saving { border-color: transparent !important; background: transparent !important; color: #8a9690 !important; }
+.reader-actions .complete,
+.reader-actions .annotate,
+.reader-actions .outline-header-toggle { color: #4f7164 !important; }
+.reader-actions .complete {
+  border-color: #cfe0d5 !important;
+  background: #f1f7f2 !important;
+  color: #426e60 !important;
+}
+.reader-actions .complete:hover {
+  border-color: #b8d1c1 !important;
+  background: #e5f0e8 !important;
+  color: #315e52 !important;
+}
+.reader-actions .edit-switch {
+  border-color: #315e52 !important;
+  background: #5d897a !important;
+  color: #fff !important;
+  box-shadow: 0 2px 5px rgba(39, 82, 69, .16) !important;
+}
+.reader-actions .edit-switch:hover { background: #4f7e6e !important; }
+
+/* The collapsed library rail is still part of the paper workspace. */
+.app-shell.library-collapsed { background: #f3f4ef !important; }
+.library-collapsed .library {
+  background: #f7f8f3 !important;
+  border-right-color: #e1e7e1 !important;
+}
+.sidebar-toggle {
+  border-color: #dfe7e1 !important;
+  background: #fbfcf9 !important;
+  color: #5f7d70 !important;
+  box-shadow: 0 1px 3px rgba(37, 58, 50, .05) !important;
+}
+.sidebar-toggle:hover {
+  border-color: #c9dbcf !important;
+  background: #eff5f0 !important;
+  color: #315e52 !important;
+}
+
+/* Final title scale declarations must come after legacy presentation rules. */
+.library .section-title,
+.library .recent-notes__title { font-size: 15px !important; }
+.note-list .note-list-header p { font-size: 15px !important; }
+.library .course-button,
+.library .recent-notes__item { font-size: 14px !important; }
+.note-list .note-list-header strong,
+.note-list .compact-note strong { font-size: 14px !important; }
+.note-list .search input { font-size: 13px; }
+.note-list .compact-note small,
+.note-list .empty-index { font-size: 12px !important; }
+
+/* Reader-header text follows the same quiet Chinese UI type system. */
+.reader-header .crumb,
+.reader-actions .saved,
+.reader-actions .saving,
+.reader-actions button,
+.data-tools__actions button {
+  font-family: "DengXian", "Microsoft YaHei UI", sans-serif;
+  font-weight: 500;
+}
+.reader-header .crumb { font-size: 14px; }
+.reader-actions .saved,
+.reader-actions .saving,
+.reader-actions button,
+.data-tools__actions button { font-size: 13px; }
+.library .storage-note {
+  font-family: "DengXian", "Microsoft YaHei UI", sans-serif;
+  font-size: 12px !important;
+  font-weight: 400;
+}
+
+/* Reader paper choices stay deliberately subtle so long-form reading remains calm. */
+html.paper-sage {
+  --paper-surface: #f8faf5;
+  --paper-header: rgba(248, 250, 245, .96);
+  --paper-ink: #39463e;
+  --paper-heading: #2d493d;
+  --paper-subheading: #3b5649;
+  --paper-soft: #eef3ed;
+  --paper-line: #dce5dc;
+  --paper-accent: #5f8270;
+  --paper-scrollbar: #afc0b3;
+}
+html.paper-ivory {
+  --paper-surface: #fcf7ed;
+  --paper-header: rgba(252, 247, 237, .96);
+  --paper-ink: #4b4439;
+  --paper-heading: #4d4538;
+  --paper-subheading: #625847;
+  --paper-soft: #f7eedf;
+  --paper-line: #e8dcc8;
+  --paper-accent: #82755d;
+  --paper-scrollbar: #c6baa6;
+}
+html.paper-amber {
+  --paper-surface: #f7f8f7;
+  --paper-header: rgba(247, 248, 247, .96);
+  --paper-ink: #424846;
+  --paper-heading: #38423e;
+  --paper-subheading: #515a56;
+  --paper-soft: #eef0ef;
+  --paper-line: #dde1df;
+  --paper-accent: #697b74;
+  --paper-scrollbar: #b8bfbc;
+}
+.reader,
+.reading-layout,
+.reader-body { background: var(--paper-surface) !important; }
+.reader-header { background: var(--paper-header) !important; border-color: var(--paper-line) !important; }
+.reader-body { color: var(--paper-ink) !important; scrollbar-color: var(--paper-scrollbar) transparent; }
+.reader-body p,
+.reader-body li { color: var(--paper-ink) !important; }
+.reader-body h1 { color: var(--paper-heading) !important; }
+.reader-body h2 { color: var(--paper-subheading) !important; border-bottom-color: var(--paper-line) !important; }
+.reader-body h3 { color: var(--paper-subheading) !important; }
+.reader-body strong { color: var(--paper-subheading) !important; }
+.reader-body a { color: var(--paper-accent) !important; text-decoration-color: color-mix(in srgb, var(--paper-accent) 45%, transparent) !important; }
+.reader-body li::marker { color: var(--paper-accent) !important; }
+.reader-body hr { border-color: var(--paper-line) !important; }
+.reader-body blockquote { background: var(--paper-soft) !important; border-left-color: color-mix(in srgb, var(--paper-accent) 52%, white) !important; color: var(--paper-ink) !important; }
+.reader-body :not(pre) > code { border-color: var(--paper-line) !important; background: var(--paper-soft) !important; color: var(--paper-subheading) !important; }
+.reader-body table th { background: var(--paper-soft) !important; color: var(--paper-subheading) !important; }
+.reader-body table :is(th, td) { border-color: var(--paper-line) !important; }
+.reader-body::-webkit-scrollbar-thumb,
+.reader-body *::-webkit-scrollbar-thumb { background: var(--paper-scrollbar) !important; }
+
+.paper-theme-control { position: relative; display: inline-flex; }
+.reader-actions .paper-theme-trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  border-color: var(--paper-line) !important;
+  background: color-mix(in srgb, var(--paper-surface) 90%, white) !important;
+  color: var(--paper-accent) !important;
+}
+.reader-actions .paper-theme-trigger:hover,
+.paper-theme-control.is-open .paper-theme-trigger {
+  border-color: color-mix(in srgb, var(--paper-accent) 40%, var(--paper-line)) !important;
+  background: var(--paper-soft) !important;
+}
+.paper-theme-chevron { font-size: 14px; line-height: 1; transform: translateY(-1px); }
+.paper-theme-control.is-open .paper-theme-chevron { transform: translateY(1px) rotate(180deg); }
+.paper-theme-menu {
+  position: absolute;
+  z-index: 35;
+  top: calc(100% + 7px);
+  right: 0;
+  display: none;
+  min-width: 114px;
+  padding: 5px;
+  border: 1px solid var(--paper-line);
+  border-radius: 9px;
+  background: var(--paper-header);
+  box-shadow: 0 8px 22px rgba(40, 54, 47, .11);
+}
+.paper-theme-control.is-open .paper-theme-menu { display: grid; gap: 2px; }
+.reader-actions .paper-theme-menu button {
+  justify-content: flex-start;
+  width: 100%;
+  padding: 6px 8px;
+  border-color: transparent !important;
+  border-radius: 6px;
+  background: transparent !important;
+  color: var(--paper-ink) !important;
+  text-align: left;
+}
+.reader-actions .paper-theme-menu button:hover,
+.reader-actions .paper-theme-menu button.is-selected {
+  background: var(--paper-soft) !important;
+  color: var(--paper-accent) !important;
+}
+.reader-actions .paper-theme-menu button.is-selected::after {
+  content: "✓";
+  margin-left: auto;
+  font-size: 12px;
+}
+
+/* Keep the reader toolbar legible and visually consistent. */
+.reader-header .crumb,
+.reader-actions .saved,
+.reader-actions .saving,
+.reader-actions button,
+.data-tools__actions button {
+  font-family: "Microsoft YaHei", "Microsoft YaHei UI", sans-serif !important;
+  font-size: 12px !important;
+  font-weight: 700 !important;
+}
+
+/* Paper-dependent controls: the whole reading workspace changes as one surface. */
+.reader-header .crumb { color: color-mix(in srgb, var(--paper-ink) 64%, transparent) !important; }
+.reader-actions button,
+.data-tools__actions button {
+  border-color: var(--paper-line) !important;
+  background: color-mix(in srgb, var(--paper-surface) 90%, white) !important;
+  color: color-mix(in srgb, var(--paper-ink) 78%, var(--paper-accent)) !important;
+}
+.reader-actions button:hover,
+.data-tools__actions button:hover {
+  border-color: color-mix(in srgb, var(--paper-accent) 42%, var(--paper-line)) !important;
+  background: var(--paper-soft) !important;
+  color: var(--paper-accent) !important;
+}
+.data-tools { border-left-color: var(--paper-line) !important; }
+.reader-actions .saved,
+.reader-actions .saving { color: color-mix(in srgb, var(--paper-ink) 48%, transparent) !important; }
+.reader-actions .complete {
+  border-color: color-mix(in srgb, var(--paper-accent) 30%, var(--paper-line)) !important;
+  background: var(--paper-soft) !important;
+  color: var(--paper-accent) !important;
+}
+.reader-actions .edit-switch {
+  border-color: var(--paper-accent) !important;
+  background: var(--paper-accent) !important;
+  color: #fff !important;
+  box-shadow: 0 2px 5px color-mix(in srgb, var(--paper-accent) 20%, transparent) !important;
+}
+.reader-actions .edit-switch:hover { background: color-mix(in srgb, var(--paper-accent) 88%, #1e342d) !important; }
+.annotation-shelf-toggle {
+  border-color: var(--paper-line) !important;
+  background: color-mix(in srgb, var(--paper-surface) 90%, white) !important;
+  color: color-mix(in srgb, var(--paper-ink) 65%, var(--paper-accent)) !important;
+}
+.annotation-shelf-toggle:hover,
+.annotation-shelf-toggle.is-open {
+  border-color: color-mix(in srgb, var(--paper-accent) 35%, var(--paper-line)) !important;
+  background: var(--paper-soft) !important;
+  color: var(--paper-accent) !important;
+}
+.annotation-shelf {
+  background: var(--paper-surface) !important;
+  border-color: var(--paper-line) !important;
+  box-shadow: 0 10px 24px color-mix(in srgb, var(--paper-ink) 13%, transparent) !important;
+}
+.annotation-shelf__bar,
+.annotation-shelf__filters,
+.annotation-shelf__tag-summary,
+.annotation-tag-popover { background: color-mix(in srgb, var(--paper-surface) 94%, white) !important; border-color: var(--paper-line) !important; }
+.annotation-shelf__card { border-color: var(--paper-line) !important; }
+.annotation-shelf__card:hover { border-color: color-mix(in srgb, var(--paper-accent) 35%, var(--paper-line)) !important; background: color-mix(in srgb, var(--paper-surface) 94%, white) !important; }
+.annotation-shelf__card.is-current { background: var(--paper-soft) !important; border-color: color-mix(in srgb, var(--paper-accent) 48%, var(--paper-line)) !important; }
+.annotation-shelf__search { border-color: var(--paper-line) !important; background: var(--paper-surface) !important; color: var(--paper-ink) !important; }
+.annotation-shelf__search:focus { border-color: color-mix(in srgb, var(--paper-accent) 52%, var(--paper-line)) !important; box-shadow: 0 0 0 3px color-mix(in srgb, var(--paper-accent) 12%, transparent) !important; }
+.annotation-shelf__outline-item:hover,
+.annotation-shelf__inline-comment:focus,
+.annotation-shelf__add-tag:hover { background: var(--paper-soft) !important; color: var(--paper-accent) !important; }
+.annotation-shelf__tab--grid.annotation-shelf__tab--active,
+.annotation-shelf__tab--active { background: var(--paper-soft) !important; color: var(--paper-accent) !important; }
+.annotation-shelf :is(button, input):focus-visible { outline-color: var(--paper-accent) !important; }
+.zotero-draw-control { border-right-color: var(--paper-line) !important; }
+.zotero-draw-control__button,
+.zotero-draw-control__select,
+.zotero-draw-control__visibility { color: color-mix(in srgb, var(--paper-ink) 65%, var(--paper-accent)) !important; }
+.zotero-draw-control.is-active .zotero-draw-control__button,
+.zotero-draw-control__button.is-active,
+.zotero-draw-control__select.is-active {
+  border-color: color-mix(in srgb, var(--paper-accent) 38%, var(--paper-line)) !important;
+  background: var(--paper-soft) !important;
+  color: var(--paper-accent) !important;
+}
+.zotero-draw-menu { background: var(--paper-header) !important; border-color: var(--paper-line) !important; box-shadow: 0 10px 26px color-mix(in srgb, var(--paper-ink) 14%, transparent) !important; }
+.zotero-draw-menu__color:hover,
+.zotero-draw-menu__color.is-selected,
+.zotero-draw-menu__eraser:hover,
+.zotero-draw-menu__eraser.is-active { border-left-color: var(--paper-accent) !important; background: var(--paper-soft) !important; }
+
+/* Use a stronger selector to override legacy per-button medium weights. */
+html .reader-header .crumb,
+html .reader-header .reader-actions .saved,
+html .reader-header .reader-actions .saving,
+html .reader-header .reader-actions button,
+html .reader-header .data-tools__actions button {
+  font-family: "Microsoft YaHei", "Microsoft YaHei UI", sans-serif !important;
+  font-size: 12px !important;
+  font-weight: 700 !important;
+}
+
+/* Annotation drawer internals use the selected paper too, including its list area. */
+.annotation-shelf,
+.annotation-shelf__list,
+.annotation-shelf__outline-list { background: var(--paper-surface) !important; color: var(--paper-ink) !important; }
+.annotation-shelf__bar,
+.annotation-shelf__filters,
+.annotation-shelf__tag-summary,
+.annotation-tag-popover { background: var(--paper-header) !important; }
+.annotation-shelf__list::-webkit-scrollbar-thumb { background: var(--paper-scrollbar) !important; }
+.annotation-shelf__card { background: color-mix(in srgb, var(--paper-surface) 94%, white) !important; color: var(--paper-ink) !important; }
+.annotation-shelf__card-head,
+.annotation-shelf__excerpt,
+.annotation-shelf__comment,
+.annotation-shelf__inline-comment,
+.annotation-shelf__add-tag,
+.annotation-shelf__outline-item { color: var(--paper-ink) !important; }
+.annotation-shelf__inline-comment,
+.annotation-shelf__add-tag { border-top-color: var(--paper-line) !important; }
+.annotation-shelf__inline-comment:focus { background: var(--paper-soft) !important; }
+.annotation-shelf__empty,
+.annotation-shelf__outline-empty,
+.annotation-shelf__more { color: color-mix(in srgb, var(--paper-ink) 48%, transparent) !important; }
+.annotation-shelf__search::placeholder,
+.annotation-shelf__inline-comment::placeholder { color: color-mix(in srgb, var(--paper-ink) 44%, transparent) !important; }
+.annotation-shelf__tabs { border-right-color: var(--paper-line) !important; }
+.annotation-shelf__outline,
+.annotation-shelf__close { color: color-mix(in srgb, var(--paper-ink) 58%, var(--paper-accent)) !important; }
+.annotation-shelf__close:hover { background: var(--paper-soft) !important; color: var(--paper-accent) !important; }
+.annotation-shelf__tag-summary { color: color-mix(in srgb, var(--paper-ink) 62%, transparent) !important; }
+.annotation-shelf__tag-summary button { color: var(--paper-accent) !important; }
+.annotation-shelf__tag-summary button.is-active { background: var(--paper-accent) !important; color: #fff !important; }
+.annotation-shelf__filter { border-color: var(--paper-surface) !important; }
+.annotation-shelf__filter.is-active { outline-color: var(--paper-accent) !important; }
+
+/* Collapsed navigation rails belong to the chosen paper rather than the old blue shell. */
+.app-shell.library-collapsed { background: var(--paper-soft) !important; }
+.library-collapsed .library,
+.note-list {
+  background: var(--paper-surface) !important;
+  border-right-color: var(--paper-line) !important;
+}
+.note-list .note-list-header {
+  background: var(--paper-header) !important;
+  border-color: var(--paper-line) !important;
+}
+.library-collapsed .sidebar-toggle,
+.note-list__close {
+  border-color: var(--paper-line) !important;
+  background: color-mix(in srgb, var(--paper-surface) 90%, white) !important;
+  color: var(--paper-accent) !important;
+  box-shadow: 0 1px 3px color-mix(in srgb, var(--paper-ink) 6%, transparent) !important;
+}
+.library-collapsed .sidebar-toggle:hover,
+.note-list__close:hover {
+  border-color: color-mix(in srgb, var(--paper-accent) 42%, var(--paper-line)) !important;
+  background: var(--paper-soft) !important;
+  color: var(--paper-accent) !important;
+}
+
+/* The brand signature and browsing rows keep distinct, intentional weights. */
+.library .brand small {
+  font-family: "Microsoft YaHei", "Microsoft YaHei UI", sans-serif !important;
+  font-weight: 700 !important;
+}
+.library .course-button,
+.library .recent-notes__item {
+  font-family: "Microsoft YaHei", "Microsoft YaHei UI", sans-serif !important;
+  font-weight: 400 !important;
+}
+.library .category-add {
+  font-family: Georgia, "Times New Roman", "Noto Serif SC", serif !important;
+  font-weight: 600 !important;
+  font-style: italic;
+}
+
+/* Library and note-index typography share one sturdy, readable UI face. */
+.library .section-title,
+.library .recent-notes__title,
+.note-list .note-list-header p,
+.note-list .note-list-header strong,
+.note-list .compact-note,
+.note-list .compact-note strong,
+.note-list .compact-note small,
+.note-list .empty-index {
+  font-family: "Microsoft YaHei", "Microsoft YaHei UI", sans-serif !important;
+  font-weight: 700 !important;
 }
