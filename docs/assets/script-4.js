@@ -24,25 +24,40 @@
   let lastSourceText = '';
   let renderedSignature = '';
   let annotationsByNote = null;
+  let annotationsById = null;
   let resolvedAnchors = new Map();
   let anchorTextSignature = '';
+  let observedRoot = null;
 
   const reader = () => document.querySelector('.reader-body');
   const readerContent = () => reader()?.firstElementChild || null;
   const currentNoteId = () => document.querySelector('.compact-note.selected')?.dataset.noteId || '';
-  const read = () => cachedItems || (cachedItems = (() => { try { return JSON.parse(localStorage.getItem(storageKey) || '[]'); } catch { return []; } })());
-  const noteAnnotations = noteId => {
-    if (!annotationsByNote) {
-      annotationsByNote = new Map();
-      read().forEach(item => { const items = annotationsByNote.get(item.noteId) || []; items.push(item); annotationsByNote.set(item.noteId, items); });
-    }
-    return annotationsByNote.get(noteId) || [];
+  const read = () => cachedItems || (cachedItems = (() => {
+    try {
+      const value = JSON.parse(localStorage.getItem(storageKey) || '[]');
+      return Array.isArray(value) ? value : [];
+    } catch { return []; }
+  })());
+  const annotationIndex = () => {
+    if (annotationsByNote && annotationsById) return { byNote: annotationsByNote, byId: annotationsById };
+    annotationsByNote = new Map(); annotationsById = new Map();
+    read().forEach(item => {
+      if (!item?.id) return;
+      annotationsById.set(item.id, item);
+      const items = annotationsByNote.get(item.noteId) || [];
+      items.push(item); annotationsByNote.set(item.noteId, items);
+    });
+    return { byNote: annotationsByNote, byId: annotationsById };
   };
+  const noteAnnotations = noteId => {
+    return annotationIndex().byNote.get(noteId) || [];
+  };
+  const annotationForId = id => annotationIndex().byId.get(id) || null;
   // This is the single persistence gateway for text annotations. Every consumer
   // (the reader, detail card and annotation shelf) receives the same change signal.
   const write = (items, detail = {}) => {
     cachedItems = items;
-    annotationsByNote = null;
+    annotationsByNote = null; annotationsById = null;
     localStorage.setItem(storageKey, JSON.stringify(items));
     document.dispatchEvent(new CustomEvent('chengmo:annotations-changed', { detail: { ...detail, source: 'reader' } }));
   };
@@ -152,7 +167,6 @@
   function renderAnnotations() {
     const root = readerContent();
     if (!root) return;
-    observer && observer.disconnect();
     const noteId = currentNoteId();
     const allItems = read();
     const currentText = root.textContent || '';
@@ -161,6 +175,7 @@
     // React can announce a UI mount without replacing the article. Avoid tearing
     // down every mark when both the text and its visual annotation state match.
     if (root === lastRoot && signature === renderedSignature && (!noteItems.length || root.querySelector('mark.selection-annotation'))) { watch(root); return; }
+    observer?.disconnect(); observer = null; observedRoot = null;
     clearMarks(root);
     // Read source once; resolving anchors no longer repeatedly walks the long note.
     if (anchorTextSignature !== currentText) { anchorTextSignature = currentText; resolvedAnchors = new Map(); }
@@ -185,12 +200,14 @@
     if (!window.MutationObserver) return;
     // A new render pass can leave the same reader node in place. Always retire
     // its old watcher before attaching the replacement to avoid duplicate work.
+    if (observer && observedRoot === root) return;
     observer?.disconnect();
     observer = new MutationObserver(() => {
       window.clearTimeout(applyTimer);
       applyTimer = window.setTimeout(scheduleAnnotationRender, 80);
     });
     observer.observe(root, { childList: true, subtree: true });
+    observedRoot = root;
   }
   function removeMenu() { menu?.remove(); menu = null; selected = null; selectionBox?.remove(); selectionBox = null; }
   function announce(message) { window.chengmoNotice?.(message); }
@@ -226,7 +243,7 @@
   }
   function showCommentCard(mark) {
     const id = mark.dataset.annotationId;
-    const item = read().find(annotation => annotation.id === id);
+    const item = annotationForId(id);
     if (!item) return;
     removeMenu();
     selectionBox = document.createElement('div'); selectionBox.className = 'selection-annotation-selection-box';
@@ -267,7 +284,7 @@
   }
   function showManageMenu(mark, point) {
     const id = mark.dataset.annotationId;
-    const item = read().find(annotation => annotation.id === id);
+    const item = annotationForId(id);
     if (!item) return;
     removeMenu();
     menu = document.createElement('div');
@@ -446,7 +463,7 @@
   listen('chengmo:annotations-changed', 'text-annotations-data', event => {
     // The shelf can edit metadata directly. Drop this module's cached copy so a
     // later reader-side edit never writes stale tags or comments back to storage.
-    if (event.detail?.source !== 'reader') { cachedItems = null; annotationsByNote = null; }
+    if (event.detail?.source !== 'reader') { cachedItems = null; annotationsByNote = null; annotationsById = null; }
   });
-  window.addEventListener('storage', event => { if (event.key === storageKey) { cachedItems = null; annotationsByNote = null; scheduleAnnotationRender(); } });
+  window.addEventListener('storage', event => { if (event.key === storageKey) { cachedItems = null; annotationsByNote = null; annotationsById = null; scheduleAnnotationRender(); } });
 })();
