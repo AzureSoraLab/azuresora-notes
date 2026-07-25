@@ -2006,6 +2006,17 @@ html .reader-header .data-tools__actions button {
 }
 
 @media (max-width: 760px) {
+  /* Mirror the phone library's composed, centered masthead while leaving the
+     category list's four-row scroll behaviour intact. */
+  .library.mobile-active .brand {
+    align-self: center;
+    flex-basis: 88px;
+    width: 224px;
+  }
+  .library.mobile-active .new-note {
+    width: 167px;
+    min-width: 167px;
+  }
   .selection-annotation-menu:not(.selection-annotation-menu--card):not(.selection-annotation-menu--manage) {
     width: min(238px, calc(100vw - 24px));
     border-radius: 10px;
