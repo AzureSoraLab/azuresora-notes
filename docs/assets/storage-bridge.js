@@ -102,7 +102,11 @@
   let databaseWritePromise = Promise.resolve();
   let databaseWriteRevision = 0;
   let noteWritePromise = Promise.resolve();
+  let noteFlushPromise = null;
   let pendingNotesState = null;
+  let notesTimer = 0;
+  let noteRevision = 0;
+  let noteWrittenRevision = 0;
   let notesRetryTimer = 0;
   let drawingTimer = 0;
   let drawingIdle = 0;
@@ -206,26 +210,51 @@
     });
     return drawingFlushPromise;
   };
-  const saveNotes = (state, replace = false) => {
-    if (!state || typeof state !== 'object' || !Array.isArray(state.notes)) return;
-    pendingNotesState = state;
+  const flushNotes = async () => {
+    if (noteFlushPromise) return noteFlushPromise;
+    if (!pendingNotesState || typeof pendingNotesState !== 'object' || !Array.isArray(pendingNotesState.notes)) return;
+    const state = pendingNotesState;
+    const revision = noteRevision;
     const { notes: ignoredNotes, ...stateMeta } = state;
     // Keep an explicit manifest. Older records can remain in IndexedDB after
     // an interrupted write, but they must never be restored as live notes.
     const meta = { ...stateMeta, noteIds: state.notes.map(note => note?.id).filter(Boolean) };
-    noteWritePromise = enqueueDatabaseWrite(async () => {
+    noteFlushPromise = noteWritePromise = enqueueDatabaseWrite(async () => {
       const db = await database();
-      if (!db) return;
+      if (!db) { noteWrittenRevision = revision; return; }
       const transaction = db.transaction(['meta', 'notes'], 'readwrite');
       transaction.objectStore('meta').put(meta, 'notes-state');
       const notes = transaction.objectStore('notes');
-      // A full replacement makes consecutive create/delete operations safe even
-      // when both changes are queued before either IndexedDB transaction runs.
+      // A full replacement makes create/delete operations safe even when a
+      // newer editor snapshot arrives while this transaction is pending.
       notes.clear();
       state.notes.forEach(note => note?.id && notes.put({ ...note }));
       await complete(transaction);
       saveNotes.previous = new Map(state.notes.filter(note => note?.id).map(note => [note.id, note]));
-    }).catch(() => { scheduleNotesRetry(); });
+      noteWrittenRevision = revision;
+    }).catch(() => { scheduleNotesRetry(); }).finally(() => {
+      noteFlushPromise = null;
+      // Text input can produce many React snapshots. Persist only the latest
+      // follow-up state once the active IndexedDB transaction has finished.
+      if (noteRevision !== revision) window.setTimeout(() => flushNotes().catch(() => scheduleNotesRetry()), 0);
+    });
+    return noteFlushPromise;
+  };
+  const saveNotes = (state, immediate = false) => {
+    if (!state || typeof state !== 'object' || !Array.isArray(state.notes)) return;
+    pendingNotesState = state;
+    noteRevision += 1;
+    if (immediate) {
+      if (notesTimer) { window.clearTimeout(notesTimer); notesTimer = 0; }
+      return flushNotes();
+    }
+    // React writes the entire note store for every keystroke. Coalesce that
+    // burst before rebuilding IndexedDB while leaving the boot cache current.
+    if (notesTimer) window.clearTimeout(notesTimer);
+    notesTimer = window.setTimeout(() => {
+      notesTimer = 0;
+      flushNotes().catch(() => scheduleNotesRetry());
+    }, 260);
     return noteWritePromise;
   };
   const saveNotesFromObject = state => {
@@ -365,6 +394,15 @@
       if (revision === drawingRevision && !drawingQueue.size && !drawingFlushPromise) return;
     }
   };
+  const flushNotesUntilStable = async () => {
+    if (notesTimer) { window.clearTimeout(notesTimer); notesTimer = 0; }
+    while (true) {
+      const revision = noteRevision;
+      await flushNotes();
+      await noteWritePromise;
+      if (revision === noteRevision && noteWrittenRevision >= revision && !noteFlushPromise) return;
+    }
+  };
   const flushDatabaseUntilStable = async () => {
     while (true) {
       const revision = databaseWriteRevision;
@@ -382,6 +420,7 @@
     }
   };
   const flush = async () => {
+    if (notesTimer) { window.clearTimeout(notesTimer); notesTimer = 0; }
     if (drawingTimer) { window.clearTimeout(drawingTimer); drawingTimer = 0; }
     if (drawingIdle) {
       if ('cancelIdleCallback' in window) window.cancelIdleCallback(drawingIdle); else window.clearTimeout(drawingIdle);
@@ -390,7 +429,7 @@
     if (metaTimer) { window.clearTimeout(metaTimer); metaTimer = 0; }
     if (bootCacheTimer) { window.clearTimeout(bootCacheTimer); bootCacheTimer = 0; }
     flushBootCache();
-    await Promise.all([flushMeta(), flushDrawingsUntilStable(), flushAnnotationsUntilStable()]);
+    await Promise.all([flushNotesUntilStable(), flushMeta(), flushDrawingsUntilStable(), flushAnnotationsUntilStable()]);
     await flushDatabaseUntilStable();
   };
   const migrate = async () => {
@@ -469,6 +508,10 @@
   const replaceSnapshot = async snapshot => {
     if (!snapshot || typeof snapshot !== 'object') return;
     return enqueueDatabaseWrite(async () => {
+      // An import rollback replaces the complete notebook. Cancel a queued
+      // editor snapshot first so it cannot write stale notes afterward.
+      if (notesTimer) { window.clearTimeout(notesTimer); notesTimer = 0; }
+      noteRevision += 1;
       window.clearTimeout(drawingTimer); drawingTimer = 0;
       if (drawingIdle) {
         if ('cancelIdleCallback' in window) window.cancelIdleCallback(drawingIdle); else window.clearTimeout(drawingIdle);
@@ -501,6 +544,7 @@
       saveNotes.previous = new Map(notes.filter(note => note?.id).map(note => [note.id, note]));
       saveAnnotations.previous = new Set(annotations.map(item => item?.id).filter(Boolean));
       pendingNotesState = notesState;
+      noteWrittenRevision = noteRevision;
       pendingAnnotations = annotations;
       drawingStateCache = drawings;
       drawingBootCacheDirty = false;
