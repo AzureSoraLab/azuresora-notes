@@ -13,7 +13,9 @@
   let current = null;
   let cachedItems = null; let markCache = new Map(); let shelfIndex = null; let markCacheDirty = true; let renderFrame = 0; let commentSaveTimer = 0; let pendingComment = null;
   let shelfNodes = null;
-  let outlineCache = { root: null, signature: '', items: [] };
+  let outlineCache = { root: null, items: [] };
+  let outlineObserver = null;
+  let outlineDirty = true;
   const read = () => cachedItems || (cachedItems = (() => { try { const value = JSON.parse(localStorage.getItem(key) || '[]'); return Array.isArray(value) ? value : []; } catch { return []; } })());
   const invalidateShelfIndex = (marks = false) => { shelfIndex = null; markCacheDirty ||= marks; };
   const refreshMarkCache = () => {
@@ -39,10 +41,20 @@
   const outlineEntries = () => {
     const root = document.querySelector('.outline-content');
     if (!root) return [];
+    if (root !== outlineCache.root) {
+      outlineObserver?.disconnect();
+      outlineObserver = new MutationObserver(() => {
+        outlineDirty = true;
+        if (activeView === 'outline') scheduleRender();
+      });
+      outlineObserver.observe(root, { childList: true, subtree: true, characterData: true });
+      outlineCache = { root, items: [] };
+      outlineDirty = true;
+    }
+    if (!outlineDirty && outlineCache.items.every(item => item.source.isConnected)) return outlineCache.items;
     const sourceItems = [...root.querySelectorAll('button.level-2, button.level-3')];
-    const signature = sourceItems.map(item => `${item.className}\u0000${item.textContent || ''}`).join('\u0001');
-    if (outlineCache.root === root && outlineCache.signature === signature && outlineCache.items.every(item => item.source.isConnected)) return outlineCache.items;
-    outlineCache = { root, signature, items: sourceItems.map(source => ({ source, className: source.className, text: source.textContent || '' })) };
+    outlineCache = { root, items: sourceItems.map(source => ({ source, className: source.className, text: source.textContent || '' })) };
+    outlineDirty = false;
     return outlineCache.items;
   };
   const commit = (detail = {}, invalidate = true) => { if (invalidate) invalidateShelfIndex(); localStorage.setItem(key, JSON.stringify(read())); document.dispatchEvent(new CustomEvent('chengmo:annotations-changed', { detail: { ...detail, source: 'shelf' } })); };
@@ -198,7 +210,7 @@
     };
     // The data-tools module emits this only when React replaces a major UI region.
     // Rebinding the header is enough; observing the entire root caused needless work.
-    listen('chengmo:ui-mounted', 'annotation-shelf-position', () => { outlineCache = { root: null, signature: '', items: [] }; watchHeader(); });
+    listen('chengmo:ui-mounted', 'annotation-shelf-position', () => { outlineCache = { root: null, items: [] }; outlineDirty = true; watchHeader(); });
     watchHeader();
     toggle.addEventListener('click', () => { const hidden = shelf.classList.toggle('is-hidden'); toggle.classList.toggle('is-open', !hidden); toggle.title = hidden ? '\u663e\u793a\u6807\u6ce8' : '\u9690\u85cf\u6807\u6ce8'; if (!hidden) { positionToggle(); positionShelf(); render(); } });
     window.addEventListener('resize', () => schedulePosition(true), { passive: true });
@@ -219,13 +231,16 @@
     const { list, summary, filters } = shelfNodes || {}; if (!list || !summary || !filters) return;
     if (activeView === 'outline') {
       filters.hidden = true; summary.hidden = true;
-      list.replaceChildren(); summary.replaceChildren();
       const sourceItems = outlineEntries();
-      if (!sourceItems.length) { const empty = document.createElement('div'); empty.className = 'annotation-shelf__outline-empty'; empty.textContent = '\u6682\u65e0\u76ee\u5f55'; list.append(empty); return; }
+      const signature = sourceItems.map(({ className, text }) => `${className}\u0000${text}`).join('\u0001');
+      if (list.dataset.outlineSignature === signature) return;
+      list.replaceChildren(); summary.replaceChildren();
+      if (!sourceItems.length) { const empty = document.createElement('div'); empty.className = 'annotation-shelf__outline-empty'; empty.textContent = '\u6682\u65e0\u76ee\u5f55'; list.append(empty); list.dataset.outlineSignature = signature; return; }
       const outlineList = document.createElement('div'); outlineList.className = 'annotation-shelf__outline-list';
-      sourceItems.forEach(({ source, className, text }) => { const item = document.createElement('button'); item.type = 'button'; item.className = `annotation-shelf__outline-item ${className}`; item.textContent = text; item.addEventListener('click', () => source.click()); outlineList.append(item); }); list.append(outlineList); return;
+      sourceItems.forEach(({ source, className, text }) => { const item = document.createElement('button'); item.type = 'button'; item.className = `annotation-shelf__outline-item ${className}`; item.textContent = text; item.addEventListener('click', () => source.click()); outlineList.append(item); }); list.append(outlineList); list.dataset.outlineSignature = signature; return;
     }
     filters.hidden = false; summary.hidden = false;
+    delete list.dataset.outlineSignature;
     const index = annotationIndex();
     const items = index.items.filter(entry => {
       const item = entry.item;
