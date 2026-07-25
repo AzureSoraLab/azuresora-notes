@@ -97,6 +97,9 @@
       localStorage.setItem(stateKey, JSON.stringify({ ...state, notes: notes.filter(note => note.id !== targetId) }));
       if (nextId) localStorage.setItem(readingSessionKey, JSON.stringify({ noteId: nextId, courseId, listOpen: true }));
       else localStorage.removeItem(readingSessionKey);
+      // The storage bridge batches compatibility-cache writes. A deletion
+      // reloads immediately, so flush this transaction before navigation.
+      window.chengmoStorage?.flush?.();
       return true;
     } catch {
       try { restoreSnapshot(); } catch {}
