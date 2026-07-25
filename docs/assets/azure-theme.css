@@ -1,0 +1,620 @@
+/* AzureSora: quiet cloud-paper theme. Blue marks intent; paper remains the focus. */
+:root {
+  --paper: #fcfcfa;
+  --ink: #334350;
+  --muted: #87949f;
+  --line: #e2e7e9;
+  --soft: #f3f6f7;
+  --accent: #6c89a5;
+}
+
+html,
+body,
+.app-shell,
+.reader {
+  background: var(--paper) !important;
+  color: var(--ink) !important;
+}
+
+.library {
+  background: #f8fafb !important;
+  border-right-color: #e0e6e9 !important;
+}
+
+.library-content { padding-top: 31px; }
+
+.brand {
+  margin-bottom: 27px !important;
+}
+
+.brand-mark { color: #7895ad !important; }
+.brand > span:not(.brand-mark) { color: #354654 !important; }
+.brand small { color: #8c9aa5 !important; }
+
+.library .new-note,
+.note-list .new-note.compact {
+  background: #6c89a5 !important;
+  box-shadow: 0 3px 9px rgba(67, 89, 108, 0.12) !important;
+}
+
+.library .new-note {
+  min-height: 45px;
+  border-radius: 8px;
+  font-weight: 600;
+  letter-spacing: 0.15px;
+}
+
+.library .new-note:hover,
+.note-list .new-note.compact:hover {
+  background: #5f7f9d !important;
+  box-shadow: 0 4px 11px rgba(67, 89, 108, 0.15) !important;
+}
+
+.library .section-title,
+.library .recent-notes__title,
+.note-list .note-list-header p {
+  color: #81919d !important;
+  font-weight: 600;
+  letter-spacing: 1.15px;
+}
+
+.library .category-add { color: #718aa0 !important; }
+.library .course-button,
+.library .recent-notes__item { color: #556673 !important; }
+
+.library .course-button:hover,
+.library .recent-notes__item:hover {
+  background: #f1f5f7 !important;
+  color: #47677f !important;
+}
+
+.library .course-button.active,
+.library .recent-notes__item.is-current {
+  background: #edf3f7 !important;
+  border-color: #d7e2ea !important;
+  color: #496b84 !important;
+  font-weight: 600;
+}
+
+.library .recent-notes,
+.library .storage-note,
+.note-list .search { border-color: #e3e8ea !important; }
+.library .storage-note { color: #939ea5 !important; }
+
+.reader-header,
+.note-list .note-list-header {
+  background: rgba(252, 252, 250, 0.96) !important;
+  border-color: #e5e9e9 !important;
+  backdrop-filter: none !important;
+}
+
+.reader-header .crumb,
+.reader-actions .saved { color: #81919d !important; }
+
+.reader-actions button {
+  border-color: #dde5e8 !important;
+  border-radius: 6px !important;
+  background: #fff !important;
+  color: #5a6d79 !important;
+  box-shadow: none !important;
+}
+
+.reader-actions button:hover {
+  background: #f1f5f7 !important;
+  color: #45667f !important;
+}
+
+.reader-body {
+  color: #3b4d59 !important;
+  scrollbar-color: #c7d1d7 transparent;
+}
+
+.reader-body h1 { color: #2e4353 !important; }
+.reader-body h2,
+.reader-body h3 { color: #3d5a6f !important; }
+.reader-body blockquote {
+  border-left-color: #9bb2c3 !important;
+  background: #f6f8f8 !important;
+  color: #5b7180 !important;
+}
+.reader-body hr { border-color: #e5e9e9 !important; }
+.reader-body table th { background: #f3f6f7 !important; color: #455e70 !important; }
+.reader-body table td,
+.reader-body table th { border-color: #e1e7e8 !important; }
+
+.note-list {
+  background: #fcfdfd !important;
+  border-right-color: #dfe7ea !important;
+  box-shadow: 10px 0 20px rgba(50, 66, 80, 0.07) !important;
+}
+
+.note-list .compact-note { border-radius: 7px; }
+.note-list .compact-note:hover {
+  background: #f2f6f8 !important;
+  border-color: #e1e9ec !important;
+}
+.note-list .compact-note.selected {
+  background: #edf3f7 !important;
+  border-color: #d6e2e9 !important;
+}
+.note-list .note-list-header strong,
+.note-list .compact-note strong { color: #3d5262 !important; }
+.note-list .compact-note small,
+.note-list .search,
+.note-list .search input { color: #8b989f !important; }
+
+.annotation-shelf-toggle {
+  background: #fcfcfa !important;
+  border-color: #dfe6e9 !important;
+  color: #71879a !important;
+}
+.annotation-shelf-toggle:hover,
+.annotation-shelf-toggle.is-open {
+  background: #edf3f7 !important;
+  color: #496b84 !important;
+}
+
+.annotation-shelf {
+  background: #f8fafb !important;
+  border-color: #dbe5e9 !important;
+  border-radius: 8px !important;
+  box-shadow: 0 10px 25px rgba(48, 65, 78, 0.14) !important;
+}
+.annotation-shelf__bar,
+.annotation-shelf__filters,
+.annotation-shelf__tag-summary {
+  background: #fcfcfa !important;
+  border-color: #e1e7e9 !important;
+}
+.annotation-shelf__card {
+  border-color: #e1e7e9 !important;
+  border-radius: 7px !important;
+  box-shadow: none !important;
+}
+.annotation-shelf__card:hover { border-color: #cbdbe4 !important; }
+.annotation-shelf__card.is-current {
+  background: #eef4f7 !important;
+  border-color: #91acbf !important;
+}
+.annotation-shelf__search {
+  border: 1px solid #d7e2e7 !important;
+  border-radius: 6px !important;
+  color: #506572 !important;
+}
+.annotation-shelf__search:focus {
+  border-color: #91acbf !important;
+  box-shadow: 0 0 0 3px rgba(108, 137, 165, 0.13) !important;
+}
+.annotation-shelf__outline-item:hover {
+  background: #edf3f7 !important;
+  border-color: #d4e1e8 !important;
+  color: #496b84 !important;
+}
+.annotation-shelf__inline-comment,
+.annotation-shelf__add-tag { color: #506572 !important; }
+.annotation-shelf__inline-comment:focus,
+.annotation-shelf__add-tag:hover { background: #f3f7f8 !important; }
+.annotation-tag-popover {
+  background: #fcfcfa !important;
+  border-color: #d7e3e8 !important;
+  box-shadow: 0 10px 24px rgba(48, 65, 78, 0.14) !important;
+}
+
+::selection { background: #dbe8ef; color: #2e4353; }
+
+/* Keyboard use follows the same quiet blue cue as the selected note. */
+:is(.new-note, .category-add, .category-edit, .course-button, .recent-notes__item,
+  .compact-note, .search input, .search__clear, .note-list__close,
+  .reader-actions button, .data-tools__actions button, .annotation-shelf-toggle,
+  .annotation-shelf button, .annotation-shelf input):focus-visible {
+  outline: 2px solid #7897b0 !important;
+  outline-offset: 2px;
+}
+
+/* The list can be dismissed without reaching back to the category column. */
+.note-list .note-list-header { position: relative; padding-right: 46px; }
+.note-list__close {
+  position: absolute;
+  top: 50%;
+  right: 13px;
+  display: grid;
+  width: 26px;
+  height: 26px;
+  place-items: center;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: transparent;
+  color: #81929c;
+  font: 20px/1 Arial, sans-serif;
+  cursor: pointer;
+}
+.note-list__close:hover { border-color: #dbe4e8; background: #f1f5f7; color: #496b84; }
+
+@media (max-width: 760px) {
+  .note-list__close { right: 10px; }
+}
+
+/* Reading-first polish: make the library easier to scan without turning it
+   into a competing panel. */
+.library .brand > span:not(.brand-mark) {
+  color: #334a5a !important;
+  font-family: "Microsoft YaHei UI", "Microsoft YaHei", "PingFang SC", sans-serif;
+  font-weight: 650;
+  letter-spacing: 0.035em;
+}
+.library .brand small {
+  color: #82919b !important;
+  font-size: 10px;
+  line-height: 1.65;
+  letter-spacing: 0.45px;
+}
+.library .section-title,
+.library .recent-notes__title {
+  color: #718391 !important;
+  font-size: 10.5px;
+  letter-spacing: 1px;
+}
+.library .course-button,
+.library .recent-notes__item { color: #4d6170 !important; }
+.library .storage-note { color: #8b989f !important; }
+.library .course-section { padding-bottom: 15px; }
+.library .recent-notes { margin-top: 15px; padding-top: 12px; }
+
+/* Backup actions remain discoverable, but no longer compete with note work. */
+.data-tools { border-left-color: #e6ecee !important; }
+.data-tools__actions { gap: 2px !important; }
+.data-tools__actions button {
+  min-width: 0 !important;
+  height: 27px !important;
+  padding: 0 7px !important;
+  border-color: transparent !important;
+  background: transparent !important;
+  color: #87959d !important;
+  font-size: 11px !important;
+}
+.data-tools__actions button:hover {
+  border-color: #dce6ea !important;
+  background: #f4f7f8 !important;
+  color: #54738a !important;
+  box-shadow: none !important;
+}
+.reader-actions { gap: 6px; }
+.reader-actions .complete,
+.reader-actions .annotate,
+.reader-actions .outline-header-toggle {
+  border-color: transparent !important;
+  background: transparent !important;
+  color: #71818c !important;
+}
+.reader-actions .complete:hover,
+.reader-actions .annotate:hover,
+.reader-actions .outline-header-toggle:hover {
+  border-color: #dce6ea !important;
+  background: #f2f6f8 !important;
+  color: #4c6d84 !important;
+}
+.reader-actions .edit-switch {
+  min-width: 46px;
+  border-color: #6686a3 !important;
+  background: #6686a3 !important;
+  color: #fff !important;
+  box-shadow: 0 2px 6px rgba(59, 84, 104, 0.14) !important;
+}
+.reader-actions .edit-switch:hover {
+  border-color: #597a98 !important;
+  background: #597a98 !important;
+  color: #fff !important;
+}
+.reader-actions .saved { margin-right: 2px; color: #91a0a8 !important; }
+
+/* A new note stays calm instead of feeling like an unfinished empty page. */
+.reader-body > div > h1:only-child::after {
+  display: block;
+  margin-top: 18px;
+  color: #9aa6ad;
+  content: "从编辑开始，记录此刻的想法。";
+  font-size: 13px;
+  font-weight: 400;
+  letter-spacing: 0.02em;
+}
+
+/* Temporary panels should feel like quiet reading tools, not a second app. */
+.note-list {
+  box-shadow: 8px 0 18px rgba(52, 69, 83, 0.08) !important;
+}
+.note-list .note-list-header p {
+  margin-bottom: 2px;
+  color: #83939e !important;
+  font-size: 10px;
+  letter-spacing: 0.9px;
+}
+.note-list .note-list-header strong { font-size: 15px; }
+.note-list .new-note.compact {
+  width: 30px;
+  min-width: 30px;
+  height: 30px;
+  min-height: 30px;
+  padding: 0;
+  border: 1px solid #d9e5eb !important;
+  border-radius: 7px;
+  background: #f1f6f8 !important;
+  box-shadow: none !important;
+  color: #55758d !important;
+  font-size: 19px;
+  line-height: 1;
+}
+.note-list .new-note.compact:hover {
+  border-color: #c7d9e3 !important;
+  background: #e7f0f5 !important;
+  box-shadow: none !important;
+  color: #416681 !important;
+  transform: none;
+}
+.note-list .search {
+  margin-top: 6px;
+  margin-bottom: 8px;
+  background: #fafcfc !important;
+}
+.note-list .compact-note {
+  min-height: 44px;
+  margin-top: 3px;
+  margin-bottom: 3px;
+  padding-top: 8px;
+  padding-bottom: 8px;
+}
+
+.annotation-shelf {
+  box-shadow: 0 8px 20px rgba(48, 65, 78, 0.12) !important;
+}
+.annotation-shelf-toggle.is-open {
+  border-color: #cfdee6 !important;
+  box-shadow: 0 1px 3px rgba(55, 78, 96, 0.08) !important;
+}
+.annotation-shelf__list {
+  min-height: 82px;
+  padding-top: 5px;
+  padding-bottom: 5px;
+}
+.annotation-shelf__empty {
+  padding: 22px 12px !important;
+  color: #92a0a7 !important;
+  font-size: 12px;
+}
+.annotation-shelf__filters {
+  flex-basis: 34px !important;
+  gap: 9px;
+  padding-left: 12px;
+  padding-right: 12px;
+}
+.annotation-shelf__filter {
+  width: 16px;
+  height: 16px;
+}
+
+/* Resolve the remaining daily-use issues in the library and header. */
+.library .brand { margin-bottom: 14px !important; }
+.library .brand small { color: #71818c !important; }
+.library .section-title,
+.library .recent-notes__title { color: #647b8b !important; }
+.library .course-button,
+.library .recent-notes__item { color: #405868 !important; }
+.library .storage-note { color: #71818c !important; font-size: 11px; }
+.library .course-section { margin-top: 17px; padding-bottom: 17px; }
+.library .recent-notes { margin-top: 17px; padding-top: 15px; }
+.library .recent-notes__item { min-height: 31px; }
+
+/* Keep the current category actionable without making every row noisy. */
+.course-group:has(.course-button.active) .category-edit,
+.course-group:has(.course-button.active) .course-group__delete {
+  opacity: 0.64;
+}
+.course-group:has(.course-button.active) .category-edit {
+  color: #607989;
+}
+.course-group:has(.course-button.active) .course-group__delete {
+  color: #8d9ca4;
+}
+.course-group:has(.course-button.active) .category-edit:hover,
+.course-group:has(.course-button.active) .course-group__delete:hover { opacity: 1; }
+
+/* The annotation trigger is part of the reader toolbar, not a floating tab. */
+.annotation-shelf-toggle {
+  border-color: transparent !important;
+  border-radius: 6px !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+.annotation-shelf-toggle:hover,
+.annotation-shelf-toggle.is-open {
+  border-color: #d7e3e9 !important;
+  background: #eff5f8 !important;
+  box-shadow: none !important;
+}
+.annotation-shelf-toggle.is-open { color: #52748d !important; }
+
+/* The reading controls now form three quiet groups: drawing, note state, edit. */
+.zotero-draw-control {
+  margin-right: 6px !important;
+  padding-right: 9px !important;
+  border-right-color: #e2e9ed !important;
+}
+.reader-actions .saved { min-width: 34px; text-align: center; }
+.reader-actions .complete { margin-left: 2px; }
+
+/* Keep navigation readable even while the note index is open. */
+@media (min-width: 761px) {
+  .note-list {
+    left: 248px !important;
+    transform: none !important;
+  }
+  .library-collapsed .note-list { left: 52px !important; }
+}
+
+/* Opening the note index temporarily takes ownership of this edge. Do not
+   leave the annotation panel visibly competing beneath it. */
+.note-list-open .annotation-shelf {
+  visibility: hidden;
+  pointer-events: none;
+}
+
+/* A steady vertical rhythm makes repeated left-column scanning less tiring. */
+.library .brand { margin-bottom: 10px !important; }
+.library .new-note { margin-bottom: 17px !important; }
+.library .course-section { margin-top: 13px; }
+.library .recent-notes { margin-top: 20px; }
+.library .storage-note { margin-top: 17px; }
+
+/* The selected category should guide the eye, never read as an input outline. */
+.library .course-button.active,
+.library .recent-notes__item.is-current {
+  border-color: transparent !important;
+  background: #eaf2f6 !important;
+  box-shadow: none !important;
+  color: #406078 !important;
+}
+.library .course-button.active i { box-shadow: 0 0 0 2px #eaf2f6 !important; }
+.library .recent-notes__item.is-current::after { display: none !important; }
+
+/* Raise legibility before adding decoration. */
+.library .section-title,
+.library .recent-notes__title {
+  color: #516b7d !important;
+  font-size: 11.5px;
+  font-weight: 650;
+  letter-spacing: 0.6px;
+}
+.library .course-button,
+.library .recent-notes__item {
+  color: #3f5667 !important;
+  font-size: 13px !important;
+}
+.library .storage-note { color: #6f818c !important; font-size: 11.5px; }
+
+/* Keep the one primary action calm enough for a reading workspace. */
+.library .new-note {
+  background: #7592aa !important;
+  box-shadow: 0 2px 7px rgba(57, 81, 100, 0.12) !important;
+}
+.library .new-note:hover {
+  background: #6687a1 !important;
+  box-shadow: 0 3px 9px rgba(57, 81, 100, 0.15) !important;
+}
+
+/* A genuinely empty note receives an intentional, text-only resting state. */
+.reader-body > div:has(> h1:only-child) {
+  width: min(100% - 64px, 520px);
+  margin: 17vh auto 0 !important;
+  padding: 0 !important;
+  text-align: center;
+}
+.reader-body > div > h1:only-child {
+  margin: 0 !important;
+  font-size: 30px;
+}
+.reader-body > div > h1:only-child::after {
+  margin-top: 15px;
+  color: #81929c;
+  font-size: 13.5px;
+  line-height: 1.7;
+}
+
+/* Imported notes sometimes begin with a divider instead of a title. Let the
+   first real section begin at the reading origin, without stacked blank gaps. */
+.reader-body > div:not(:has(> h1:only-child)) {
+  display: flow-root;
+  padding-top: 28px !important;
+}
+.reader-body > div:not(:has(> h1:only-child)) > hr:first-child {
+  display: none;
+}
+.reader-body > div:not(:has(> h1:only-child)) > hr:first-child + h2 {
+  margin-top: 0 !important;
+}
+
+/* One shared axis makes the sidebar read as a composed column, not a stack
+   of independently positioned widgets. */
+.library .brand {
+  transform: translate(0, -20px) !important;
+}
+.library .new-note {
+  width: 167px;
+  margin-left: auto !important;
+  margin-right: auto !important;
+}
+
+/* Keep the note-index header as one calm, aligned control row. */
+.note-list .note-list-header {
+  display: grid !important;
+  grid-template-columns: minmax(0, 1fr) 30px 26px;
+  align-items: center;
+  gap: 7px;
+  min-height: 60px;
+  padding: 10px 12px 9px !important;
+}
+.note-list .note-list-header > div { min-width: 0; }
+.note-list .note-list-header p { margin: 0 0 2px !important; }
+.note-list .note-list-header strong { line-height: 1.2; }
+.note-list .new-note.compact {
+  grid-column: 2;
+  align-self: center;
+}
+.note-list__close {
+  position: static !important;
+  grid-column: 3;
+  align-self: center;
+  justify-self: center;
+  color: #83949e;
+}
+
+/* Search feedback should read as feedback, not as an empty-card warning. */
+.note-list .empty-index {
+  margin: 20px 14px !important;
+  padding: 10px 4px !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  color: #84949d !important;
+  font-size: 12px;
+}
+
+/* Section labels remain typographic grouping, never a colored widget. */
+.library .section-title {
+  border-bottom-color: #e6ecef !important;
+  background: transparent !important;
+}
+.library .category-add {
+  padding: 2px 0 !important;
+  background: transparent !important;
+  color: #658198 !important;
+  font-weight: 550;
+}
+
+/* The category heading must never cover the first category while scrolling. */
+.course-section:has(.course-group:nth-of-type(7)) .section-title {
+  position: static !important;
+  z-index: auto !important;
+  background: transparent !important;
+}
+
+/* Keep author-provided bold for structure, but do not tint it green. */
+.markdown strong,
+.reader-body strong {
+  color: inherit !important;
+  font-weight: 650 !important;
+}
+
+/* A completed note is a quiet status, not a primary navigation signal. */
+.note-list .done-dot {
+  display: inline-block;
+  color: #94a2aa !important;
+  font-size: 10px !important;
+  font-weight: 400 !important;
+  line-height: 1 !important;
+  opacity: 0.72;
+  transform: scale(0.78);
+  transform-origin: center;
+}
+.note-list .compact-note.selected .done-dot {
+  color: #8399a5 !important;
+}

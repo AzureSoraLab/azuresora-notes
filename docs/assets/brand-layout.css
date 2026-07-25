@@ -1,0 +1,1006 @@
+﻿/* A compact, vertical signature keeps the narrow sidebar calm. */
+.brand {
+  position: relative !important;
+  display: block !important;
+  min-height: 66px;
+  margin: 0 0 40px !important;
+  padding-left: 23px;
+  transform: translate(-8px, -10px);
+}
+
+.brand-mark {
+  position: absolute !important;
+  top: 9px;
+  left: 1px;
+  font-size: 30px !important;
+}
+
+.brand > span:not(.brand-mark) {
+  display: block;
+  white-space: nowrap;
+}
+
+.brand small {
+  display: block !important;
+  max-width: 168px;
+  margin: 9px 0 0 !important;
+  color: var(--muted);
+  font-size: 10px;
+  letter-spacing: 0.5px;
+  line-height: 1.45;
+  white-space: normal !important;
+}
+
+.library-content {
+  padding: 34px 16px 20px;
+}
+
+.new-note {
+  margin: 0 0 23px;
+  border-radius: 7px;
+  padding: 11px 13px;
+  letter-spacing: 0.25px;
+  transition: background-color 160ms ease, transform 160ms ease;
+}
+
+.new-note:hover {
+  background: #58776d;
+  transform: translateY(-1px);
+}
+
+.course-section {
+  padding: 3px 0 17px;
+}
+
+.section-title {
+  padding: 9px 4px 9px;
+  letter-spacing: 1.55px;
+}
+
+.category-add {
+  border-radius: 4px;
+  padding: 3px 5px;
+}
+
+.course-group { margin: 2px 0; }
+.course-button {
+  min-height: 36px;
+  border-radius: 6px;
+  padding: 8px 9px;
+  transition: background-color 150ms ease, color 150ms ease;
+}
+.course-button.active { box-shadow: inset 2px 0 0 var(--accent); }
+.recent-notes { margin-top: 19px; padding: 2px 0 0; }
+.recent-notes__title {
+  color: var(--muted);
+  letter-spacing: 1.55px;
+  font-size: 10px;
+  margin: 0 0 8px;
+}
+
+/* Title and signature share one quiet center line; the dot remains decorative. */
+.brand {
+  width: 190px;
+  min-height: 54px;
+  padding-left: 0;
+  text-align: center;
+  margin: 0 auto 12px !important;
+  /* Align the visual title center with the library column, not the text box. */
+  transform: translate(-18px, -20px);
+}
+
+.brand-mark {
+  left: 9px;
+}
+
+.brand > span:not(.brand-mark) {
+  text-align: center;
+}
+
+.brand small {
+  max-width: 184px;
+  margin-left: auto !important;
+  margin-right: auto !important;
+  text-align: center;
+  letter-spacing: 0.72px;
+}
+
+/* Lightweight navigation groups: one active note, quiet supporting entries. */
+.course-section {
+  border-bottom: 0;
+  padding: 0 0 13px;
+}
+
+.section-title,
+.recent-notes__title {
+  display: flex;
+  align-items: center;
+  min-height: 30px;
+  margin: 0 0 6px;
+  padding: 0 3px;
+  color: #7a8984;
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 1.35px;
+}
+
+.category-add {
+  margin-left: auto;
+  color: #5d8075;
+  font-size: 10px;
+  letter-spacing: 0.35px;
+}
+
+.course-group {
+  margin: 1px 0;
+}
+
+.course-button {
+  min-height: 33px;
+  padding: 7px 10px;
+  color: #52625d;
+  font-size: 13px;
+}
+
+.course-button i {
+  width: 5px;
+  height: 5px;
+  margin-right: 8px;
+  opacity: 0.82;
+}
+
+.course-button.active {
+  background: #e8f0eb;
+  color: #254e45;
+  box-shadow: none;
+}
+
+.recent-notes {
+  margin-top: 12px;
+  padding: 13px 0 0;
+  border-top: 1px solid #e6ebe7;
+}
+
+.recent-notes__title {
+  padding: 0 3px;
+}
+
+.recent-notes__item {
+  min-height: 30px;
+  padding: 5px 9px !important;
+  border: 0 !important;
+  border-radius: 5px !important;
+  color: #687771 !important;
+  font-size: 12px !important;
+}
+
+.recent-notes__item::before {
+  margin-right: 6px;
+  color: #9ab8ad !important;
+  font-size: 14px !important;
+}
+
+.recent-notes__item:hover,
+.recent-notes__item:focus-visible {
+  background: #f0f5f1 !important;
+  color: #315d53 !important;
+}
+
+.recent-notes__item.is-current {
+  background: #e9f1ec !important;
+  color: #27574c !important;
+  font-weight: 600;
+  box-shadow: none;
+}
+
+.storage-note {
+  margin-top: 20px;
+  padding-top: 13px;
+  border-top-color: #e6ebe7;
+}
+
+/* Final selection treatment: background and text only, never a left marker. */
+.library .course-button.active,
+.library .course-button.active:hover,
+.library .course-button.active:focus-visible,
+.library .recent-notes__item.is-current {
+  border-left: 0 !important;
+  box-shadow: none !important;
+}
+
+.library .course-button.active::before,
+.library .course-button.active::after,
+.library .recent-notes__item.is-current::after {
+  display: none !important;
+  content: none !important;
+}
+
+/* A restrained selected state: quiet outline, no heavy colour block. */
+.library .course-button.active {
+  background: rgba(255, 255, 255, 0.62) !important;
+  border: 1px solid #d6e2da !important;
+  color: #28564a !important;
+  font-weight: 600;
+}
+
+.library .recent-notes__item.is-current {
+  background: rgba(255, 255, 255, 0.54) !important;
+  border: 1px solid #dbe5de !important;
+  color: #315d51 !important;
+  font-weight: 600;
+}
+
+/* Note index: reading-first controls, with destructive actions kept on demand. */
+.library-content,
+.library-content button,
+.note-list,
+.note-list button,
+.note-list input {
+  font-family: "Microsoft YaHei UI", "Microsoft YaHei", "PingFang SC", Arial, sans-serif;
+}
+
+.note-list-open .note-list {
+  padding: 24px 14px 16px;
+  background: #fcfcf9;
+}
+
+.note-list .note-list-header {
+  padding: 2px 4px 14px;
+}
+
+.note-list .note-list-header p {
+  margin-bottom: 4px;
+  color: #87938d;
+  letter-spacing: 1.2px;
+}
+
+.note-list .note-list-header strong {
+  color: #314940;
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.note-list .search {
+  margin: 0 4px 13px;
+  padding: 8px 2px;
+  border-bottom-color: #e2e8e3;
+}
+
+.note-list .note-index-scroll {
+  padding: 1px 4px 8px;
+}
+
+.note-list .compact-note {
+  min-height: 46px;
+  margin: 3px 0;
+  padding: 8px 34px 8px 9px;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  box-shadow: none;
+}
+
+.note-list .compact-note:hover {
+  background: #f1f5f1;
+  border-color: #e5ece6;
+}
+
+.note-list .compact-note.selected {
+  background: #edf4ef;
+  border-color: #dce9df;
+  box-shadow: none;
+}
+
+.note-list .compact-note strong {
+  color: #3d524a;
+  font-size: 13px;
+  font-weight: 560;
+}
+
+.note-list .compact-note small {
+  color: #8a9791;
+  font-size: 10px;
+}
+
+.note-list .compact-note.selected .note-dot,
+.note-list .compact-note.selected .done-dot {
+  color: #669985;
+}
+
+/* Actions stay discoverable on the focused row without competing with titles. */
+.note-list .compact-note__delete {
+  right: 7px;
+  width: 22px;
+  height: 22px;
+  opacity: 0;
+  color: #9da8a2;
+}
+
+.note-list .compact-note:hover .compact-note__delete,
+.note-list .compact-note:focus-within .compact-note__delete,
+.note-list .compact-note__delete:focus-visible {
+  opacity: 1;
+}
+
+.note-list .compact-note.selected .compact-note__delete {
+  opacity: 0;
+}
+
+.note-list .compact-note.selected:hover .compact-note__delete,
+.note-list .compact-note.selected:focus-within .compact-note__delete {
+  opacity: 1;
+}
+
+/* AzureSora palette: mist paper, quiet sky, and one restrained sage accent. */
+.library,
+.note-list {
+  background: #f8faf8 !important;
+}
+
+.library {
+  border-right-color: #dce7e3 !important;
+}
+
+.note-list-open .note-list {
+  background: #fbfcfb !important;
+  border-right-color: #dfe9e5 !important;
+}
+
+.library .new-note,
+.note-list .new-note.compact {
+  background: #3f766a;
+  color: #fff;
+}
+
+.library .new-note:hover,
+.note-list .new-note.compact:hover {
+  background: #32665c;
+}
+
+.library .section-title,
+.library .recent-notes__title,
+.note-list .note-list-header p {
+  color: #79929a;
+}
+
+.library .category-add {
+  color: #5d7f88;
+}
+
+.library .course-button {
+  color: #526970;
+}
+
+.library .course-button:hover,
+.library .recent-notes__item:hover {
+  background: #eff5f4 !important;
+}
+
+.library .course-button.active {
+  background: #f8fbfa !important;
+  border-color: #cddfda !important;
+  color: #2f6258 !important;
+}
+
+.library .recent-notes__item.is-current {
+  background: #f7fbfa !important;
+  border-color: #d2e1dc !important;
+  color: #35675d !important;
+}
+
+.library .course-button i,
+.library .recent-notes__item::before {
+  filter: saturate(0.76);
+}
+
+.note-list .compact-note:hover {
+  background: #f1f6f5;
+  border-color: #dfeae6;
+}
+
+.note-list .compact-note.selected {
+  background: #eef6f4;
+  border-color: #cfe1dc;
+}
+
+.note-list .compact-note.selected strong,
+.note-list .compact-note.selected .note-dot,
+.note-list .compact-note.selected .done-dot {
+  color: #356d62;
+}
+
+.library .recent-notes,
+.library .storage-note,
+.note-list .search {
+  border-color: #e0e9e5;
+}
+
+/* AzureSora color system — sky paper, distant blue, and a single clear accent. */
+:root {
+  --paper: #f7f9fc;
+  --ink: #26364a;
+  --muted: #8291a4;
+  --line: #dfe7f0;
+  --soft: #edf4fb;
+  --accent: #4a7fb2;
+}
+
+body,
+.app-shell,
+.reader,
+.library,
+.note-list {
+  background: var(--paper) !important;
+  color: var(--ink);
+}
+
+.library {
+  background: #f5f8fc !important;
+  border-right-color: #d7e2ed !important;
+}
+
+.note-list-open .note-list {
+  background: #fbfcfe !important;
+  border-right-color: #dce6ef !important;
+}
+
+.brand-mark {
+  color: #4a7fb2 !important;
+}
+
+.brand > span:not(.brand-mark) {
+  color: #26364a;
+}
+
+.brand small,
+.library .section-title,
+.library .recent-notes__title,
+.note-list .note-list-header p {
+  color: #7e91a8 !important;
+}
+
+.library .new-note,
+.note-list .new-note.compact {
+  background: #4a7fb2 !important;
+  color: #fff !important;
+  box-shadow: 0 6px 14px rgba(52, 96, 141, 0.17) !important;
+}
+
+.library .new-note:hover,
+.note-list .new-note.compact:hover {
+  background: #3c709f !important;
+}
+
+.library .category-add {
+  color: #547d9f !important;
+}
+
+.library .course-button,
+.library .recent-notes__item {
+  color: #52677e !important;
+}
+
+.library .course-button:hover,
+.library .recent-notes__item:hover {
+  background: #edf4fb !important;
+  color: #365f85 !important;
+}
+
+/* Current locations feel like a pane of blue-tinted glass, not a green label. */
+.library .course-button.active,
+.library .recent-notes__item.is-current {
+  background: #e8f2fb !important;
+  border-color: #cbddeb !important;
+  color: #2e5f8b !important;
+}
+
+.library .course-button i,
+.library .recent-notes__item::before {
+  filter: none;
+}
+
+.library .recent-notes,
+.library .storage-note,
+.note-list .search {
+  border-color: #dce6ef !important;
+}
+
+.library .storage-note {
+  color: #8797aa;
+}
+
+.note-list .note-list-header strong,
+.note-list .compact-note strong {
+  color: #344a62 !important;
+}
+
+.note-list .compact-note small {
+  color: #8b9bae !important;
+}
+
+.note-list .search,
+.note-list .search input {
+  color: #6f8297;
+}
+
+.note-list .compact-note:hover {
+  background: #f0f6fc !important;
+  border-color: #dbe7f1 !important;
+}
+
+.note-list .compact-note.selected {
+  background: #eaf3fb !important;
+  border-color: #c9ddea !important;
+}
+
+.note-list .compact-note.selected strong,
+.note-list .compact-note.selected .note-dot,
+.note-list .compact-note.selected .done-dot,
+.note-list .note-dot,
+.note-list .done-dot {
+  color: #427cad !important;
+}
+
+.note-list .compact-note__delete,
+.library .course-group__delete {
+  color: #a4afbd;
+}
+
+.note-list .compact-note__delete:hover,
+.library .course-group__delete:hover {
+  background: #f9edec;
+  color: #aa625d;
+}
+
+/* Calm AzureSora — a low-contrast sky palette designed for long reading sessions. */
+:root {
+  --paper: #fafbfd;
+  --ink: #344152;
+  --muted: #8996a5;
+  --line: #e2e8ef;
+  --soft: #f1f5f8;
+  --accent: #6686a8;
+}
+
+body,
+.app-shell,
+.reader,
+.note-list {
+  background: #fafbfd !important;
+  color: #344152;
+}
+
+.library {
+  background: #f7f9fc !important;
+  border-right-color: #e0e7ef !important;
+}
+
+.note-list-open .note-list {
+  background: #fcfdfe !important;
+  border-right-color: #e2e8ef !important;
+}
+
+.brand-mark { color: #7897b6 !important; }
+.brand > span:not(.brand-mark) { color: #344152; }
+.brand small,
+.library .section-title,
+.library .recent-notes__title,
+.note-list .note-list-header p { color: #8999aa !important; }
+
+/* Keep the only filled control quiet, tactile, and easy on the eye. */
+.library .new-note,
+.note-list .new-note.compact {
+  background: #6686a8 !important;
+  box-shadow: 0 3px 9px rgba(67, 95, 124, 0.12) !important;
+}
+
+.library .new-note:hover,
+.note-list .new-note.compact:hover {
+  background: #597a9d !important;
+  box-shadow: 0 4px 11px rgba(67, 95, 124, 0.15) !important;
+}
+
+.library .category-add { color: #6d879f !important; }
+.library .course-button,
+.library .recent-notes__item { color: #5e6d7d !important; }
+
+.library .course-button:hover,
+.library .recent-notes__item:hover {
+  background: #f1f5f8 !important;
+  color: #465f78 !important;
+}
+
+/* Current location is clear through proximity, not saturated colour. */
+.library .course-button.active,
+.library .recent-notes__item.is-current {
+  background: #f4f7fa !important;
+  border-color: #dbe4ed !important;
+  color: #42627f !important;
+}
+
+.library .recent-notes,
+.library .storage-note,
+.note-list .search { border-color: #e3e9f0 !important; }
+.library .storage-note { color: #939fad; }
+
+.note-list .note-list-header strong,
+.note-list .compact-note strong { color: #3f4f61 !important; }
+.note-list .compact-note small,
+.note-list .search,
+.note-list .search input { color: #8d9aa8 !important; }
+
+.note-list .compact-note:hover {
+  background: #f4f7fa !important;
+  border-color: #e1e8ef !important;
+}
+
+.note-list .compact-note.selected {
+  background: #f0f5f9 !important;
+  border-color: #d9e4ed !important;
+}
+
+.note-list .compact-note.selected strong,
+.note-list .compact-note.selected .note-dot,
+.note-list .compact-note.selected .done-dot,
+.note-list .note-dot,
+.note-list .done-dot { color: #6686a8 !important; }
+
+/* Final visual direction: neutral paper first, Azure only as a restrained signal. */
+:root {
+  --paper: #fcfcfa;
+  --ink: #2d3b45;
+  --muted: #89938f;
+  --line: #e3e7e2;
+  --soft: #f2f5f3;
+  --accent: #637f9e;
+}
+
+html,
+body,
+.app-shell,
+.reader {
+  background: #fcfcfa !important;
+  color: #2d3b45 !important;
+}
+
+.library {
+  background: #f8f9f7 !important;
+  border-right-color: #e1e6e1 !important;
+}
+
+.note-list-open .note-list,
+.note-list {
+  background: #fdfdfb !important;
+  border-right-color: #e3e7e2 !important;
+}
+
+.reader-header,
+.note-list .note-list-header {
+  background: rgba(255, 255, 253, 0.82) !important;
+  border-color: #e5e8e3 !important;
+}
+
+.brand-mark { color: #6e8ba8 !important; }
+.brand > span:not(.brand-mark) { color: #2d3b45 !important; }
+.brand small,
+.library .section-title,
+.library .recent-notes__title,
+.note-list .note-list-header p { color: #8b9693 !important; }
+
+/* Blue stays reserved for deliberate actions, never for entire surfaces. */
+.library .new-note,
+.note-list .new-note.compact {
+  background: #637f9e !important;
+  color: #fff !important;
+  box-shadow: 0 3px 8px rgba(48, 65, 82, 0.10) !important;
+}
+
+.library .new-note:hover,
+.note-list .new-note.compact:hover {
+  background: #55728f !important;
+}
+
+.library .category-add { color: #738aa0 !important; }
+.library .course-button,
+.library .recent-notes__item { color: #596761 !important; }
+.library .course-button:hover,
+.library .recent-notes__item:hover { background: #f1f4f2 !important; color: #445a6e !important; }
+
+.library .course-button.active,
+.library .recent-notes__item.is-current {
+  background: #f6f8f7 !important;
+  border-color: #dce4df !important;
+  color: #46647f !important;
+}
+
+.library .recent-notes,
+.library .storage-note,
+.note-list .search { border-color: #e4e8e3 !important; }
+.library .storage-note { color: #929b96 !important; }
+
+.note-list .note-list-header strong,
+.note-list .compact-note strong { color: #364650 !important; }
+.note-list .compact-note small,
+.note-list .search,
+.note-list .search input { color: #909a96 !important; }
+
+.note-list .compact-note:hover {
+  background: #f4f6f4 !important;
+  border-color: #e2e8e3 !important;
+}
+
+.note-list .compact-note.selected {
+  background: #f1f5f7 !important;
+  border-color: #d7e1e6 !important;
+}
+
+.note-list .compact-note.selected strong,
+.note-list .compact-note.selected .note-dot,
+.note-list .compact-note.selected .done-dot,
+.note-list .note-dot,
+.note-list .done-dot { color: #63809d !important; }
+
+/* Reader type remains the visual priority over navigation chrome. */
+.markdown,
+.reader-body,
+.reader-body h1,
+.reader-body h2,
+.reader-body h3 { color: #273945 !important; }
+
+/* The note index floats over the reader so opening it never narrows the text column. */
+@media (min-width: 761px) {
+  .app-shell,
+  .app-shell.note-list-open {
+    grid-template-columns: 248px minmax(0, 1fr) !important;
+    position: relative;
+  }
+
+  .library-collapsed,
+  .library-collapsed.note-list-open {
+    grid-template-columns: 52px minmax(0, 1fr) !important;
+  }
+
+  .note-list {
+    position: absolute;
+    z-index: 10022;
+    top: 0;
+    bottom: 0;
+    left: 248px;
+    width: 270px;
+    box-shadow: 12px 0 24px rgba(42, 57, 71, 0.08);
+    pointer-events: none;
+  }
+
+  .note-list-open .note-list { pointer-events: auto; }
+  .library-collapsed .note-list { left: 52px; }
+
+}
+
+/* A quieter AzureSora reading surface: soft paper, restrained blue, and clear hierarchy. */
+:root {
+  --paper: #fbfcfd;
+  --ink: #314253;
+  --muted: #8493a2;
+  --line: #e1e8ee;
+  --soft: #f2f6f9;
+  --accent: #6384a5;
+}
+
+.library {
+  background: linear-gradient(180deg, #f7f9fc 0%, #f9fafb 100%) !important;
+  border-right-color: #dce5ed !important;
+}
+
+.library-content { padding-top: 30px; }
+.brand { margin-bottom: 28px !important; }
+.brand-mark { color: #7294b4 !important; }
+.brand small { color: #8b9aaa !important; }
+
+.library .new-note {
+  min-height: 46px;
+  border-radius: 9px;
+  background: #6687a8 !important;
+  box-shadow: 0 5px 14px rgba(53, 78, 105, 0.14) !important;
+  font-weight: 600;
+}
+
+.library .new-note:hover {
+  background: #587a9d !important;
+  box-shadow: 0 7px 17px rgba(53, 78, 105, 0.17) !important;
+}
+
+.library .section-title,
+.library .recent-notes__title {
+  color: #7d91a5 !important;
+  font-weight: 600;
+  letter-spacing: 1.2px;
+}
+
+.library .course-button,
+.library .recent-notes__item {
+  border-radius: 7px !important;
+  color: #536577 !important;
+}
+
+.library .course-button.active,
+.library .recent-notes__item.is-current {
+  background: #eef4f8 !important;
+  border-color: #d5e2ec !important;
+  color: #416987 !important;
+}
+
+.reader-header {
+  background: rgba(253, 254, 255, 0.93) !important;
+  border-bottom-color: #e5ebf0 !important;
+  backdrop-filter: blur(8px);
+}
+
+.reader-header .crumb { color: #718497; }
+.reader-actions .saved { color: #8b9aaa; }
+.reader-actions button {
+  border-radius: 6px;
+  border-color: #dce5eb;
+  background: #fff;
+  color: #596d80;
+}
+.reader-actions button:hover { background: #f1f6fa; color: #3e6685; }
+
+.reader-body {
+  color: #344655 !important;
+  scrollbar-color: #c2ced8 transparent;
+}
+
+.reader-body h1 {
+  color: #263d50 !important;
+  letter-spacing: 0.01em;
+}
+
+.reader-body h2,
+.reader-body h3 { color: #38566d !important; }
+.reader-body blockquote {
+  border-left-color: #91aec7;
+  background: #f5f8fb;
+  color: #587087;
+}
+.reader-body hr { border-color: #e4eaf0; }
+.reader-body table th { background: #f2f6f9; color: #405970; }
+.reader-body table td,
+.reader-body table th { border-color: #e0e8ee; }
+
+.note-list {
+  background: rgba(253, 254, 255, 0.98) !important;
+  border-right-color: #dce6ee !important;
+}
+
+.note-list .note-list-header {
+  background: transparent !important;
+  border-bottom-color: #e4ebf1 !important;
+}
+
+.note-list .search { border-bottom-color: #e0e8ee !important; }
+.note-list .compact-note {
+  border-radius: 8px;
+  transition: background-color 150ms ease, border-color 150ms ease;
+}
+.note-list .compact-note:hover { background: #f3f7fa !important; }
+.note-list .compact-note.selected {
+  background: #edf4f9 !important;
+  border-color: #d2e1eb !important;
+}
+
+.annotation-shelf {
+  border-color: #d9e4ec;
+  border-radius: 9px;
+  background: #f8fafc;
+  box-shadow: 0 14px 32px rgba(47, 69, 88, 0.16);
+}
+.annotation-shelf__bar,
+.annotation-shelf__filters,
+.annotation-shelf__tag-summary {
+  background: #fbfcfd;
+  border-color: #e0e8ee;
+}
+.annotation-shelf__card {
+  border-color: #e0e8ee;
+  border-radius: 7px;
+  box-shadow: none;
+}
+.annotation-shelf__card:hover { border-color: #c8d8e4; }
+.annotation-shelf__card.is-current {
+  border-color: #8ba9c2;
+  background: #f0f6fa;
+}
+
+::selection { background: #d8e7f2; color: #263d50; }
+
+/* Final component alignment: override legacy module styles with one consistent system. */
+.annotation-shelf-toggle {
+  border-color: #dce6ee !important;
+  background: #fbfcfd !important;
+  color: #69829a !important;
+}
+
+.annotation-shelf-toggle:hover,
+.annotation-shelf-toggle.is-open {
+  background: #edf4f9 !important;
+  color: #416987 !important;
+}
+
+.annotation-shelf__tabs { border-right-color: #e0e8ee !important; }
+.annotation-shelf__tab--grid.annotation-shelf__tab--active,
+.annotation-shelf__tab--active {
+  background: #eaf3f9 !important;
+  color: #416987 !important;
+}
+
+.annotation-shelf__outline,
+.annotation-shelf__close { color: #71879a !important; }
+.annotation-shelf__outline:hover,
+.annotation-shelf__outline.is-active,
+.annotation-shelf__close:hover {
+  background: #edf4f9 !important;
+  color: #416987 !important;
+}
+
+.annotation-shelf__search {
+  border: 1px solid #d6e3ec !important;
+  border-radius: 6px !important;
+  background-color: #fff !important;
+  color: #4b6174 !important;
+}
+
+.annotation-shelf__search:focus {
+  border-color: #8caac2 !important;
+  box-shadow: 0 0 0 3px rgba(101, 134, 168, 0.14);
+}
+
+.annotation-shelf__outline-item.level-2 {
+  border-color: #e0e8ee !important;
+  background: #fbfcfd !important;
+  color: #3d576b !important;
+}
+
+.annotation-shelf__outline-item.level-3 {
+  border-left-color: #d5e1ea !important;
+  color: #6f8190 !important;
+}
+
+.annotation-shelf__outline-item:hover {
+  border-color: #d0e0eb !important;
+  background: #edf4f9 !important;
+  color: #416987 !important;
+}
+
+.annotation-shelf__inline-comment,
+.annotation-shelf__add-tag { color: #4b6174 !important; }
+.annotation-shelf__inline-comment:focus,
+.annotation-shelf__add-tag:hover { background: #f4f8fb !important; }
+.annotation-shelf__add-tag { border-top-color: #e1e8ee !important; }
+
+.annotation-tag-popover {
+  border-color: #d5e2eb !important;
+  background: #fbfcfd !important;
+  box-shadow: 0 12px 28px rgba(47, 69, 88, 0.14) !important;
+  color: #4e6578 !important;
+}
+
+.annotation-tag-popover__add { border-top-color: #e1e8ee !important; }
+.annotation-tag-popover__add input {
+  border-color: #d6e2eb !important;
+  border-radius: 6px !important;
+}
+
+.annotation-tag-popover__add input:focus {
+  border-color: #8caac2 !important;
+  box-shadow: 0 0 0 3px rgba(101, 134, 168, 0.14) !important;
+}
+
+/* One alignment axis prevents the wider library from looking loose. */
+.brand,
+.library .new-note { width: 196px; }
+.library .new-note { margin-left: auto; margin-right: auto; }
+.library .course-section,
+.library .recent-notes,
+.library .storage-note { margin-left: 4px; margin-right: 4px; }
+
+/* Keep the header crisp; blur made the near-white layers visually muddy. */
+.reader-header { backdrop-filter: none; }
