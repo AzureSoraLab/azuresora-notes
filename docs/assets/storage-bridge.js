@@ -115,7 +115,11 @@
   const metaQueue = new Map();
   let metaWritePromise = Promise.resolve();
   let annotationWritePromise = Promise.resolve();
+  let annotationFlushPromise = null;
   let pendingAnnotations = null;
+  let annotationTimer = 0;
+  let annotationRevision = 0;
+  let annotationWrittenRevision = 0;
   let annotationRetryTimer = 0;
   const database = () => dbPromise || (dbPromise = open().catch(error => {
     console.warn('澄墨 IndexedDB 不可用，将继续使用浏览器本地缓存。', error);
@@ -142,7 +146,7 @@
     if (annotationRetryTimer || !pendingAnnotations) return;
     annotationRetryTimer = window.setTimeout(() => {
       annotationRetryTimer = 0;
-      saveAnnotations(pendingAnnotations, true);
+      flushAnnotations().catch(() => scheduleAnnotationsRetry());
     }, 2400);
   };
   const scheduleMetaRetry = () => {
@@ -228,13 +232,15 @@
     queueNoteBootCache(state);
     document.dispatchEvent(new CustomEvent('chengmo:notes-state-updated'));
   };
-  const saveAnnotations = (items, replace = false) => {
+  const flushAnnotations = async () => {
+    if (annotationFlushPromise) return annotationFlushPromise;
+    const items = pendingAnnotations;
     if (!Array.isArray(items)) return;
-    pendingAnnotations = items;
+    const revision = annotationRevision;
     const next = new Set(items.map(item => item?.id).filter(Boolean));
-    annotationWritePromise = enqueueDatabaseWrite(async () => {
+    annotationFlushPromise = annotationWritePromise = enqueueDatabaseWrite(async () => {
       const db = await database();
-      if (!db) return;
+      if (!db) { annotationWrittenRevision = revision; return; }
       const transaction = db.transaction('textAnnotations', 'readwrite');
       const store = transaction.objectStore('textAnnotations');
       // Match the synchronous annotation list exactly to avoid orphan records
@@ -243,7 +249,24 @@
       items.forEach(item => item?.id && store.put({ ...item }));
       await complete(transaction);
       saveAnnotations.previous = next;
-    }).catch(() => { scheduleAnnotationsRetry(); });
+      annotationWrittenRevision = revision;
+    }).catch(() => { annotationWrittenRevision = revision; scheduleAnnotationsRetry(); }).finally(() => {
+      annotationFlushPromise = null;
+      // Metadata typing can create several snapshots in one short burst. Write
+      // only the newest follow-up snapshot after the active transaction ends.
+      if (annotationRevision !== revision) window.setTimeout(() => flushAnnotations().catch(() => scheduleAnnotationsRetry()), 0);
+    });
+    return annotationFlushPromise;
+  };
+  const saveAnnotations = items => {
+    if (!Array.isArray(items)) return;
+    pendingAnnotations = items;
+    annotationRevision += 1;
+    if (annotationTimer) return annotationWritePromise;
+    annotationTimer = window.setTimeout(() => {
+      annotationTimer = 0;
+      flushAnnotations().catch(() => scheduleAnnotationsRetry());
+    }, 140);
     return annotationWritePromise;
   };
   const flushBootCache = () => {
@@ -348,6 +371,15 @@
       if (revision === databaseWriteRevision) return;
     }
   };
+  const flushAnnotationsUntilStable = async () => {
+    if (annotationTimer) { window.clearTimeout(annotationTimer); annotationTimer = 0; }
+    while (true) {
+      const revision = annotationRevision;
+      await flushAnnotations();
+      await annotationWritePromise;
+      if (revision === annotationRevision && annotationWrittenRevision >= revision && !annotationFlushPromise) return;
+    }
+  };
   const flush = async () => {
     if (drawingTimer) { window.clearTimeout(drawingTimer); drawingTimer = 0; }
     if (drawingIdle) {
@@ -357,7 +389,7 @@
     if (metaTimer) { window.clearTimeout(metaTimer); metaTimer = 0; }
     if (bootCacheTimer) { window.clearTimeout(bootCacheTimer); bootCacheTimer = 0; }
     flushBootCache();
-    await Promise.all([flushMeta(), flushDrawingsUntilStable()]);
+    await Promise.all([flushMeta(), flushDrawingsUntilStable(), flushAnnotationsUntilStable()]);
     await flushDatabaseUntilStable();
   };
   const migrate = async () => {
