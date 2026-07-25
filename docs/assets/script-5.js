@@ -11,10 +11,10 @@
   let searchFilter = '';
   let activeView = 'annotations';
   let current = null;
-  let cachedItems = null; let markCache = new Map(); let shelfIndex = null; let markCacheDirty = true; let renderFrame = 0; let commentSaveTimer = 0;
+  let cachedItems = null; let markCache = new Map(); let shelfIndex = null; let markCacheDirty = true; let renderFrame = 0; let commentSaveTimer = 0; let pendingComment = null;
   let shelfNodes = null;
   let outlineCache = { root: null, signature: '', items: [] };
-  const read = () => cachedItems || (cachedItems = (() => { try { return JSON.parse(localStorage.getItem(key) || '[]'); } catch { return []; } })());
+  const read = () => cachedItems || (cachedItems = (() => { try { const value = JSON.parse(localStorage.getItem(key) || '[]'); return Array.isArray(value) ? value : []; } catch { return []; } })());
   const invalidateShelfIndex = (marks = false) => { shelfIndex = null; markCacheDirty ||= marks; };
   const refreshMarkCache = () => {
     if (!markCacheDirty) return;
@@ -45,10 +45,23 @@
     outlineCache = { root, signature, items: sourceItems.map(source => ({ source, className: source.className, text: source.textContent || '' })) };
     return outlineCache.items;
   };
-  const commit = (detail = {}) => { invalidateShelfIndex(); localStorage.setItem(key, JSON.stringify(read())); document.dispatchEvent(new CustomEvent('chengmo:annotations-changed', { detail: { ...detail, source: 'shelf' } })); };
-  const saveItem = (id, changes) => { const items = read(); const item = items.find(entry => entry.id === id); if (item) Object.assign(item, changes); commit({ type: 'update', id, changes }); };
-  const flushCommentSave = () => { if (!commentSaveTimer) return; window.clearTimeout(commentSaveTimer); commentSaveTimer = 0; commit({ type: 'update', id: current, changes: { comment: read().find(item => item.id === current)?.comment || '' } }); };
-  const scheduleCommentSave = () => { invalidateShelfIndex(); window.clearTimeout(commentSaveTimer); commentSaveTimer = window.setTimeout(() => { commentSaveTimer = 0; commit({ type: 'update', id: current, changes: { comment: read().find(item => item.id === current)?.comment || '' } }); }, 260); };
+  const commit = (detail = {}, invalidate = true) => { if (invalidate) invalidateShelfIndex(); localStorage.setItem(key, JSON.stringify(read())); document.dispatchEvent(new CustomEvent('chengmo:annotations-changed', { detail: { ...detail, source: 'shelf' } })); };
+  const saveItem = (id, changes, invalidate = true) => {
+    const item = read().find(entry => entry.id === id);
+    if (!item || !Object.entries(changes).some(([name, value]) => item[name] !== value)) return false;
+    Object.assign(item, changes); commit({ type: 'update', id, changes }, invalidate); return true;
+  };
+  const flushCommentSave = id => {
+    if (!pendingComment || (id && pendingComment.id !== id)) return;
+    window.clearTimeout(commentSaveTimer); commentSaveTimer = 0;
+    const pending = pendingComment; pendingComment = null;
+    saveItem(pending.id, { comment: pending.value }, false);
+  };
+  const scheduleCommentSave = (id, value) => {
+    pendingComment = { id, value };
+    window.clearTimeout(commentSaveTimer);
+    commentSaveTimer = window.setTimeout(() => flushCommentSave(id), 260);
+  };
   const scheduleRender = () => {
     const shelf = shelfNodes?.shelf || document.querySelector('.annotation-shelf');
     if (!shelf || shelf.classList.contains('is-hidden') || renderFrame) return;
@@ -88,8 +101,8 @@
     const close = document.createElement('button'); close.type = 'button'; close.className = 'annotation-tag-popover__close'; close.textContent = '\u00d7'; close.title = '关闭'; close.setAttribute('aria-label', '关闭标签'); close.addEventListener('click', closeTagPopover); header.append(count, close);
     const items = document.createElement('div'); items.className = 'annotation-tag-popover__items';
     const inputLine = document.createElement('div'); inputLine.className = 'annotation-tag-popover__add'; const input = document.createElement('input'); input.placeholder = '添加标签'; const add = document.createElement('button'); add.type = 'button'; add.textContent = '+'; inputLine.append(input, add);
-    const draw = () => { const tags = item.tags || []; count.textContent = `${tags.length} 个标签`; items.replaceChildren(...tags.map(tag => { const row = document.createElement('div'); row.className = 'annotation-tag-popover__item'; const label = document.createElement('span'); label.textContent = `# ${tag}`; const remove = document.createElement('button'); remove.type = 'button'; remove.className = 'annotation-tag-popover__remove'; remove.textContent = '\u00d7'; remove.title = '删除标签'; remove.setAttribute('aria-label', `删除标签 ${tag}`); remove.addEventListener('click', () => { item.tags = tags.filter(value => value !== tag); saveItem(item.id, { tags: item.tags }); draw(); scheduleRender(); window.chengmoNotice?.(`已删除标签 #${tag}`); }); row.append(label, remove); return row; })); };
-    const addTag = () => { const tag = input.value.trim().replace(/^#/, ''); if (!tag) return; if ((item.tags || []).includes(tag)) { input.value = ''; window.chengmoNotice?.(`标签 #${tag} 已存在`); return; } item.tags = [...(item.tags || []), tag]; saveItem(item.id, { tags: item.tags }); input.value = ''; draw(); scheduleRender(); window.chengmoNotice?.(`已添加标签 #${tag}`); };
+    const draw = () => { const tags = item.tags || []; count.textContent = `${tags.length} 个标签`; items.replaceChildren(...tags.map(tag => { const row = document.createElement('div'); row.className = 'annotation-tag-popover__item'; const label = document.createElement('span'); label.textContent = `# ${tag}`; const remove = document.createElement('button'); remove.type = 'button'; remove.className = 'annotation-tag-popover__remove'; remove.textContent = '\u00d7'; remove.title = '删除标签'; remove.setAttribute('aria-label', `删除标签 ${tag}`); remove.addEventListener('click', () => { saveItem(item.id, { tags: tags.filter(value => value !== tag) }); draw(); scheduleRender(); window.chengmoNotice?.(`已删除标签 #${tag}`); }); row.append(label, remove); return row; })); };
+    const addTag = () => { const tag = input.value.trim().replace(/^#/, ''); if (!tag) return; if ((item.tags || []).includes(tag)) { input.value = ''; window.chengmoNotice?.(`标签 #${tag} 已存在`); return; } saveItem(item.id, { tags: [...(item.tags || []), tag] }); input.value = ''; draw(); scheduleRender(); window.chengmoNotice?.(`已添加标签 #${tag}`); };
     add.addEventListener('click', addTag); input.addEventListener('keydown', event => { if (event.key === 'Enter') addTag(); }); draw(); popover.append(header, items, inputLine); document.body.append(popover); input.focus();
   }
   function build() {
@@ -228,7 +241,7 @@
       const page = document.createElement('span'); page.textContent = '\u6807\u6ce8';
       const more = document.createElement('span'); more.className = 'annotation-shelf__more'; more.textContent = '...'; head.append(letter, page, more);
       const excerptNode = document.createElement('div'); excerptNode.className = 'annotation-shelf__excerpt'; excerptNode.textContent = excerpt; card.append(head, excerptNode);
-      if (current === item.id) { const commentInput = document.createElement('input'); commentInput.className = 'annotation-shelf__inline-comment'; commentInput.placeholder = '\u6dfb\u52a0\u8bc4\u8bba'; commentInput.value = item.comment || ''; commentInput.addEventListener('pointerdown', event => event.stopPropagation()); commentInput.addEventListener('click', event => event.stopPropagation()); commentInput.addEventListener('input', () => { item.comment = commentInput.value; scheduleCommentSave(); }); commentInput.addEventListener('blur', flushCommentSave); commentInput.addEventListener('keydown', event => { if (event.key !== 'Enter') return; event.preventDefault(); event.stopPropagation(); flushCommentSave(); commentInput.blur(); scheduleRender(); }); card.append(commentInput); const addTag = document.createElement('button'); addTag.type = 'button'; addTag.className = 'annotation-shelf__add-tag'; addTag.textContent = (item.tags || []).length ? `\u6807\u7b7e\uff1a${(item.tags || []).join(', ')}` : '\u6dfb\u52a0\u6807\u7b7e...'; addTag.addEventListener('pointerdown', event => event.stopPropagation()); addTag.addEventListener('click', event => { event.stopPropagation(); showTagPopover(item, addTag); }); card.append(addTag); } else if (item.comment?.trim()) { const comment = document.createElement('div'); comment.className = 'annotation-shelf__comment'; comment.textContent = item.comment; card.append(comment); }
+      if (current === item.id) { const commentInput = document.createElement('input'); commentInput.className = 'annotation-shelf__inline-comment'; commentInput.placeholder = '\u6dfb\u52a0\u8bc4\u8bba'; commentInput.value = item.comment || ''; commentInput.addEventListener('pointerdown', event => event.stopPropagation()); commentInput.addEventListener('click', event => event.stopPropagation()); commentInput.addEventListener('input', () => scheduleCommentSave(item.id, commentInput.value)); commentInput.addEventListener('blur', () => flushCommentSave(item.id)); commentInput.addEventListener('keydown', event => { if (event.key !== 'Enter') return; event.preventDefault(); event.stopPropagation(); flushCommentSave(item.id); commentInput.blur(); scheduleRender(); }); card.append(commentInput); const addTag = document.createElement('button'); addTag.type = 'button'; addTag.className = 'annotation-shelf__add-tag'; addTag.textContent = (item.tags || []).length ? `\u6807\u7b7e\uff1a${(item.tags || []).join(', ')}` : '\u6dfb\u52a0\u6807\u7b7e...'; addTag.addEventListener('pointerdown', event => event.stopPropagation()); addTag.addEventListener('click', event => { event.stopPropagation(); showTagPopover(item, addTag); }); card.append(addTag); } else if (item.comment?.trim()) { const comment = document.createElement('div'); comment.className = 'annotation-shelf__comment'; comment.textContent = item.comment; card.append(comment); }
       card.addEventListener('click', () => { if (current === item.id) { card.classList.toggle('is-expanded'); return; } current = item.id; scheduleRender(); const mark = document.querySelector(`mark.selection-annotation[data-annotation-id="${item.id}"]`); if (mark) mark.scrollIntoView({ behavior: 'smooth', block: 'center' }); else window.chengmoNotice?.('原文位置暂不可见，请切换回对应笔记后查看。'); }); list.append(card);
     });
   }

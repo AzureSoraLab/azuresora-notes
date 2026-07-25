@@ -232,7 +232,12 @@
     menu.style.top = `${menuTop}px`;
   }
   function updateAnnotation(id, changes) {
-    write(read().map(item => item.id === id ? { ...item, ...changes } : item), { type: 'update', id, changes });
+    const item = annotationForId(id);
+    if (!item) return;
+    const changed = Object.entries(changes).some(([key, value]) => item[key] !== value);
+    if (!changed) return;
+    Object.assign(item, changes);
+    write(read(), { type: 'update', id, changes });
     removeMenu();
     renderAnnotations();
   }
@@ -252,11 +257,12 @@
     menu.dataset.annotationId = id; menu.style.setProperty('--selection-annotation-color', displayColor(item.color));
     const header = document.createElement('div'); header.className = 'selection-annotation-card__header';
     const icon = document.createElement('b'); icon.textContent = 'A'; const page = document.createElement('span'); page.textContent = '标注详情'; const close = document.createElement('button'); close.textContent = '×'; close.title = '关闭'; close.addEventListener('click', removeMenu); header.append(icon, page, close);
-    const saveComment = () => { window.clearTimeout(commentSaveTimer); commentSaveTimer = 0; write(read().map(annotation => annotation.id === id ? { ...annotation, comment: item.comment || '' } : annotation), { type: 'update', id, changes: { comment: item.comment || '' } }); };
-    const comment = document.createElement('textarea'); comment.className = 'selection-annotation-card__comment'; comment.placeholder = '添加评论'; comment.value = item.comment || ''; comment.addEventListener('input', () => { item.comment = comment.value; window.clearTimeout(commentSaveTimer); commentSaveTimer = window.setTimeout(saveComment, 260); }); comment.addEventListener('blur', saveComment);
+    let pendingComment = item.comment || '';
+    const saveComment = () => { window.clearTimeout(commentSaveTimer); commentSaveTimer = 0; updateAnnotation(id, { comment: pendingComment }); };
+    const comment = document.createElement('textarea'); comment.className = 'selection-annotation-card__comment'; comment.placeholder = '添加评论'; comment.value = pendingComment; comment.addEventListener('input', () => { pendingComment = comment.value; window.clearTimeout(commentSaveTimer); commentSaveTimer = window.setTimeout(saveComment, 260); }); comment.addEventListener('blur', saveComment);
     const tags = document.createElement('div'); tags.className = 'selection-annotation-card__tags'; const tagInput = document.createElement('input'); tagInput.className = 'selection-annotation-card__tag'; tagInput.placeholder = '添加标签…';
-    const renderTags = () => { tags.replaceChildren(...(item.tags || []).map(tag => { const chip = document.createElement('button'); chip.className = 'selection-annotation-card__tag-chip'; chip.textContent = `#${tag} ×`; chip.title = `删除标签 ${tag}`; chip.setAttribute('aria-label', `删除标签 ${tag}`); chip.addEventListener('click', () => { item.tags = (item.tags || []).filter(value => value !== tag); write(read().map(annotation => annotation.id === id ? { ...annotation, tags: item.tags } : annotation), { type: 'update', id, changes: { tags: item.tags } }); renderTags(); announce(`已删除标签 #${tag}`); }); return chip; })); };
-    tagInput.addEventListener('keydown', event => { if (event.key !== 'Enter') return; const tag = tagInput.value.trim().replace(/^#/, ''); if (!tag) return; event.preventDefault(); if ((item.tags || []).includes(tag)) { tagInput.value = ''; announce(`标签 #${tag} 已存在`); return; } item.tags = [...(item.tags || []), tag]; write(read().map(annotation => annotation.id === id ? { ...annotation, tags: item.tags } : annotation), { type: 'update', id, changes: { tags: item.tags } }); tagInput.value = ''; renderTags(); announce(`已添加标签 #${tag}`); });
+    const renderTags = () => { tags.replaceChildren(...(item.tags || []).map(tag => { const chip = document.createElement('button'); chip.className = 'selection-annotation-card__tag-chip'; chip.textContent = `#${tag} ×`; chip.title = `删除标签 ${tag}`; chip.setAttribute('aria-label', `删除标签 ${tag}`); chip.addEventListener('click', () => { updateAnnotation(id, { tags: (item.tags || []).filter(value => value !== tag) }); renderTags(); announce(`已删除标签 #${tag}`); }); return chip; })); };
+    tagInput.addEventListener('keydown', event => { if (event.key !== 'Enter') return; const tag = tagInput.value.trim().replace(/^#/, ''); if (!tag) return; event.preventDefault(); if ((item.tags || []).includes(tag)) { tagInput.value = ''; announce(`标签 #${tag} 已存在`); return; } updateAnnotation(id, { tags: [...(item.tags || []), tag] }); tagInput.value = ''; renderTags(); announce(`已添加标签 #${tag}`); });
     renderTags(); menu.append(header, comment, tags, tagInput); document.body.append(menu); positionCommentCard(id);
   }
   function positionManageMenu(id) {
