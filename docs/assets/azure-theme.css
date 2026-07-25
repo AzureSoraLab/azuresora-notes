@@ -525,25 +525,34 @@ body,
   transform: translateX(-8px);
 }
 
-/* Add a little width to the desktop library without changing its inner rhythm. */
+/* One desktop layout source of truth keeps the library column and its floating
+   note index on the same axis at every usable desktop width. */
 @media (min-width: 761px) {
   .app-shell,
   .app-shell.note-list-open {
-    grid-template-columns: 264px minmax(0, 1fr) !important;
+    --library-open-width: 264px;
+    grid-template-columns: var(--library-open-width) minmax(0, 1fr) !important;
+    position: relative;
   }
   .app-shell.library-collapsed,
   .app-shell.library-collapsed.note-list-open {
     grid-template-columns: 0 minmax(0, 1fr) !important;
   }
   .note-list {
-    left: 264px !important;
+    position: absolute;
+    z-index: 10022;
+    top: 0;
+    bottom: 0;
+    left: var(--library-open-width) !important;
     width: 264px !important;
     padding-left: 20px !important;
     padding-right: 20px !important;
     background: #f3f6f7 !important;
     border-right-color: #d7e1e5 !important;
     box-shadow: 10px 0 24px rgba(64, 83, 98, 0.10) !important;
+    pointer-events: none;
   }
+  .note-list-open .note-list { pointer-events: auto; }
   .library-collapsed .note-list {
     left: 0 !important;
   }
@@ -1662,10 +1671,7 @@ html .reader-header .data-tools__actions button {
 @media (min-width: 761px) and (max-width: 1080px) {
   .app-shell,
   .app-shell.note-list-open {
-    grid-template-columns: clamp(224px, 30vw, 264px) minmax(0, 1fr) !important;
-  }
-  .note-list {
-    left: clamp(224px, 30vw, 264px) !important;
+    --library-open-width: clamp(224px, 30vw, 264px);
   }
 }
 
