@@ -419,12 +419,17 @@
     drawingsCache = drawingsCache.filter((_, index) => index !== selectedStroke);
     selectedStroke = -1; selectionAnchor = null; markDrawingChanged();
     if (selectionDelete) selectionDelete.hidden = true;
-    const snapshot = drawingsCache.map(stroke => ({ ...stroke, points: (stroke.points || []).map(point => [...point]) }));
-    persistRecoverySnapshot(loadedNoteId, snapshot);
-    saveDrawing(loadedNoteId, snapshot);
-    rememberPersistedDrawing(loadedNoteId);
     lastCanvasGeometry = ''; renderedRevision = -1;
-    redraw();
+    scheduleRedraw();
+    const deletedNoteId = loadedNoteId, deletedDrawings = drawingsCache.slice();
+    // Let the cleared selection paint before serializing a potentially large
+    // drawing. A second frame keeps desktop deletion visually instantaneous.
+    requestAnimationFrame(() => requestAnimationFrame(() => {
+      const snapshot = deletedDrawings.map(stroke => ({ ...stroke, points: (stroke.points || []).map(point => [...point]) }));
+      persistRecoverySnapshot(deletedNoteId, snapshot);
+      saveDrawing(deletedNoteId, snapshot);
+      if (deletedNoteId === loadedNoteId) rememberPersistedDrawing(deletedNoteId);
+    }));
   };
   const erasePoints = (points, radius) => {
     if (!points.length) return false;
