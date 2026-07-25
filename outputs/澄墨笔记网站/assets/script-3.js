@@ -85,7 +85,9 @@
     if (saveIdle) { window.cancelIdleCallback?.(saveIdle); saveIdle = 0; }
     // Serialize once after a burst of completed strokes, rather than cloning
     // every point while the user is still writing.
-    saveDrawing(id, strokes.map(stroke => ({ ...stroke, points: (stroke.points || []).map(point => [...point]) })));
+    const snapshot = strokes.map(stroke => ({ ...stroke, points: (stroke.points || []).map(point => [...point]) }));
+    saveDrawing(id, snapshot);
+    if (id === loadedNoteId) rememberPersistedDrawing(id);
   };
   const queueSave = () => {
     pendingDrawingSave = { id: loadedNoteId, strokes: drawingsCache };
@@ -97,7 +99,8 @@
     }, 480);
   };
   let drawingsCache = [];
-  let loadedNoteId = '', renderedNoteId = '', lastCanvasGeometry = '', lastVisibleRange = '', drawingRevision = 0, renderedRevision = -1, renderedSelectedStroke = -1;
+  let loadedNoteId = '', renderedNoteId = '', lastCanvasGeometry = '', lastVisibleRange = '', drawingRevision = 0, persistedDrawingNoteId = '', persistedDrawingRevision = -1, renderedRevision = -1, renderedSelectedStroke = -1;
+  const rememberPersistedDrawing = (id, revision = drawingRevision) => { persistedDrawingNoteId = id; persistedDrawingRevision = revision; };
   // React replaces the reader shortly after a note card is clicked. Keep the
   // outgoing ink hidden during that hand-off so it can never be painted on the
   // incoming note, even for two notes with the same visible title.
@@ -218,7 +221,7 @@
     // Only non-empty local ink may be newer than an asynchronous IDB read.
     const hasCachedDrawing = Array.isArray(recoveryStrokes) || cachedStrokes.length > 0;
     drawingsCache = Array.isArray(recoveryStrokes) ? recoveryStrokes : cachedStrokes; selectedStroke = -1;
-    clearRenderedChunks(); invalidateGeometry(); markDrawingChanged();
+    clearRenderedChunks(); invalidateGeometry(); markDrawingChanged(); rememberPersistedDrawing(loadedNoteId);
     // IndexedDB is the canonical drawing store. The old localStorage record
     // supplies an immediate first paint, then a note-scoped read upgrades it
     // without scanning every other note's ink.
@@ -230,7 +233,7 @@
       if (!Array.isArray(strokes) || hasCachedDrawing || requestedId !== loadedNoteId || activeStroke || drawingRevision !== requestedRevision) return;
       drawingsCache = strokes; selectedStroke = -1;
       const data = read(); data[requestedId] = strokes;
-      markDrawingChanged(); scheduleRedraw();
+      markDrawingChanged(); rememberPersistedDrawing(requestedId); scheduleRedraw();
     }).catch(() => {});
   };
   const scheduleRedraw = () => {
@@ -406,6 +409,7 @@
     const snapshot = drawingsCache.map(stroke => ({ ...stroke, points: (stroke.points || []).map(point => [...point]) }));
     persistRecoverySnapshot(loadedNoteId, snapshot);
     saveDrawing(loadedNoteId, snapshot);
+    rememberPersistedDrawing(loadedNoteId);
     lastCanvasGeometry = ''; renderedRevision = -1;
     redraw();
   };
@@ -544,7 +548,7 @@
     if (!activeNoteId) {
       if (saveTimer || saveIdle || pendingDrawingSave) flushDrawingSave();
       if (loadedNoteId || drawingsCache.length) {
-        loadedNoteId = ''; drawingsCache = []; selectedStroke = -1;
+        loadedNoteId = ''; drawingsCache = []; selectedStroke = -1; persistedDrawingNoteId = ''; persistedDrawingRevision = -1;
         clearRenderedChunks(); invalidateGeometry();
       }
       return;
@@ -660,7 +664,7 @@
     if (saveTimer || saveIdle || pendingDrawingSave) flushDrawingSave();
     activeStroke = null; eraserPointerActive = false; pendingErasePoints = []; cancelSelectionDrag(); clearInteractionPointer();
     if (redrawFrame) { cancelAnimationFrame(redrawFrame); redrawFrame = 0; }
-    loadedNoteId = ''; drawingsCache = []; selectedStroke = -1;
+    loadedNoteId = ''; drawingsCache = []; selectedStroke = -1; persistedDrawingNoteId = ''; persistedDrawingRevision = -1;
     clearRenderedChunks(); invalidateGeometry(); markDrawingChanged();
   };
   const beginNoteSwitch = card => {
@@ -703,7 +707,12 @@
   window.addEventListener('resize', () => { closeMenu(); enqueue('drawing-redraw', scheduleRedraw); });
   const persistBeforeLeave = () => {
     flushDrawingSave();
-    if (loadedNoteId) saveDrawing(loadedNoteId, drawingsCache);
+    // A visibility change often follows a completed pen-up. Do not enqueue the
+    // identical note a second time once its latest revision is already queued.
+    if (loadedNoteId && (persistedDrawingNoteId !== loadedNoteId || persistedDrawingRevision !== drawingRevision)) {
+      saveDrawing(loadedNoteId, drawingsCache);
+      rememberPersistedDrawing(loadedNoteId);
+    }
     // flushBootCache happens synchronously before this promise waits on IDB.
     window.chengmoStorage?.flush?.().catch(() => {});
   };
