@@ -15,7 +15,7 @@
   const defaultState = { color: palette[0][0], size: 2, eraserSize: 14, eraser: false, drawing: false, selecting: false, inkVisible: false };
   let state = { ...defaultState };
   const chunkHeight = 900;
-  let canvas = null, context = null, activeStroke = null, selectedStroke = -1, dragStart = null, selectionAnchor = null, eraserPointerActive = false, eraserDirty = false, saveTimer = 0, saveIdle = 0, pendingDrawingSave = null, redrawFrame = 0, eraseFrame = 0, pendingErasePoints = [], resizeObserver = null, scrollRoot = null, selectionDelete = null, observedDrawContent = null, colorButton = null;
+  let canvas = null, context = null, activeStroke = null, selectedStroke = -1, dragStart = null, selectionAnchor = null, interactionPointerId = null, selectionDragFrame = 0, pendingSelectionPoint = null, eraserPointerActive = false, eraserDirty = false, saveTimer = 0, saveIdle = 0, pendingDrawingSave = null, redrawFrame = 0, eraseFrame = 0, pendingErasePoints = [], resizeObserver = null, scrollRoot = null, selectionDelete = null, selectionDeletePosition = '', observedDrawContent = null, colorButton = null;
   let chunkCanvases = new Map();
   let menu = null;
   let drawingStore = null;
@@ -315,14 +315,20 @@
       selectionDelete.addEventListener('click', deleteSelectedStroke); document.body.append(selectionDelete);
     }
     const stroke = drawingsCache[selectedStroke];
-    if (!state.selecting || !stroke?.points?.length) { selectionDelete.hidden = true; return; }
+    if (!state.selecting || !stroke?.points?.length) { selectionDelete.hidden = true; selectionDeletePosition = ''; return; }
     const point = selectionAnchor || stroke.points[stroke.points.length - 1];
     const x = rect.left + point[0] * rect.width, y = rect.top + point[1] * rect.height;
     const readerRect = canvas.parentElement?.getBoundingClientRect();
     const visible = x >= Math.max(0, readerRect?.left || 0) && x <= Math.min(window.innerWidth, readerRect?.right || window.innerWidth) && y >= Math.max(0, readerRect?.top || 0) && y <= Math.min(window.innerHeight, readerRect?.bottom || window.innerHeight);
-    if (!visible) { selectionDelete.hidden = true; return; }
-    selectionDelete.style.left = `${Math.max(8, Math.min(window.innerWidth - 36, x + 10))}px`;
-    selectionDelete.style.top = `${Math.max(8, y - 34)}px`;
+    if (!visible) { selectionDelete.hidden = true; selectionDeletePosition = ''; return; }
+    const left = Math.max(8, Math.min(window.innerWidth - 36, x + 10));
+    const top = Math.max(8, y - 34);
+    const position = `${left}:${top}`;
+    if (selectionDeletePosition !== position) {
+      selectionDelete.style.left = `${left}px`;
+      selectionDelete.style.top = `${top}px`;
+      selectionDeletePosition = position;
+    }
     selectionDelete.hidden = false;
   };
   const paintSegment = (stroke, previous, current, rect) => {
@@ -427,8 +433,36 @@
       if (changed) { eraserDirty = true; queueSave(); scheduleRedraw(); }
     });
   };
+  const clearInteractionPointer = () => {
+    if (interactionPointerId === null) return;
+    canvas?.releasePointerCapture?.(interactionPointerId);
+    interactionPointerId = null;
+  };
+  const cancelSelectionDrag = () => {
+    if (selectionDragFrame) { cancelAnimationFrame(selectionDragFrame); selectionDragFrame = 0; }
+    pendingSelectionPoint = null;
+    dragStart = null;
+    canvas?.classList.remove('is-dragging');
+  };
+  const applySelectionDrag = point => {
+    if (!dragStart || selectedStroke < 0 || !point) return false;
+    const dx = point[0] - dragStart.point[0], dy = point[1] - dragStart.point[1];
+    const movedPixels = Math.hypot(dx * canvas.clientWidth, dy * canvas.clientHeight);
+    if (!dragStart.moved && movedPixels < 4) return false;
+    dragStart.moved = true;
+    canvas.classList.add('is-dragging');
+    drawingsCache[selectedStroke].points = dragStart.strokes.map(p => [Math.max(0, Math.min(1, p[0] + dx)), Math.max(0, Math.min(1, p[1] + dy))]);
+    selectionAnchor = point;
+    markDrawingChanged(); scheduleRedraw();
+    return true;
+  };
+  const flushSelectionDrag = () => {
+    if (selectionDragFrame) { cancelAnimationFrame(selectionDragFrame); selectionDragFrame = 0; }
+    const point = pendingSelectionPoint; pendingSelectionPoint = null;
+    return applySelectionDrag(point);
+  };
   const begin = event => {
-    if ((!state.drawing && !state.selecting && !state.eraser) || event.button !== 0) return;
+    if ((!state.drawing && !state.selecting && !state.eraser) || event.button !== 0 || event.isPrimary === false || interactionPointerId !== null) return;
     event.preventDefault(); event.stopPropagation();
     if (state.selecting) {
       const point = pointFor(event);
@@ -437,35 +471,34 @@
       if (selectedStroke < 0 && selectionDelete) selectionDelete.hidden = true;
       // Selecting is a click. Only turn it into a move after a small movement
       // threshold, so a normal click cannot accidentally shift handwriting.
-      if (selectedStroke >= 0) { dragStart = { point, strokes: drawingsCache[selectedStroke].points.map(p => [...p]), moved: false }; canvas.setPointerCapture?.(event.pointerId); }
+      if (selectedStroke >= 0) { dragStart = { point, strokes: drawingsCache[selectedStroke].points.map(p => [...p]), moved: false }; interactionPointerId = event.pointerId; canvas.setPointerCapture?.(event.pointerId); }
       scheduleRedraw(); return;
     }
     if (state.eraser) {
       // One click erases at that point; subsequent movement keeps erasing
       // until the pointer is released. Hovering alone never changes ink.
       eraserPointerActive = true; eraserDirty = false; queueErase(pointFor(event));
-      canvas.setPointerCapture?.(event.pointerId); return;
+      interactionPointerId = event.pointerId; canvas.setPointerCapture?.(event.pointerId); return;
     }
     activeStroke = { color: state.color, size: state.size, eraser: false, points: [pointFor(event)] };
     scheduleRedraw();
-    canvas.setPointerCapture?.(event.pointerId);
+    interactionPointerId = event.pointerId; canvas.setPointerCapture?.(event.pointerId);
   };
   const move = event => {
     if (state.selecting && dragStart && selectedStroke >= 0) {
-      event.preventDefault(); const point = pointFor(event); const dx = point[0] - dragStart.point[0], dy = point[1] - dragStart.point[1];
-      const movedPixels = Math.hypot(dx * canvas.clientWidth, dy * canvas.clientHeight);
-      if (!dragStart.moved && movedPixels < 4) return;
-      dragStart.moved = true; canvas.classList.add('is-dragging');
-      drawingsCache[selectedStroke].points = dragStart.strokes.map(p => [Math.max(0, Math.min(1, p[0] + dx)), Math.max(0, Math.min(1, p[1] + dy))]); selectionAnchor = point; markDrawingChanged(); scheduleRedraw(); return;
+      if (event.pointerId !== interactionPointerId) return;
+      event.preventDefault(); pendingSelectionPoint = pointFor(event);
+      if (!selectionDragFrame) selectionDragFrame = requestAnimationFrame(() => { selectionDragFrame = 0; const point = pendingSelectionPoint; pendingSelectionPoint = null; applySelectionDrag(point); });
+      return;
     }
     if (state.eraser) {
-      if (!eraserPointerActive) return;
+      if (!eraserPointerActive || event.pointerId !== interactionPointerId) return;
       const samples = event.getCoalescedEvents ? event.getCoalescedEvents() : [event];
       const rect = canvas.getBoundingClientRect();
       samples.forEach(sample => queueErase(pointFor(sample, rect)));
       return;
     }
-    if (!activeStroke) return;
+    if (!activeStroke || event.pointerId !== interactionPointerId) return;
     event.preventDefault();
     const samples = event.getCoalescedEvents ? event.getCoalescedEvents() : [event];
     const rect = canvas.getBoundingClientRect();
@@ -475,18 +508,21 @@
     if (!paintLiveSegments(activeStroke, points)) scheduleRedraw();
   };
   const end = event => {
-    if (state.selecting && dragStart) { event.preventDefault(); const moved = dragStart.moved; dragStart = null; canvas.classList.remove('is-dragging'); if (moved) { persistRecoverySnapshot(); queueSave(); } return; }
+    if (event.pointerId !== interactionPointerId) return;
+    if (state.selecting && dragStart) { event.preventDefault(); flushSelectionDrag(); const moved = dragStart.moved; cancelSelectionDrag(); clearInteractionPointer(); if (moved) { persistRecoverySnapshot(); queueSave(); } return; }
     if (state.eraser) {
       event.preventDefault();
       if (eraseFrame) { cancelAnimationFrame(eraseFrame); eraseFrame = 0; const points = pendingErasePoints; pendingErasePoints = []; const changed = erasePoints(points, state.eraserSize / 2); if (changed) { eraserDirty = true; queueSave(); scheduleRedraw(); } }
       eraserPointerActive = false; pendingErasePoints = [];
       if (eraserDirty) persistRecoverySnapshot();
+      clearInteractionPointer();
       return;
     }
     if (!activeStroke) return;
     event.preventDefault();
     if (activeStroke.points.length) { drawingsCache.push(activeStroke); markDrawingChanged(); persistRecoverySnapshot(); queueSave(); }
     activeStroke = null;
+    clearInteractionPointer();
     scheduleRedraw();
   };
   const syncCanvas = () => {
@@ -549,7 +585,7 @@
   const leaveInteractionMode = () => {
     if (!state.drawing && !state.selecting && !state.eraser) return false;
     state.drawing = false; state.selecting = false; state.eraser = false;
-    selectedStroke = -1; selectionAnchor = null; dragStart = null;
+    selectedStroke = -1; selectionAnchor = null; cancelSelectionDrag(); clearInteractionPointer();
     if (selectionDelete) selectionDelete.hidden = true;
     closeMenu(); refreshInteractionUi(); scheduleRedraw();
     window.chengmoNotice?.('已退出绘图模式');
@@ -614,7 +650,7 @@
   listen('chengmo:note-list-ready', 'drawing-note-list', scheduleMountAndSync);
   const clearOutgoingDrawing = () => {
     if (saveTimer || saveIdle || pendingDrawingSave) flushDrawingSave();
-    activeStroke = null; eraserPointerActive = false; pendingErasePoints = [];
+    activeStroke = null; eraserPointerActive = false; pendingErasePoints = []; cancelSelectionDrag(); clearInteractionPointer();
     if (redrawFrame) { cancelAnimationFrame(redrawFrame); redrawFrame = 0; }
     loadedNoteId = ''; drawingsCache = []; selectedStroke = -1;
     clearRenderedChunks(); invalidateGeometry(); markDrawingChanged();
