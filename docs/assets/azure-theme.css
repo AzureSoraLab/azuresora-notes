@@ -839,7 +839,7 @@ mark.selection-annotation--highlight {
 mark.selection-annotation--underline {
   /* Keep underline annotations in their chosen marker colour, like highlights. */
   text-decoration-color: var(--selection-annotation-color) !important;
-  text-decoration-thickness: 3px !important;
+  text-decoration-thickness: 2px !important;
   text-underline-offset: 2.5px !important;
 }
 

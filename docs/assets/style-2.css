@@ -66,7 +66,7 @@
 .selection-annotation-menu__item--danger { border-top: 1px solid #e7e6e2; border-bottom: 0; color: #4e5350; }
 mark.selection-annotation { padding: 0; color: inherit; }
 mark.selection-annotation--highlight { background: color-mix(in srgb, var(--selection-annotation-color) 55%, transparent); box-decoration-break: clone; -webkit-box-decoration-break: clone; }
-mark.selection-annotation--underline { background: transparent; text-decoration: underline 3px var(--selection-annotation-color); text-decoration-skip-ink: none; text-underline-offset: 3px; }
+mark.selection-annotation--underline { background: transparent; text-decoration: underline 2px var(--selection-annotation-color); text-decoration-skip-ink: none; text-underline-offset: 3px; }
 .selection-annotation-menu--card { width: 254px; transform: none; border: 1px solid #d9e1db; border-radius: 8px; background: #fffefa; box-shadow: 0 8px 22px rgba(37, 58, 50, .16); }
 .selection-annotation-card__header { display: flex; align-items: center; gap: 6px; height: 32px; box-sizing: border-box; padding: 0 10px; border-bottom: 1px solid #e4e9e4; color: #43584f; font: 13px/1.2 "Microsoft YaHei", Arial, sans-serif; }
 .selection-annotation-card__header b { color: var(--selection-annotation-color); font-family: Georgia, serif; font-size: 17px; line-height: 14px; }
