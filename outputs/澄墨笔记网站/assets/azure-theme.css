@@ -1742,3 +1742,66 @@ html .reader-header .data-tools__actions button {
     padding-right: 3px !important;
   }
 }
+
+/* The mobile library reserves independent scrolling space for categories and
+   recent notes, so either list cannot push the other into an overlap. */
+@media (max-width: 760px) {
+  .library.mobile-active {
+    overflow: hidden;
+  }
+  .library.mobile-active .library-content {
+    display: grid;
+    grid-template-rows: auto auto auto minmax(0, 1fr) auto;
+    gap: 14px;
+    height: 100%;
+    padding: 20px 20px 12px;
+    overflow: hidden;
+  }
+  .library.mobile-active .brand,
+  .library.mobile-active .new-note,
+  .library.mobile-active .course-section,
+  .library.mobile-active .recent-notes,
+  .library.mobile-active .storage-note {
+    min-width: 0;
+    margin: 0 !important;
+  }
+  .library.mobile-active .brand {
+    align-self: center;
+  }
+  .library.mobile-active .new-note {
+    align-self: center;
+  }
+  .library.mobile-active .course-section {
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    padding: 0 0 8px;
+    overflow: hidden;
+  }
+  .library.mobile-active .course-list-scroll {
+    min-height: 0;
+    max-height: min(24vh, 190px);
+    padding-right: 6px;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    scrollbar-gutter: stable;
+  }
+  .library.mobile-active .recent-notes {
+    min-height: 0;
+    padding: 12px 0 0;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    scrollbar-gutter: stable;
+  }
+  .library.mobile-active .recent-notes__title {
+    position: sticky;
+    z-index: 1;
+    top: 0;
+    margin-top: -12px;
+    padding-top: 12px;
+    background: #f8fafb;
+  }
+  .library.mobile-active .storage-note {
+    padding-top: 10px;
+  }
+}
