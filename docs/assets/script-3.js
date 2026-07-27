@@ -107,7 +107,7 @@
   // incoming note, even for two notes with the same visible title.
   let pendingNoteSwitchId = '', noteSwitchFrame = 0;
   let geometryRoot = null, geometryDirty = true, cachedGeometry = { width: 0, height: 0 }, observedGeometrySignature = '';
-  let chunkStrokeIndex = null, chunkIndexSignature = '', segmentHitIndex = null, segmentHitSignature = '';
+  let chunkStrokeIndex = null, chunkIndexSignature = '', segmentHitIndex = null, segmentHitSignature = '', indexRevision = 0, draggedStrokeIndex = -1;
   let strokeBounds = new WeakMap();
   const clearRenderedChunks = () => {
     chunkCanvases.forEach(chunk => chunk.node.remove());
@@ -121,7 +121,12 @@
       }
     });
   };
-  const markDrawingChanged = () => { drawingRevision += 1; strokeBounds = new WeakMap(); chunkStrokeIndex = null; chunkIndexSignature = ''; segmentHitIndex = null; segmentHitSignature = ''; };
+  const markDrawingChanged = (reindex = true) => {
+    drawingRevision += 1;
+    // A moved selected stroke is painted separately while dragging. Its static
+    // index stays valid, avoiding a full-note reindex for every drag frame.
+    if (reindex) { strokeBounds = new WeakMap(); indexRevision += 1; chunkStrokeIndex = null; chunkIndexSignature = ''; segmentHitIndex = null; segmentHitSignature = ''; }
+  };
   const invalidateGeometry = () => { geometryDirty = true; observedGeometrySignature = ''; chunkStrokeIndex = null; chunkIndexSignature = ''; segmentHitIndex = null; segmentHitSignature = ''; };
   const refreshGeometryIfNeeded = () => {
     const root = drawingRoot();
@@ -162,10 +167,11 @@
     return cachedGeometry;
   };
   const indexStrokesByChunk = pageHeight => {
-    const signature = `${loadedNoteId}:${drawingRevision}:${pageHeight}`;
+    const signature = `${loadedNoteId}:${indexRevision}:${draggedStrokeIndex}:${pageHeight}`;
     if (chunkStrokeIndex && chunkIndexSignature === signature) return chunkStrokeIndex;
     const index = new Map();
     drawingsCache.forEach((stroke, strokeIndex) => {
+      if (strokeIndex === draggedStrokeIndex) return;
       const bounds = boundsFor(stroke);
       const bleed = Math.max(2, stroke.size || 2) / 2;
       const first = Math.max(0, Math.floor((bounds.minY * pageHeight - bleed) / chunkHeight));
@@ -221,7 +227,7 @@
     // created before the IndexedDB drawing record has hydrated after refresh.
     // Only non-empty local ink may be newer than an asynchronous IDB read.
     const hasCachedDrawing = Array.isArray(recoveryStrokes) || cachedStrokes.length > 0;
-    drawingsCache = Array.isArray(recoveryStrokes) ? recoveryStrokes : cachedStrokes; selectedStroke = -1;
+    drawingsCache = Array.isArray(recoveryStrokes) ? recoveryStrokes : cachedStrokes; selectedStroke = -1; draggedStrokeIndex = -1;
     clearRenderedChunks(); invalidateGeometry(); markDrawingChanged(); rememberPersistedDrawing(loadedNoteId);
     // IndexedDB is the canonical drawing store. The old localStorage record
     // supplies an immediate first paint, then a note-scoped read upgrades it
@@ -232,7 +238,7 @@
       // An asynchronous old-record read must never overwrite ink created
       // immediately after switching into this note.
       if (!Array.isArray(strokes) || hasCachedDrawing || requestedId !== loadedNoteId || activeStroke || drawingRevision !== requestedRevision) return;
-      drawingsCache = strokes; selectedStroke = -1;
+      drawingsCache = strokes; selectedStroke = -1; draggedStrokeIndex = -1;
       const data = read(); data[requestedId] = strokes;
       markDrawingChanged(); rememberPersistedDrawing(requestedId); scheduleRedraw();
     }).catch(() => {});
@@ -283,6 +289,15 @@
         paintStroke(stroke, { width: pageWidth, height: pageHeight });
         if (strokeIndex === selectedStroke) paintSelection(stroke, { width: pageWidth, height: pageHeight });
       });
+      // During a drag this stroke is intentionally outside the static index,
+      // so only its visible chunks are repainted as its position changes.
+      if (draggedStrokeIndex === selectedStroke) {
+        const stroke = drawingsCache[selectedStroke];
+        if (stroke && intersectsChunk(stroke, top, height, pageHeight)) {
+          paintStroke(stroke, { width: pageWidth, height: pageHeight });
+          paintSelection(stroke, { width: pageWidth, height: pageHeight });
+        }
+      }
       if (activeStroke && intersectsChunk(activeStroke, top, height, pageHeight, activeBounds)) paintStroke(activeStroke, { width: pageWidth, height: pageHeight });
       context.restore();
       chunk.signature = signature;
@@ -420,7 +435,7 @@
     }
     pendingDrawingSave = null;
     drawingsCache = drawingsCache.filter((_, index) => index !== selectedStroke);
-    selectedStroke = -1; selectionAnchor = null; markDrawingChanged();
+    selectedStroke = -1; draggedStrokeIndex = -1; selectionAnchor = null; markDrawingChanged();
     if (selectionDelete) selectionDelete.hidden = true;
     lastCanvasGeometry = ''; renderedRevision = -1;
     scheduleRedraw();
@@ -485,8 +500,11 @@
     dragStart.moved = true;
     canvas.classList.add('is-dragging');
     drawingsCache[selectedStroke].points = dragStart.strokes.map(p => [Math.max(0, Math.min(1, p[0] + dx)), Math.max(0, Math.min(1, p[1] + dy))]);
+    strokeBounds.delete(drawingsCache[selectedStroke]);
     selectionAnchor = point;
-    markDrawingChanged(); scheduleRedraw();
+    const startsDrag = draggedStrokeIndex !== selectedStroke;
+    if (startsDrag) draggedStrokeIndex = selectedStroke;
+    markDrawingChanged(startsDrag); scheduleRedraw();
     return true;
   };
   const flushSelectionDrag = () => {
@@ -542,7 +560,17 @@
   };
   const end = event => {
     if (event.pointerId !== interactionPointerId) return;
-    if (state.selecting && dragStart) { event.preventDefault(); flushSelectionDrag(); const moved = dragStart.moved; cancelSelectionDrag(); clearInteractionPointer(); if (moved) { persistRecoverySnapshot(); queueSave(); } return; }
+    if (state.selecting && dragStart) {
+      event.preventDefault(); flushSelectionDrag(); const moved = dragStart.moved;
+      cancelSelectionDrag(); clearInteractionPointer();
+      if (moved) {
+        // Put the completed stroke back in the persistent index for the next
+        // selection or scroll, after the inexpensive drag frames finish.
+        draggedStrokeIndex = -1; markDrawingChanged(); scheduleRedraw();
+        persistRecoverySnapshot(); queueSave();
+      }
+      return;
+    }
     if (state.eraser) {
       event.preventDefault();
       if (eraseFrame) { cancelAnimationFrame(eraseFrame); eraseFrame = 0; const points = pendingErasePoints; pendingErasePoints = []; const changed = erasePoints(points, state.eraserSize / 2); if (changed) { eraserDirty = true; queueSave(); scheduleRedraw(); } }
@@ -618,7 +646,7 @@
   const leaveInteractionMode = () => {
     if (!state.drawing && !state.selecting && !state.eraser) return false;
     state.drawing = false; state.selecting = false; state.eraser = false;
-    selectedStroke = -1; selectionAnchor = null; cancelSelectionDrag(); clearInteractionPointer();
+    selectedStroke = -1; draggedStrokeIndex = -1; selectionAnchor = null; cancelSelectionDrag(); clearInteractionPointer();
     if (selectionDelete) selectionDelete.hidden = true;
     closeMenu(); refreshInteractionUi(); scheduleRedraw();
     window.chengmoNotice?.('已退出绘图模式');
@@ -648,9 +676,9 @@
         canvas.classList.toggle('is-ink-hidden', !state.inkVisible);
       }
     };
-    drawButton.addEventListener('click', () => { if (!noteId()) return; state.inkVisible = true; state.drawing = !state.drawing; state.selecting = false; state.eraser = false; selectedStroke = -1; selectionAnchor = null; dragStart = null; if (selectionDelete) selectionDelete.hidden = true; closeMenu(); syncCanvas(); update(); });
-    selectButton.addEventListener('click', () => { if (!noteId()) return; state.inkVisible = true; state.selecting = !state.selecting; state.drawing = false; state.eraser = false; selectedStroke = -1; selectionAnchor = null; dragStart = null; if (selectionDelete) selectionDelete.hidden = true; closeMenu(); syncCanvas(); update(); });
-    visibilityButton.addEventListener('click', () => { state.inkVisible = !state.inkVisible; if (!state.inkVisible) { state.drawing = false; state.selecting = false; state.eraser = false; selectedStroke = -1; selectionAnchor = null; dragStart = null; if (selectionDelete) selectionDelete.hidden = true; closeMenu(); } syncCanvas(); update(); });
+    drawButton.addEventListener('click', () => { if (!noteId()) return; state.inkVisible = true; state.drawing = !state.drawing; state.selecting = false; state.eraser = false; selectedStroke = -1; draggedStrokeIndex = -1; selectionAnchor = null; dragStart = null; if (selectionDelete) selectionDelete.hidden = true; closeMenu(); syncCanvas(); update(); });
+    selectButton.addEventListener('click', () => { if (!noteId()) return; state.inkVisible = true; state.selecting = !state.selecting; state.drawing = false; state.eraser = false; selectedStroke = -1; draggedStrokeIndex = -1; selectionAnchor = null; dragStart = null; if (selectionDelete) selectionDelete.hidden = true; closeMenu(); syncCanvas(); update(); });
+    visibilityButton.addEventListener('click', () => { state.inkVisible = !state.inkVisible; if (!state.inkVisible) { state.drawing = false; state.selecting = false; state.eraser = false; selectedStroke = -1; draggedStrokeIndex = -1; selectionAnchor = null; dragStart = null; if (selectionDelete) selectionDelete.hidden = true; closeMenu(); } syncCanvas(); update(); });
     colorButton.addEventListener('click', event => { event.stopPropagation(); buildMenu(colorButton, update); });
     actions.prepend(control); update();
   };
@@ -685,7 +713,7 @@
     if (saveTimer || saveIdle || pendingDrawingSave) flushDrawingSave();
     activeStroke = null; eraserPointerActive = false; pendingErasePoints = []; cancelSelectionDrag(); clearInteractionPointer();
     if (redrawFrame) { cancelAnimationFrame(redrawFrame); redrawFrame = 0; }
-    loadedNoteId = ''; drawingsCache = []; selectedStroke = -1; persistedDrawingNoteId = ''; persistedDrawingRevision = -1;
+    loadedNoteId = ''; drawingsCache = []; selectedStroke = -1; draggedStrokeIndex = -1; persistedDrawingNoteId = ''; persistedDrawingRevision = -1;
     clearRenderedChunks(); invalidateGeometry(); markDrawingChanged();
   };
   const beginNoteSwitch = card => {

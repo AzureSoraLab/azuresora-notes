@@ -1,10 +1,10 @@
-const CACHE_NAME = 'azuresora-notes-offline-20260727-4';
+const CACHE_NAME = 'azuresora-notes-offline-20260728-7';
 // Install only what is needed to reopen the shell. The full offline bundle is
 // filled after first paint so service-worker installation never competes with it.
 const CORE_ASSETS = [
   './',
   './index.html',
-  './favicon.svg',
+  './favicon.png',
   './manifest.webmanifest',
   './assets/offline-runtime.js',
   './assets/storage-bridge.js',
@@ -12,7 +12,7 @@ const CORE_ASSETS = [
   './assets/style-1.css', './assets/brand-layout.css', './assets/azure-theme.css'
 ];
 const DEFERRED_ASSETS = [
-  './assets/enhancements-loader.js', './assets/katex-fonts.css', './favicon.svg',
+  './assets/enhancements-loader.js', './assets/katex-fonts.css', './favicon.png',
   './assets/script-3.js', './assets/script-4.js',
   './assets/script-5.js', './assets/script-6.js', './assets/script-7.js', './assets/script-8.js',
   './assets/script-9.js', './assets/script-10.js', './assets/script-11.js', './assets/script-12.js',
