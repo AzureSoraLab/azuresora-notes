@@ -4,6 +4,7 @@ const CACHE_NAME = 'azuresora-notes-offline-20260727-4';
 const CORE_ASSETS = [
   './',
   './index.html',
+  './favicon.svg',
   './manifest.webmanifest',
   './assets/offline-runtime.js',
   './assets/storage-bridge.js',
@@ -11,7 +12,7 @@ const CORE_ASSETS = [
   './assets/style-1.css', './assets/brand-layout.css', './assets/azure-theme.css'
 ];
 const DEFERRED_ASSETS = [
-  './assets/enhancements-loader.js', './assets/katex-fonts.css',
+  './assets/enhancements-loader.js', './assets/katex-fonts.css', './favicon.svg',
   './assets/script-3.js', './assets/script-4.js',
   './assets/script-5.js', './assets/script-6.js', './assets/script-7.js', './assets/script-8.js',
   './assets/script-9.js', './assets/script-10.js', './assets/script-11.js', './assets/script-12.js',
