@@ -105,6 +105,7 @@
   let noteFlushPromise = null;
   let pendingNotesState = null;
   let notesTimer = 0;
+  let notesStateEventTimer = 0;
   let noteRevision = 0;
   let noteWrittenRevision = 0;
   let notesRetryTimer = 0;
@@ -257,10 +258,22 @@
     }, 260);
     return noteWritePromise;
   };
+  const scheduleNotesStateUpdated = () => {
+    // React can save on every keystroke. The auxiliary library controls only
+    // need the settled state, so avoid rebuilding them for each character.
+    window.clearTimeout(notesStateEventTimer);
+    notesStateEventTimer = window.setTimeout(() => {
+      notesStateEventTimer = 0;
+      emit('chengmo:notes-state-updated');
+    }, 280);
+  };
   const saveNotesFromObject = state => {
     saveNotes(state);
     queueNoteBootCache(state);
-    emit('chengmo:notes-state-updated');
+    scheduleNotesStateUpdated();
+    // The React shell uses this truthy result to avoid synchronously writing
+    // its complete note library to localStorage after every input event.
+    return true;
   };
   const flushAnnotations = async () => {
     if (annotationFlushPromise) return annotationFlushPromise;
@@ -564,7 +577,7 @@
         latestNotesState = state && typeof state === 'object' ? state : null;
         notesRevision += 1;
         queueBootCache(key, value);
-        emit('chengmo:notes-state-updated');
+        scheduleNotesStateUpdated();
         return;
       }
       if (key === KEYS.annotations) {

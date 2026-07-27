@@ -29,7 +29,7 @@
   let cachedItems = null;
   let renderFrame = 0;
   let lastRoot = null;
-  let lastSourceText = '';
+  let lastSourceText = null;
   let renderedSignature = '';
   let annotationsByNote = null;
   let annotationsById = null;
@@ -90,7 +90,7 @@
     range.setEnd(container, offset);
     return range.toString().length;
   };
-  const rootText = root => root === lastRoot ? lastSourceText : (root?.textContent || '');
+  const rootText = root => root === lastRoot && lastSourceText !== null ? lastSourceText : (root?.textContent || '');
   const makeAnchor = (root, start, end) => {
     const text = rootText(root);
     return {
@@ -191,9 +191,18 @@
     const root = readerContent();
     if (!root) return;
     const noteId = currentNoteId();
+    const noteItems = noteAnnotations(noteId);
+    // Most notes are unannotated. Do not read a long article's text or attach
+    // a subtree observer unless there is annotation work to keep in sync.
+    if (!noteItems.length) {
+      observer?.disconnect(); observer = null; observedRoot = null;
+      if (root.querySelector('mark.selection-annotation')) clearMarks(root);
+      lastRoot = root; lastSourceText = null;
+      renderedSignature = `${noteId}\u0000`;
+      return;
+    }
     const allItems = read();
     const currentText = root.textContent || '';
-    const noteItems = noteAnnotations(noteId);
     const signature = `${noteId}\u0000${currentText}\u0000${noteItems.map(item => `${item.id}:${item.start}:${item.end}:${item.color}:${item.kind}`).join('|')}`;
     // React can announce a UI mount without replacing the article. Avoid tearing
     // down every mark when both the text and its visual annotation state match.
@@ -542,6 +551,9 @@
   // follows marks even when the reader component swaps its scroll container.
   let scrollPositionFrame = 0;
   document.addEventListener('scroll', () => {
+    // A closed annotation menu has no geometry to follow. Avoid scheduling a
+    // frame for every reader scroll in the normal reading state.
+    if (!menu?.dataset.annotationId) return;
     if (scrollPositionFrame) return;
     scrollPositionFrame = window.requestAnimationFrame(() => {
       scrollPositionFrame = 0;

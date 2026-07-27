@@ -610,17 +610,17 @@ body,
 }
 
 /* A genuinely empty note receives an intentional, text-only resting state. */
-.reader-body > div:has(> h1:only-child) {
+.reader-body > div.is-empty-note {
   width: min(100% - 64px, 520px);
   margin: 17vh auto 0 !important;
   padding: 0 !important;
   text-align: center;
 }
-.reader-body > div > h1:only-child {
+.reader-body > div.is-empty-note > h1:only-child {
   margin: 0 !important;
   font-size: 30px;
 }
-.reader-body > div > h1:only-child::after {
+.reader-body > div.is-empty-note > h1:only-child::after {
   margin-top: 15px;
   color: #81929c;
   font-size: 13.5px;
@@ -629,14 +629,14 @@ body,
 
 /* Imported notes sometimes begin with a divider instead of a title. Let the
    first real section begin at the reading origin, without stacked blank gaps. */
-.reader-body > div:not(.drawing-layer):not(:has(> h1:only-child)) {
+.reader-body > div:not(.drawing-layer):not(.is-empty-note) {
   display: flow-root;
   padding-top: 28px !important;
 }
-.reader-body > div:not(:has(> h1:only-child)) > hr:first-child {
+.reader-body > div:not(.is-empty-note) > hr:first-child {
   display: none;
 }
-.reader-body > div:not(:has(> h1:only-child)) > hr:first-child + h2 {
+.reader-body > div:not(.is-empty-note) > hr:first-child + h2 {
   margin-top: 0 !important;
 }
 
@@ -892,7 +892,7 @@ mark.selection-annotation--underline {
   font-size: 16.5px;
   line-height: 1.92;
 }
-.reader-body > div:not(.drawing-layer):not(:has(> h1:only-child)) {
+.reader-body > div:not(.drawing-layer):not(.is-empty-note) {
   max-width: 860px;
   padding-bottom: 96px !important;
 }
@@ -2054,5 +2054,19 @@ html .reader-header .data-tools__actions button {
   .library.mobile-active .recent-notes__title {
     min-height: 34px;
     margin-bottom: 12px;
+  }
+}
+
+/* Long note collections do not need layout or paint work until their rows
+   enter the scroll viewport. Reserve a stable row height to prevent jumping. */
+.note-index-scroll > .compact-note {
+  content-visibility: auto;
+  contain-intrinsic-size: 48px;
+}
+
+@media (max-width: 760px) {
+  .library.mobile-active .mobile-course-note {
+    content-visibility: auto;
+    contain-intrinsic-size: 42px;
   }
 }

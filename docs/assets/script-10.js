@@ -97,11 +97,17 @@
     if (!noteId || !(state.notes || []).some(note => note.id === noteId)) return;
     localStorage.setItem(readingSessionKey, JSON.stringify({ noteId, courseId: activeCourseId(state), listOpen: document.querySelector('.app-shell')?.classList.contains('note-list-open') === true }));
   };
-  const visibleNotes = (state, courseId, query) => (state.notes || []).filter(note => {
-    const tags = Array.isArray(note.tags) ? note.tags : [];
-    const haystack = `${note.title || ''} ${note.content || ''} ${tags.join(' ')}`.toLowerCase();
-    return (query ? true : note.courseId === courseId) && haystack.includes(query);
-  });
+  const visibleNotes = (state, courseId, query) => {
+    const normalizedQuery = String(query || '').trim().toLowerCase();
+    // Opening a category never needs to inspect every long Markdown body.
+    // Full-text work is reserved for an actual search query.
+    if (!normalizedQuery) return (state.notes || []).filter(note => note.courseId === courseId);
+    return (state.notes || []).filter(note => {
+      const tags = Array.isArray(note.tags) ? note.tags : [];
+      const haystack = `${note.title || ''} ${note.content || ''} ${tags.join(' ')}`.toLowerCase();
+      return haystack.includes(normalizedQuery);
+    });
+  };
   let mobileInlineCourseId = '';
   let suppressMobileCourseToggle = false;
   const mobileLibraryIsActive = () => window.matchMedia('(max-width: 760px)').matches && document.querySelector('.library')?.classList.contains('mobile-active');
@@ -136,7 +142,9 @@
     const selectedId = document.querySelector('.compact-note.selected')?.dataset.noteId || '';
     // Most UI lifecycle events do not alter this category. Keep its existing
     // mobile list and only refresh the selected marker in that common case.
-    const signature = JSON.stringify(notes.map(note => [note.id, note.title || '', note.updatedAt || '', Array.isArray(note.tags) ? note.tags : []]));
+    // `updatedAt` changes for each keystroke but is not shown in this list.
+    // Excluding it prevents a full mobile-list rebuild while editing body text.
+    const signature = JSON.stringify(notes.map(note => [note.id, note.title || '', Array.isArray(note.tags) ? note.tags.slice(0, 2) : []]));
     if (list.dataset.renderSignature === signature) {
       syncMobileInlineSelection(list, selectedId);
       return;
@@ -457,7 +465,12 @@
     };
     listen('chengmo:ui-mounted', 'note-controls-ui', () => { watchHost(); sync(); });
     listen('chengmo:note-created', 'note-controls-created', event => { pendingCreatedNoteId = event.detail?.id || ''; sync(); });
-    listen('chengmo:notes-state-updated', 'note-controls-state', () => { stateCache.raw = undefined; sync(); });
+    listen('chengmo:notes-state-updated', 'note-controls-state', () => {
+      stateCache.raw = undefined;
+      // Desktop controls are already attached and React updates their labels.
+      // Only an open mobile inline category needs a data-driven refresh here.
+      if (mobileLibraryIsActive() && mobileInlineCourseId) sync();
+    });
     window.addEventListener('storage', event => {
       if (event.key === stateKey) stateCache.raw = undefined;
       if ([annotationKey, recentKey, drawingKey].includes(event.key)) valueCache.delete(event.key);

@@ -5,6 +5,7 @@
     
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="theme-color" content="#f8f7f3">
+    <link rel="manifest" href="./manifest.webmanifest">
     <script>
       (() => {
         try {
@@ -15,11 +16,12 @@
       })();
     </script>
     <script src="./assets/script-1.js?v=runtime-cross-feature-20260726"></script>
-    <script src="./assets/storage-bridge.js?v=notes-batching-20260726"></script>
+<script src="./assets/storage-bridge.js?v=async-editor-save-20260727"></script>
     <style>html.chengmo-restoring-session .reader { visibility: hidden; }</style>
     <title>AzureSora · Skyward Notes</title>
-    <script type="module" crossorigin="" src="./assets/script-2.js?v=category-scroll-20260725"></script>
-    <link rel="stylesheet" href="./assets/style-1.css">
+    <script type="module" crossorigin="" src="./assets/script-2.js?v=editor-save-status-20260727"></script>
+    <link rel="stylesheet" href="./assets/style-1.css?v=font-lazy-20260727">
+    <link rel="stylesheet" href="./assets/katex-fonts.css?v=20260727" media="print" onload="this.media='all'">
   </head>
   <body>
     <div id="root"><main class="app-shell reading-shell  "><aside class="sidebar library panel "><button class="sidebar-toggle" aria-label="收起资料库">‹</button><div class="library-content"><div class="brand"><span class="brand-mark">·</span><span>AzureSora</span><small>向着晴空，写下新的序章。</small></div><button class="new-note"><span>＋</span> New Note</button><section class="course-section"><div class="section-title"><span>笔记分类</span><button class="category-add">＋ 新建</button></div><div class="course-group"><button class="course-button active"><i style="background: rgb(145, 168, 194);"></i>工作与项目</button><button class="category-edit" aria-label="修改 工作与项目">编辑</button></div><div class="course-group"><button class="course-button "><i style="background: rgb(188, 155, 132);"></i>阅读与学习</button><button class="category-edit" aria-label="修改 阅读与学习">编辑</button></div><div class="course-group"><button class="course-button "><i style="background: rgb(146, 168, 149);"></i>生活灵感</button><button class="category-edit" aria-label="修改 生活灵感">编辑</button></div></section><p class="storage-note">离线保存于此浏览器</p></div></aside><aside class="note-list panel" aria-hidden="true"><div class="note-list-header"><div><p>笔记列表</p><strong>工作与项目</strong></div><button class="new-note compact">＋</button></div><label class="search"><span>⌕</span><input placeholder="搜索当前分类笔记" aria-label="搜索笔记" value=""></label><div class="note-index-scroll"><button class="compact-note "><span class="note-dot">·</span><div><strong>未命名笔记</strong><small>未添加标签</small></div></button><button class="compact-note "><span class="note-dot">·</span><div><strong>未命名笔记</strong><small>未添加标签</small></div></button><button class="compact-note "><span class="note-dot">·</span><div><strong>未命名笔记</strong><small>未添加标签</small></div></button><button class="compact-note "><span class="note-dot">·</span><div><strong>未命名笔记</strong><small>未添加标签</small></div></button><button class="compact-note "><span class="note-dot">·</span><div><strong>未命名笔记</strong><small>未添加标签</small></div></button><button class="compact-note "><span class="note-dot">·</span><div><strong>未命名笔记</strong><small>未添加标签</small></div></button><button class="compact-note "><span class="note-dot">·</span><div><strong>未命名笔记</strong><small>未添加标签</small></div></button><button class="compact-note selected"><span class="note-dot">·</span><div><strong>电磁场笔记1</strong><small>未添加标签</small></div></button><button class="compact-note "><span class="note-dot">·</span><div><strong>未命名笔记</strong><small>未添加标签</small></div></button><button class="compact-note "><span class="note-dot">·</span><div><strong>未命名笔记</strong><small>未添加标签</small></div></button><button class="compact-note "><span class="note-dot">·</span><div><strong>未命名笔记</strong><small>未添加标签</small></div></button><button class="compact-note "><span class="note-dot">·</span><div><strong>未命名笔记</strong><small>未添加标签</small></div></button><button class="compact-note "><span class="note-dot">·</span><div><strong>4</strong><small>#电磁场</small></div></button><button class="compact-note "><span class="note-dot">·</span><div><strong>1</strong><small>未添加标签</small></div></button><button class="compact-note "><span class="note-dot">·</span><div><strong>电磁场笔记2</strong><small>未添加标签</small></div></button><button class="compact-note "><span class="note-dot">·</span><div><strong>3</strong><small>未添加标签</small></div></button><button class="compact-note "><span class="note-dot">·</span><div><strong>欢迎来到澄墨</strong><small>#开始使用  #知识库</small></div></button></div></aside><section class="reader panel  mobile-active"><header class="reader-header"><button class="annotation-shelf-toggle" type="button" title="Show annotations" aria-label="Show annotations"><span></span></button><div class="crumb">工作与项目</div><div class="reader-actions"><span class="saved">已保存</span><button class="complete">标为已读</button><button class="annotate" aria-pressed="false">✎ 标注</button><button class="outline-header-toggle" aria-label="收起本文目录">›</button><button class="edit-switch">编辑</button></div></header><div class="progress-track"><i style="width: 0%;"></i></div><div class="reading-layout "><article class="markdown reader-body"><div><h1 id="新笔记">新笔记</h1>
@@ -30,28 +32,16 @@
   
 
 <link rel="stylesheet" href="./assets/style-2.css?v=annotation-underline-20260726">
-<script src="./assets/script-3.js?v=instant-stroke-delete-20260726"></script>
-<script src="./assets/script-4.js?v=mobile-text-annotation-menu-20260726"></script>
 <link rel="stylesheet" href="./assets/style-3.css?v=annotation-toolbar-toggle-20260726">
-<script src="./assets/script-5.js?v=zotero-annotation-colors-20260726"></script>
 
 <link rel="stylesheet" href="./assets/style-4.css">
 <link rel="stylesheet" href="./assets/style-5.css">
-<script src="./assets/script-6.js"></script>
-<script src="./assets/script-7.js?v=recent-reading-runtime-20260726"></script>
 <link rel="stylesheet" href="./assets/style-6.css">
-<script src="./assets/script-8.js?v=reader-title-runtime-20260726"></script>
-<script src="./assets/script-9.js?v=search-runtime-20260726"></script>
 <link rel="stylesheet" href="./assets/style-7.css">
-  <script src="./assets/script-10.js?v=mobile-note-delete-20260726"></script>
-<script src="./assets/script-11.js"></script>
 <link rel="stylesheet" href="./assets/style-8.css">
-<script src="./assets/script-12.js?v=backup-icons-20260726"></script>
-<script src="./assets/script-13.js?v=reader-ux-20260725"></script>
-<script src="./assets/script-14.js?v=reader-content-runtime-20260726"></script>
-<script src="./assets/script-15.js?v=runtime-coordination-20260726"></script>
-<script src="./assets/script-16.js?v=library-toggle-state-runtime-20260726"></script>
 <link rel="stylesheet" href="./assets/style-9.css?v=quiet-interactions-20260725">
 <link rel="stylesheet" href="./assets/brand-layout.css?v=20260725-final">
-<link rel="stylesheet" href="./assets/azure-theme.css?v=mobile-library-alignment-20260726">
+<link rel="stylesheet" href="./assets/azure-theme.css?v=reader-state-20260727">
+<script src="./assets/enhancements-loader.js?v=reader-state-20260727"></script>
+<script src="./assets/offline-runtime.js?v=offline-cache-20260727"></script>
 </body></html>

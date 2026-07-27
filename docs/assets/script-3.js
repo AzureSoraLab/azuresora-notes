@@ -239,6 +239,9 @@
   };
   const scheduleRedraw = () => {
     if (!canvas || pendingNoteSwitchId) return;
+    // Hidden ink is not composited. Ignore reader scrolling until the user
+    // explicitly reveals ink or begins an interaction.
+    if (!state.inkVisible && !activeStroke && selectionDelete?.hidden !== false) return;
     if (redrawFrame) return;
     redrawFrame = requestAnimationFrame(() => { redrawFrame = 0; redraw(); });
   };

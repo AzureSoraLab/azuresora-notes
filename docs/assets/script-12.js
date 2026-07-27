@@ -15,6 +15,20 @@
   const parse = key => { try { return JSON.parse(localStorage.getItem(key) || (key === notesKey ? '{}' : '[]')); } catch { return key === notesKey ? {} : []; } };
   const makeArray = value => Array.isArray(value) ? value : [];
   const makeRecord = value => value && typeof value === 'object' && !Array.isArray(value) ? value : {};
+  const buildBackupPayload = async () => {
+    await window.chengmoStorage?.flush?.().catch(() => {});
+    const indexedDrawings = await window.chengmoStorage?.getAllDrawings?.().catch(() => null);
+    return {
+      version: 2,
+      exportedAt: new Date().toISOString(),
+      notes: parse(notesKey),
+      annotations: makeArray(parse(annotationsKey)),
+      drawings: indexedDrawings && Object.keys(indexedDrawings).length ? indexedDrawings : makeRecord(parse(drawingsKey)),
+      drawingPreferences: makeRecord(parse(drawingPreferencesKey)),
+      recent: makeArray(parse(recentKey))
+    };
+  };
+  window.chengmoBuildBackupPayload = buildBackupPayload;
   const createTools = () => {
     const header = document.querySelector('.reader-header');
     const actionBar = header?.querySelector('.reader-actions');
@@ -24,6 +38,7 @@
     const toolActions = document.createElement('div'); toolActions.className = 'data-tools__actions';
     const exportButton = document.createElement('button'); exportButton.type = 'button'; exportButton.className = 'data-tools__icon-button'; exportButton.innerHTML = backupIcons.export; exportButton.title = '\u5bfc\u51fa\u5907\u4efd'; exportButton.setAttribute('aria-label', '\u5bfc\u51fa\u5907\u4efd');
     const importButton = document.createElement('button'); importButton.type = 'button'; importButton.className = 'data-tools__icon-button'; importButton.innerHTML = backupIcons.import; importButton.title = '\u5bfc\u5165\u5907\u4efd'; importButton.setAttribute('aria-label', '\u5bfc\u5165\u5907\u4efd');
+    const localButton = document.createElement('button'); localButton.type = 'button'; localButton.className = 'data-tools__icon-button data-tools__local-backup'; localButton.textContent = '\u672c\u5730\u4fdd\u5b58'; localButton.title = '\u9009\u62e9\u672c\u5730\u6587\u4ef6\u5939\u5e76\u4fdd\u5b58\u5907\u4efd'; localButton.setAttribute('aria-label', '\u9009\u62e9\u672c\u5730\u6587\u4ef6\u5939\u5e76\u4fdd\u5b58\u5907\u4efd');
     const file = document.createElement('input'); file.type = 'file'; file.accept = 'application/json,.json'; file.hidden = true;
     const notice = document.createElement('p'); notice.className = 'data-tools__notice'; notice.textContent = '\u5907\u4efd\u4ec5\u4fdd\u5b58\u5728\u6b64\u6d4f\u89c8\u5668\u4e2d';
     const show = (message, error = false) => { notice.textContent = message; notice.classList.toggle('is-error', error); window.chengmoNotice?.(message); };
@@ -31,13 +46,25 @@
       // IndexedDB may contain newer ink than the legacy boot cache. Prefer it
       // for backups while retaining the cache as an offline fallback.
       // Complete deferred ink writes so a just-finished stroke is included.
-      await window.chengmoStorage?.flush?.().catch(() => {});
-      const indexedDrawings = await window.chengmoStorage?.getAllDrawings?.().catch(() => null);
-      const payload = { version: 2, exportedAt: new Date().toISOString(), notes: parse(notesKey), annotations: makeArray(parse(annotationsKey)), drawings: indexedDrawings && Object.keys(indexedDrawings).length ? indexedDrawings : makeRecord(parse(drawingsKey)), drawingPreferences: makeRecord(parse(drawingPreferencesKey)), recent: makeArray(parse(recentKey)) };
+      const payload = await buildBackupPayload();
       const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json;charset=utf-8' });
       const link = document.createElement('a'); link.href = URL.createObjectURL(blob);
       const stamp = new Date().toISOString().slice(0, 10); link.download = `\u6f84\u58a8\u5907\u4efd-${stamp}.json`; link.click(); URL.revokeObjectURL(link.href);
       show('\u5907\u4efd\u5df2\u5bfc\u51fa\uff0c\u8bf7\u59a5\u5584\u4fdd\u5b58\u6587\u4ef6\u3002');
+    });
+    localButton.addEventListener('click', async () => {
+      const localBackup = window.chengmoLocalBackup;
+      if (!localBackup?.supported?.()) {
+        show('\u5f53\u524d\u6d4f\u89c8\u5668\u4e0d\u652f\u6301\u9009\u62e9\u672c\u5730\u6587\u4ef6\u5939\uff0c\u8bf7\u4f7f\u7528\u5bfc\u51fa\u5907\u4efd\u3002');
+        return;
+      }
+      try {
+        const payload = await buildBackupPayload();
+        const result = await localBackup.chooseDirectory(payload);
+        if (result.ok) show(`\u5df2\u4fdd\u5b58\u5230\u9009\u5b9a\u6587\u4ef6\u5939\uff1a${result.fileName}`);
+      } catch (error) {
+        if (error?.name !== 'AbortError') show('\u65e0\u6cd5\u4fdd\u5b58\u5230\u672c\u5730\u6587\u4ef6\u5939\uff0c\u8bf7\u91cd\u65b0\u9009\u62e9\u3002', true);
+      }
     });
     importButton.addEventListener('click', () => file.click());
     file.addEventListener('change', () => {
@@ -98,7 +125,8 @@
       };
       reader.readAsText(source, 'utf-8');
     });
-    toolActions.append(exportButton, importButton); section.append(title, toolActions, file, notice);
+    if (!window.chengmoLocalBackup?.supported?.()) localButton.hidden = true;
+    toolActions.append(exportButton, importButton, localButton); section.append(title, toolActions, file, notice);
     actionBar.before(section);
   };
   const start = () => {
