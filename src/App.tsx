@@ -91,16 +91,27 @@ export default function App() {
   const [editing, setEditing] = useState(false)
   const [query, setQuery] = useState('')
   const [menu, setMenu] = useState<SelectionMenu | null>(null)
-  const [annotationKind, setAnnotationKind] = useState<Annotation['kind']>('highlight')
-  const readerRef = useRef<HTMLElement>(null)
-  const note = store.notes.find(item => item.id === noteId)
-  const category = store.categories.find(item => item.id === categoryId)
-  const notes = store.notes.filter(item => item.categoryId === categoryId && `${item.title} ${item.content}`.toLowerCase().includes(query.toLowerCase()))
-  const outline = useMemo(() => note ? headings(note.content) : [], [note?.content])
-  const rendered = useMemo(() => note ? renderMarkdown(note.content, note.annotations || []) : '', [note?.content, note?.annotations])
+ const [annotationKind, setAnnotationKind] = useState<Annotation['kind']>('highlight')
+ const readerRef = useRef<HTMLElement>(null)
+  const saveTimerRef = useRef<number | undefined>(undefined)
+ const note = store.notes.find(item => item.id === noteId)
+ const category = store.categories.find(item => item.id === categoryId)
+ const notes = store.notes.filter(item => item.categoryId === categoryId && `${item.title} ${item.content}`.toLowerCase().includes(query.toLowerCase()))
+ const outline = useMemo(() => note ? headings(note.content) : [], [note?.content])
+  const rendered = useMemo(() => {
+    if (editing || !note) return ''
+    return renderMarkdown(note.content, note.annotations || [])
+  }, [note?.content, note?.annotations, editing])
 
-  useEffect(() => localStorage.setItem(storageKey, JSON.stringify(store)), [store])
-  function patch(changes: Partial<Note>) {
+  useEffect(() => {
+    const timer = saveTimerRef.current
+    if (timer) clearTimeout(timer)
+    saveTimerRef.current = window.setTimeout(() => {
+      localStorage.setItem(storageKey, JSON.stringify(store))
+    }, 500)
+    return () => { if (saveTimerRef.current) clearTimeout(saveTimerRef.current) }
+  }, [store])
+ function patch(changes: Partial<Note>) {
     if (!note) return
     setStore(value => ({ ...value, notes: value.notes.map(item => item.id === note.id ? { ...item, ...changes, updatedAt: new Date().toISOString() } : item) }))
   }
