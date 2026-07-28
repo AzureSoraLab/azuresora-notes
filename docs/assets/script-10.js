@@ -289,6 +289,34 @@
       return false;
     }
   };
+  const reactDeleteState = ({ nextState, nextId, courseId, listOpen }) => {
+    // The published shell predates an exported deletion callback. Resolve the
+    // state hooks from its mounted component so we can update the React view
+    // together with storage rather than forcing a full-page reload.
+    const host = document.getElementById('root');
+    const containerKey = host && Object.keys(host).find(key => key.startsWith('__reactContainer$'));
+    const root = containerKey && host[containerKey]?.current;
+    if (!root) return false;
+    const stack = [root];
+    while (stack.length) {
+      const fiber = stack.pop();
+      const hooks = [];
+      for (let hook = fiber?.memoizedState; hook; hook = hook.next) hooks.push(hook);
+      const storeIndex = hooks.findIndex(hook => Array.isArray(hook?.memoizedState?.notes) && Array.isArray(hook?.memoizedState?.courses) && typeof hook?.queue?.dispatch === 'function');
+      if (storeIndex >= 0) {
+        const store = hooks[storeIndex]; const selected = hooks[storeIndex + 1]; const activeCourse = hooks[storeIndex + 2]; const list = hooks[storeIndex + 3];
+        if (typeof selected?.queue?.dispatch !== 'function' || typeof activeCourse?.queue?.dispatch !== 'function' || typeof list?.queue?.dispatch !== 'function') return false;
+        store.queue.dispatch(nextState);
+        selected.queue.dispatch(nextId || '');
+        activeCourse.queue.dispatch(courseId || '');
+        list.queue.dispatch(Boolean(listOpen));
+        return true;
+      }
+      if (fiber?.sibling) stack.push(fiber.sibling);
+      if (fiber?.child) stack.push(fiber.child);
+    }
+    return false;
+  };
   const prepareCourseDeletion = (state, courseId) => {
     const courses = Array.isArray(state.courses) ? state.courses : [];
     const course = courses.find(item => item?.id === courseId);
@@ -317,7 +345,6 @@
     const related = [deletion.annotationCount && `${deletion.annotationCount} \u6761\u6587\u672c\u6807\u6ce8`, deletion.drawingCount && `${deletion.drawingCount} \u6761\u7ed8\u56fe\u7b14\u8ff9`].filter(Boolean).join('\u3001');
     const relatedHint = related ? `\n\n\u540c\u65f6\u4f1a\u5220\u9664\uff1a${related}\u3002` : '';
     if (!confirm(`\u786e\u5b9a\u5220\u9664\u300c${noteTitle(deletion.target)}\u300d\uff1f${relatedHint}`)) return;
-    if (!confirm('\u8bf7\u518d\u6b21\u786e\u8ba4\uff1a\u5220\u9664\u540e\u65e0\u6cd5\u64a4\u9500\u3002')) return;
     const listContext = noteListContext();
     const buttons = courseButtons(); const context = courseContext(state, buttons);
     applyDeleteControls(state, listContext.cards, buttons, context, listContext.searchInput?.value?.toLowerCase() || '');
@@ -332,12 +359,24 @@
     const courseId = mobile ? deletion.target.courseId : (activeCourseId(state, buttons, context) || deletion.target.courseId || '');
     const query = listContext.searchInput?.value || '';
     if (!writeDeletion({ deletion, nextId, courseId, listOpen: !mobile })) { alert('\u5220\u9664\u5931\u8d25\uff0c\u8bf7\u68c0\u67e5\u6d4f\u89c8\u5668\u7684\u672c\u5730\u5b58\u50a8\u7a7a\u95f4\u540e\u91cd\u8bd5\u3002'); return; }
-    // Mobile has no separate note-list panel. Restore the expanded category
-    // after reload so deletion keeps the user in the same mobile context.
+    const uiUpdated = reactDeleteState({ nextState: deletion.nextState, nextId, courseId, listOpen: !mobile });
+    // Finish IndexedDB writes in the background. The synchronous boot cache
+    // and React state are already updated, so waiting here only made deletion
+    // feel like a page transition.
+    window.chengmoStorage?.flush?.().catch(() => {});
+    if (uiUpdated) {
+      window.chengmoNotice?.(`\u5df2\u5220\u9664\u300c${noteTitle(deletion.target)}\u300d\u3002`);
+      window.requestAnimationFrame(() => {
+        emit('chengmo:notes-state-updated', { source: 'note-delete' });
+        emit('chengmo:note-selected', { source: 'note-delete' });
+      });
+      return;
+    }
+    // Mobile has no separate note-list panel. Keep the previous, reliable
+    // reload path only for an unknown future React runtime.
     if (mobile) sessionStorage.setItem(mobileInlineRestoreKey, JSON.stringify({ courseId, noteId: nextId }));
     else sessionStorage.setItem(keepListOpenKey, JSON.stringify({ courseId, nextId, query }));
     sessionStorage.setItem('chengmo-pending-notice', JSON.stringify({ message: `\u5df2\u5220\u9664\u300c${noteTitle(deletion.target)}\u300d\u3002` }));
-    try { await window.chengmoStorage?.flush?.(); } catch {}
     window.location.reload();
   };
   const start = () => {

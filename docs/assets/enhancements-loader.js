@@ -7,7 +7,7 @@
     './assets/script-7.js?v=recent-reading-runtime-20260726',
     './assets/script-8.js?v=reader-title-runtime-20260726',
     './assets/script-9.js?v=search-runtime-20260726',
-    './assets/script-10.js?v=mobile-note-delete-20260728',
+    './assets/script-10.js?v=instant-react-note-delete-20260728-2',
     './assets/script-11.js',
     './assets/script-13.js?v=reader-ux-20260725',
     './assets/script-14.js?v=reader-geometry-runtime-20260727',

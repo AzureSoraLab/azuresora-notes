@@ -41,6 +41,7 @@
   let noteStateCache = null;
   let latestNotesState = null;
   let protectedNoteIds = null;
+  let protectedNotesUntil = 0;
   let notesRevision = 0;
   let drawingStateCache = null;
   let drawingBootCacheDirty = false;
@@ -273,7 +274,12 @@
     // A library action can replace the store immediately before reload. React's
     // pagehide cleanup still holds the pre-action state, so do not let it put
     // deleted notes back into the pending persistence queue.
-    if (protectedNoteIds && Array.isArray(state?.notes) && state.notes.some(note => note?.id && !protectedNoteIds.has(note.id))) return true;
+    if (protectedNoteIds && Array.isArray(state?.notes)) {
+      if (Date.now() < protectedNotesUntil && state.notes.some(note => note?.id && !protectedNoteIds.has(note.id))) return true;
+      // The React view has now accepted the replacement, so future creates
+      // and imports must be saved normally without a page reload.
+      protectedNoteIds = null; protectedNotesUntil = 0;
+    }
     saveNotes(state);
     queueNoteBootCache(state);
     scheduleNotesStateUpdated();
@@ -284,6 +290,7 @@
   const replaceNotesState = state => {
     if (!state || typeof state !== 'object' || !Array.isArray(state.notes)) return false;
     protectedNoteIds = new Set(state.notes.map(note => note?.id).filter(Boolean));
+    protectedNotesUntil = Date.now() + 1200;
     pendingNotesState = state;
     latestNotesState = state;
     notesRevision += 1;
