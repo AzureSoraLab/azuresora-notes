@@ -7,7 +7,7 @@
     './assets/script-7.js?v=recent-reading-runtime-20260726',
     './assets/script-8.js?v=reader-title-runtime-20260726',
     './assets/script-9.js?v=search-runtime-20260726',
-    './assets/script-10.js?v=mobile-note-delete-20260726',
+    './assets/script-10.js?v=mobile-note-delete-20260728',
     './assets/script-11.js',
     './assets/script-13.js?v=reader-ux-20260725',
     './assets/script-14.js?v=reader-geometry-runtime-20260727',
@@ -15,8 +15,8 @@
   ];
   const optionalSources = [
     './assets/script-5.js?v=zotero-annotation-colors-20260726',
-    './assets/local-file-backup.js?v=20260727',
-    './assets/script-12.js?v=backup-icons-20260726',
+    './assets/local-file-backup.js?v=local-auto-backup-20260728',
+    './assets/script-12.js?v=local-auto-backup-20260728',
     './assets/script-15.js?v=runtime-coordination-20260726'
   ];
   let coreStarted = false;

@@ -4,6 +4,7 @@
   const STORE = 'settings';
   const KEY = 'directory';
   const FILE_NAME = 'azuresora-notes-backup.json';
+  const AUTO_BACKUP_INTERVAL = 20 * 60 * 1000;
   let directoryHandle = null;
   let savePromise = Promise.resolve();
   const supported = () => typeof window.showDirectoryPicker === 'function';
@@ -76,6 +77,10 @@
     await writeHandle(directoryHandle);
     return save(payload, true);
   };
-  window.chengmoLocalBackup = { supported, chooseDirectory, save, clearDirectory: removeHandle, fileName: FILE_NAME };
+  // Automatic saves never request permission, so they cannot interrupt a
+  // reading session. They begin working as soon as the user has chosen a
+  // writable folder once.
+  window.setInterval(() => { save().catch(() => {}); }, AUTO_BACKUP_INTERVAL);
+  window.chengmoLocalBackup = { supported, chooseDirectory, save, clearDirectory: removeHandle, fileName: FILE_NAME, autoBackupInterval: AUTO_BACKUP_INTERVAL };
   readHandle().then(handle => { directoryHandle = handle; });
 })();

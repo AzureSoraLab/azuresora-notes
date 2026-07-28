@@ -40,6 +40,7 @@
   const bootCache = new Map();
   let noteStateCache = null;
   let latestNotesState = null;
+  let protectedNoteIds = null;
   let notesRevision = 0;
   let drawingStateCache = null;
   let drawingBootCacheDirty = false;
@@ -268,11 +269,25 @@
     }, 280);
   };
   const saveNotesFromObject = state => {
+    // A library action can replace the store immediately before reload. React's
+    // pagehide cleanup still holds the pre-action state, so do not let it put
+    // deleted notes back into the pending persistence queue.
+    if (protectedNoteIds && Array.isArray(state?.notes) && state.notes.some(note => note?.id && !protectedNoteIds.has(note.id))) return true;
     saveNotes(state);
     queueNoteBootCache(state);
     scheduleNotesStateUpdated();
     // The React shell uses this truthy result to avoid synchronously writing
     // its complete note library to localStorage after every input event.
+    return true;
+  };
+  const replaceNotesState = state => {
+    if (!state || typeof state !== 'object' || !Array.isArray(state.notes)) return false;
+    protectedNoteIds = new Set(state.notes.map(note => note?.id).filter(Boolean));
+    pendingNotesState = state;
+    latestNotesState = state;
+    notesRevision += 1;
+    queueNoteBootCache(state);
+    saveNotes(state, true);
     return true;
   };
   const flushAnnotations = async () => {
@@ -614,7 +629,7 @@
   document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') flush().catch(() => {}); }, { capture: true });
   window.addEventListener('pagehide', () => { flush().catch(() => {}); }, { capture: true });
   const peekNotes = () => noteStateCache || latestNotesState || readJson(KEYS.notes, {});
-  window.chengmoStorage = { database, saveNotes: saveNotesFromObject, queueNoteBootCache, peekNotes, saveDrawing, persistDrawingSnapshot, getDrawingRecovery, queueDrawing, removeDrawing, getDrawing, getAllDrawings, replaceSnapshot, flush, unpackStroke, packStroke, version: 2 };
+  window.chengmoStorage = { database, saveNotes: saveNotesFromObject, replaceNotesState, queueNoteBootCache, peekNotes, saveDrawing, persistDrawingSnapshot, getDrawingRecovery, queueDrawing, removeDrawing, getDrawing, getAllDrawings, replaceSnapshot, flush, unpackStroke, packStroke, version: 2 };
   document.documentElement.dataset.chengmoPersistence = 'loading';
   window.chengmoStorageReady = database()
     .then(migrate)

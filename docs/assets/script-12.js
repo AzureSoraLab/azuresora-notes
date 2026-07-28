@@ -38,7 +38,7 @@
     const toolActions = document.createElement('div'); toolActions.className = 'data-tools__actions';
     const exportButton = document.createElement('button'); exportButton.type = 'button'; exportButton.className = 'data-tools__icon-button'; exportButton.innerHTML = backupIcons.export; exportButton.title = '\u5bfc\u51fa\u5907\u4efd'; exportButton.setAttribute('aria-label', '\u5bfc\u51fa\u5907\u4efd');
     const importButton = document.createElement('button'); importButton.type = 'button'; importButton.className = 'data-tools__icon-button'; importButton.innerHTML = backupIcons.import; importButton.title = '\u5bfc\u5165\u5907\u4efd'; importButton.setAttribute('aria-label', '\u5bfc\u5165\u5907\u4efd');
-    const localButton = document.createElement('button'); localButton.type = 'button'; localButton.className = 'data-tools__icon-button data-tools__local-backup'; localButton.textContent = '\u672c\u5730\u4fdd\u5b58'; localButton.title = '\u9009\u62e9\u672c\u5730\u6587\u4ef6\u5939\u5e76\u4fdd\u5b58\u5907\u4efd'; localButton.setAttribute('aria-label', '\u9009\u62e9\u672c\u5730\u6587\u4ef6\u5939\u5e76\u4fdd\u5b58\u5907\u4efd');
+    const localButton = document.createElement('button'); localButton.type = 'button'; localButton.className = 'data-tools__icon-button data-tools__local-backup'; localButton.textContent = '\u672c\u5730\u4fdd\u5b58'; localButton.title = '\u9996\u6b21\u9009\u62e9\u6587\u4ef6\u5939\uff0c\u4e4b\u540e\u76f4\u63a5\u4fdd\u5b58\uff1b\u6bcf 20 \u5206\u949f\u81ea\u52a8\u5907\u4efd'; localButton.setAttribute('aria-label', '\u672c\u5730\u4fdd\u5b58\uff0c\u6bcf 20 \u5206\u949f\u81ea\u52a8\u5907\u4efd');
     const file = document.createElement('input'); file.type = 'file'; file.accept = 'application/json,.json'; file.hidden = true;
     const notice = document.createElement('p'); notice.className = 'data-tools__notice'; notice.textContent = '\u5907\u4efd\u4ec5\u4fdd\u5b58\u5728\u6b64\u6d4f\u89c8\u5668\u4e2d';
     const show = (message, error = false) => { notice.textContent = message; notice.classList.toggle('is-error', error); window.chengmoNotice?.(message); };
@@ -60,8 +60,12 @@
       }
       try {
         const payload = await buildBackupPayload();
-        const result = await localBackup.chooseDirectory(payload);
-        if (result.ok) show(`\u5df2\u4fdd\u5b58\u5230\u9009\u5b9a\u6587\u4ef6\u5939\uff1a${result.fileName}`);
+        // Reuse the persisted folder handle when it remains authorized. The
+        // picker is only needed for the first save or after access is revoked.
+        let result = await localBackup.save(payload, true);
+        if (result.reason === 'missing') result = await localBackup.chooseDirectory(payload);
+        if (result.ok) show(`\u5df2\u4fdd\u5b58\u5230\u672c\u5730\uff1a${result.fileName}\uff08\u6bcf 20 \u5206\u949f\u81ea\u52a8\u5907\u4efd\uff09`);
+        else if (result.reason === 'permission') show('\u5df2\u9009\u62e9\u7684\u6587\u4ef6\u5939\u65e0\x6cd5\u5199\u5165\uff0c\u8bf7\u91cd\u65b0\u9009\u62e9\u672c\u5730\u4fdd\u5b58\u4f4d\u7f6e\u3002', true);
       } catch (error) {
         if (error?.name !== 'AbortError') show('\u65e0\u6cd5\u4fdd\u5b58\u5230\u672c\u5730\u6587\u4ef6\u5939\uff0c\u8bf7\u91cd\u65b0\u9009\u62e9\u3002', true);
       }

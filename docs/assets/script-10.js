@@ -274,7 +274,10 @@
       if (deletion.annotationsChanged) localStorage.setItem(annotationKey, JSON.stringify(deletion.nextAnnotations));
       if (deletion.recentChanged) localStorage.setItem(recentKey, JSON.stringify(deletion.nextRecent));
       if (deletion.drawingsChanged) localStorage.setItem(drawingKey, JSON.stringify(deletion.nextDrawings));
-      localStorage.setItem(stateKey, JSON.stringify(deletion.nextState));
+      // Tell the async storage bridge this is an authoritative replacement.
+      // Otherwise React's pagehide save can requeue its stale in-memory list
+      // while the page is reloading and resurrect the deleted note.
+      if (!window.chengmoStorage?.replaceNotesState?.(deletion.nextState)) localStorage.setItem(stateKey, JSON.stringify(deletion.nextState));
       if (nextId) localStorage.setItem(readingSessionKey, JSON.stringify({ noteId: nextId, courseId, listOpen }));
       else localStorage.removeItem(readingSessionKey);
       // Queue the IndexedDB delete only after its synchronous source-of-truth
