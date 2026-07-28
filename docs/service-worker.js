@@ -1,4 +1,4 @@
-const CACHE_NAME = 'azuresora-notes-offline-20260728-9';
+const CACHE_NAME = 'azuresora-notes-offline-20260728-11';
 // Install only what is needed to reopen the shell. The full offline bundle is
 // filled after first paint so service-worker installation never competes with it.
 const CORE_ASSETS = [

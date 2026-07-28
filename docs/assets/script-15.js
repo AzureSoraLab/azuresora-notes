@@ -103,7 +103,9 @@
     // Watch only the compact action region. Observing the full React root made
     // paper-control checks run for every markdown and canvas update.
     headerObserver = new MutationObserver(scheduleMount);
-    headerObserver.observe(header, { childList: true, subtree: true });
+    // React replaces header-level controls as a unit. Watching descendants
+    // also fires for every save-status label update while the user is typing.
+    headerObserver.observe(header, { childList: true });
     observedHeader = header;
   };
   const syncAndWatch = () => { watchHeader(); scheduleMount(); };

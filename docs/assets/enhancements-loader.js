@@ -17,7 +17,7 @@
     './assets/script-5.js?v=zotero-annotation-colors-20260726',
     './assets/local-file-backup.js?v=local-auto-backup-20260728',
     './assets/script-12.js?v=local-auto-backup-20260728',
-    './assets/script-15.js?v=runtime-coordination-20260726'
+    './assets/script-15.js?v=runtime-coordination-20260728'
   ];
   let coreStarted = false;
   let optionalStarted = false;
@@ -49,7 +49,10 @@
     } else {
       window.setTimeout(loadCore, 120);
     }
-    window.setTimeout(loadOptional, 2200);
+    // Optional controls add several observers and parse sizable scripts. Load
+    // them when interaction is idle instead of competing with early editing.
+    if ('requestIdleCallback' in window) window.requestIdleCallback(loadOptional, { timeout: 6000 });
+    else window.setTimeout(loadOptional, 3500);
   };
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', schedule, { once: true });
   else schedule();

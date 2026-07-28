@@ -45,6 +45,7 @@
   let drawingStateCache = null;
   let drawingBootCacheDirty = false;
   let bootCacheTimer = 0;
+  let bootCacheIdle = 0;
   const jsonCache = new Map();
   const toJson = value => {
     try { return JSON.parse(value); } catch { return undefined; }
@@ -260,13 +261,13 @@
     return noteWritePromise;
   };
   const scheduleNotesStateUpdated = () => {
-    // React can save on every keystroke. The auxiliary library controls only
-    // need the settled state, so avoid rebuilding them for each character.
+    // React can save on every keystroke. These controls only display compact
+    // metadata, so wait for a real typing pause before touching the DOM again.
     window.clearTimeout(notesStateEventTimer);
     notesStateEventTimer = window.setTimeout(() => {
       notesStateEventTimer = 0;
       emit('chengmo:notes-state-updated');
-    }, 280);
+    }, 650);
   };
   const saveNotesFromObject = state => {
     // A library action can replace the store immediately before reload. React's
@@ -341,8 +342,14 @@
     bootCache.clear();
   };
   const scheduleBootCacheFlush = () => {
-    if (bootCacheTimer) return;
-    bootCacheTimer = window.setTimeout(flushBootCache, 1800);
+    if (bootCacheTimer || bootCacheIdle) return;
+    bootCacheTimer = window.setTimeout(() => {
+      bootCacheTimer = 0;
+      // Serializing a large notebook can briefly block typing. Let the browser
+      // choose an idle gap, while retaining a bounded timeout for reliability.
+      const flush = () => { bootCacheIdle = 0; flushBootCache(); };
+      bootCacheIdle = window.requestIdleCallback ? window.requestIdleCallback(flush, { timeout: 1000 }) : window.setTimeout(flush, 0);
+    }, 1800);
   };
   const queueBootCache = (key, value) => {
     bootCache.set(key, value);
@@ -456,6 +463,10 @@
     }
     if (metaTimer) { window.clearTimeout(metaTimer); metaTimer = 0; }
     if (bootCacheTimer) { window.clearTimeout(bootCacheTimer); bootCacheTimer = 0; }
+    if (bootCacheIdle) {
+      if (window.cancelIdleCallback) window.cancelIdleCallback(bootCacheIdle); else window.clearTimeout(bootCacheIdle);
+      bootCacheIdle = 0;
+    }
     flushBootCache();
     await Promise.all([flushNotesUntilStable(), flushMeta(), flushDrawingsUntilStable(), flushAnnotationsUntilStable()]);
     await flushDatabaseUntilStable();
