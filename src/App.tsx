@@ -44,10 +44,93 @@ function load(): Store {
 function safe(input: string) { return input.replace(/<\/?(script|iframe|object|embed)[^>]*>/gi, '') }
 function headings(content: string) { return [...content.matchAll(/^(#{1,3})\s+(.+)$/gm)].map((m, i) => ({ id: `section-${i}`, text: m[2].replace(/[*_`]/g, ''), level: m[1].length })) }
 
+const renderedMarkdownCache = new Map<string, string>()
+const renderedMarkdownCacheLimit = 24
+const mathDelimiterPattern = /\r|^ {0,3}(?:\$\$|\\\[|\\\])[ \t]*$|\\\([^\n]+?\\\)/m
+
+function findCodeSpanEnd(content: string, start: number, marker: string) {
+  const end = content.indexOf(marker, start + marker.length)
+  return end < 0 ? content.length : end + marker.length
+}
+
+function findFenceEnd(content: string, start: number, marker: string) {
+  const markerChar = marker[0]
+  const markerLength = marker.length
+  let cursor = content.indexOf('\n', start) + 1
+  while (cursor > 0 && cursor < content.length) {
+    const lineEnd = content.indexOf('\n', cursor)
+    const end = lineEnd < 0 ? content.length : lineEnd
+    const line = content.slice(cursor, end)
+    const match = line.match(/^[ \t]{0,3}([`~]+)[ \t]*$/)
+    if (match && match[1][0] === markerChar && match[1].length >= markerLength) return lineEnd < 0 ? end : lineEnd + 1
+    cursor = lineEnd < 0 ? content.length : lineEnd + 1
+  }
+  return content.length
+}
+
+function normalizeOutsideCode(content: string, normalizeText: (text: string) => string) {
+  let result = ''
+  let cursor = 0
+  while (cursor < content.length) {
+    const lineStart = cursor === 0 || content[cursor - 1] === '\n'
+    const fence = lineStart && content.slice(cursor).match(/^[ \t]{0,3}(`{3,}|~{3,})/)
+    if (fence) {
+      const start = cursor + fence[0].indexOf(fence[1])
+      result += normalizeText(content.slice(0, start))
+      const end = findFenceEnd(content, start, fence[1])
+      result += content.slice(start, end)
+      content = content.slice(end)
+      cursor = 0
+      continue
+    }
+    if (content[cursor] === '`') {
+      let markerEnd = cursor
+      while (content[markerEnd] === '`') markerEnd++
+      const marker = content.slice(cursor, markerEnd)
+      result += normalizeText(content.slice(0, cursor))
+      const end = findCodeSpanEnd(content, cursor, marker)
+      result += content.slice(cursor, end)
+      content = content.slice(end)
+      cursor = 0
+      continue
+    }
+    cursor++
+  }
+  return result + normalizeText(content)
+}
+
+function normalizeMathDelimiters(content: string) {
+  // Preserve code examples while making common editor input unambiguous to KaTeX.
+  if (!mathDelimiterPattern.test(content)) return content
+  const normalizeText = (text: string) => text
+    .replace(/^ {0,3}\$\$[ \t]*$/gm, () => '$$')
+    .replace(/^ {0,3}\\\[[ \t]*$/gm, () => '$$')
+    .replace(/^ {0,3}\\\][ \t]*$/gm, () => '$$')
+    .replace(/\\\(([^\n]+?)\\\)/g, (match, formula, offset, source) => {
+      let precedingBackslashes = 0
+      for (let index = offset - 1; source[index] === '\\'; index--) precedingBackslashes++
+      return precedingBackslashes % 2 ? match : `$${formula}$`
+    })
+
+  const normalized = content.replace(/\r\n?/g, '\n')
+  return normalizeOutsideCode(normalized, normalizeText)
+}
+
+function renderCacheKey(content: string, annotations: Annotation[]) {
+  return `${content}\0${annotations.map(({ id, start, end, color, kind }) => `${id}:${start}:${end}:${color}:${kind}`).join('|')}`
+}
+
 function renderMarkdown(content: string, annotations: Annotation[]) {
-  let result = safe(marked.parse(content, { async: false, breaks: true }) as string)
+  const cacheKey = renderCacheKey(content, annotations)
+  const cached = renderedMarkdownCache.get(cacheKey)
+  if (cached) return cached
+
+  const normalizedContent = normalizeMathDelimiters(content)
+  let result = safe(marked.parse(normalizedContent, { async: false, breaks: true }) as string)
   let headingIndex = 0
   result = result.replace(/<h([1-3])>/g, (_, level) => `<h${level} id="section-${headingIndex++}">`)
+  if (!annotations.length) return cacheMarkdown(cacheKey, result)
+
   const doc = new DOMParser().parseFromString(result, 'text/html')
   const walker = document.createTreeWalker(doc.body, NodeFilter.SHOW_TEXT)
   const textNodes: Text[] = []
@@ -79,7 +162,13 @@ function renderMarkdown(content: string, annotations: Annotation[]) {
       textNode.parentNode.replaceChild(fragment, textNode)
     }
   }
-  return doc.body.innerHTML
+  return cacheMarkdown(cacheKey, doc.body.innerHTML)
+}
+
+function cacheMarkdown(cacheKey: string, html: string) {
+  if (renderedMarkdownCache.size >= renderedMarkdownCacheLimit) renderedMarkdownCache.delete(renderedMarkdownCache.keys().next().value!)
+  renderedMarkdownCache.set(cacheKey, html)
+  return html
 }
 
 export default function App() {

@@ -26,7 +26,35 @@
 /* Keep wide tables, formulas, and media readable inside the reader. */
 .markdown :is(img, svg, canvas, video, iframe) { max-width: 100%; height: auto; }
 .markdown svg { display: block; }
+/* KaTeX accents and stretchy braces are SVGs sized by their parent. */
+.markdown .katex svg {
+  max-width: none;
+  width: 100%;
+  height: inherit;
+  fill: currentColor;
+  stroke: currentColor;
+}
+.markdown .katex .katex-stretchy {
+  display: block;
+  position: relative;
+  width: 100%;
+  overflow: hidden;
+}
+.markdown .katex :is(.brace-left, .brace-center, .brace-right) {
+  position: absolute;
+  overflow: hidden;
+}
+.markdown .katex .brace-left { left: 0; width: 25.1%; }
+.markdown .katex .brace-center { left: 25%; width: 50%; }
+.markdown .katex .brace-right { right: 0; width: 25.1%; }
 .markdown :is(pre, .katex-display) { max-width: 100%; overflow-x: auto; overflow-y: hidden; }
+.markdown .katex-display {
+  margin: 1.15em 0;
+  padding: .55em .2em;
+  scrollbar-color: #83958a transparent;
+}
+.markdown .katex-display > .katex { min-width: max-content; }
+.markdown .katex-error { color: #a95149; white-space: pre-wrap; }
 .markdown pre { color: #eaf0ec; background: #2e3938; border: 0; border-radius: 4px; padding: 15px; line-height: 1.6; }
 .markdown pre code { display: block; padding: 0; border: 0; border-radius: 0; background: transparent; color: inherit; font-family: Consolas, "Microsoft YaHei", monospace; font-size: inherit; }
 .markdown table { display: block; max-width: 100%; overflow-x: auto; white-space: nowrap; }
