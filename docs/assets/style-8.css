@@ -24,29 +24,8 @@
 .markdown > div { max-width: 860px; margin: 0 auto; padding-bottom: 52px; }
 .markdown, .markdown > div { min-width: 0; }
 /* Keep wide tables, formulas, and media readable inside the reader. */
-.markdown :is(img, svg, canvas, video, iframe) { max-width: 100%; height: auto; }
-.markdown svg { display: block; }
-/* KaTeX accents and stretchy braces are SVGs sized by their parent. */
-.markdown .katex svg {
-  max-width: none;
-  width: 100%;
-  height: inherit;
-  fill: currentColor;
-  stroke: currentColor;
-}
-.markdown .katex .katex-stretchy {
-  display: block;
-  position: relative;
-  width: 100%;
-  overflow: hidden;
-}
-.markdown .katex :is(.brace-left, .brace-center, .brace-right) {
-  position: absolute;
-  overflow: hidden;
-}
-.markdown .katex .brace-left { left: 0; width: 25.1%; }
-.markdown .katex .brace-center { left: 25%; width: 50%; }
-.markdown .katex .brace-right { right: 0; width: 25.1%; }
+.markdown :is(img, canvas, video, iframe) { max-width: 100%; height: auto; }
+.markdown > svg { display: block; max-width: 100%; height: auto; }
 .markdown :is(pre, .katex-display) { max-width: 100%; overflow-x: auto; overflow-y: hidden; }
 .markdown .katex-display {
   margin: 1.15em 0;
