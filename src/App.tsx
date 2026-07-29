@@ -46,7 +46,7 @@ function headings(content: string) { return [...content.matchAll(/^(#{1,3})\s+(.
 
 const renderedMarkdownCache = new Map<string, string>()
 const renderedMarkdownCacheLimit = 24
-const mathDelimiterPattern = /\r|^ {0,3}(?:\$\$|\\\[|\\\])[ \t]*$|\\\([^\n]+?\\\)/m
+const mathDelimiterPattern = /\r|^[ \t\u00a0\u3000]*(?:\$\$|\\\[|\\\])[ \t\u00a0\u3000]*$|\\\([^\n]+?\\\)/m
 
 function findCodeSpanEnd(content: string, start: number, marker: string) {
   const end = content.indexOf(marker, start + marker.length)
@@ -103,9 +103,9 @@ function normalizeMathDelimiters(content: string) {
   // Preserve code examples while making common editor input unambiguous to KaTeX.
   if (!mathDelimiterPattern.test(content)) return content
   const normalizeText = (text: string) => text
-    .replace(/^ {0,3}\$\$[ \t]*$/gm, () => '$$')
-    .replace(/^ {0,3}\\\[[ \t]*$/gm, () => '$$')
-    .replace(/^ {0,3}\\\][ \t]*$/gm, () => '$$')
+    .replace(/^[ \t\u00a0\u3000]*\$\$[ \t\u00a0\u3000]*$/gm, () => '$$')
+    .replace(/^[ \t\u00a0\u3000]*\\\[[ \t\u00a0\u3000]*$/gm, () => '$$')
+    .replace(/^[ \t\u00a0\u3000]*\\\][ \t\u00a0\u3000]*$/gm, () => '$$')
     .replace(/\\\(([^\n]+?)\\\)/g, (match, formula, offset, source) => {
       let precedingBackslashes = 0
       for (let index = offset - 1; source[index] === '\\'; index--) precedingBackslashes++
