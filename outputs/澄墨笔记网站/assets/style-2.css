@@ -26,7 +26,7 @@
 .zotero-draw-control__visibility svg { width: 18px; height: 18px; vertical-align: middle; }
 .drawing-canvas.is-selecting { pointer-events: auto; cursor: default; }
 .drawing-canvas.is-selecting.is-dragging { cursor: grabbing; }
-.drawing-selection-delete { position: fixed; z-index: 10036; height: 26px; padding: 0 8px; border: 1px solid #d6ded9; border-radius: 5px; background: #fffefa; box-shadow: 0 3px 10px rgba(37,58,50,.14); color: #5c6862; font: 12px/24px Arial, "Microsoft YaHei", sans-serif; cursor: pointer; }
+.drawing-selection-delete { position: fixed; z-index: 10036; height: 26px; padding: 0 8px; border: 1px solid #d6ded9; border-radius: 5px; background: #fffefa; box-shadow: 0 3px 10px rgba(37,58,50,.14); color: #5c6862; font: 12px/24px Arial, "Microsoft YaHei", sans-serif; cursor: pointer; touch-action: manipulation; }
 .drawing-selection-delete:hover { border-color: #c9a7a0; background: #faf3f1; color: #9b5147; }
 .drawing-selection-delete[hidden] { display: none; }
 .zotero-draw-control__color { display: inline-flex; align-items: center; gap: 4px; height: 28px; margin-left: 5px; padding: 0 4px 0 5px; border: 0; border-radius: 5px; background: transparent; color: #69736f; cursor: pointer; }
@@ -65,7 +65,7 @@
 .selection-annotation-menu__item.is-current:before { position: absolute; left: 8px; content: '✓'; }
 .selection-annotation-menu__item--danger { border-top: 1px solid #e7e6e2; border-bottom: 0; color: #4e5350; }
 mark.selection-annotation { padding: 0; color: inherit; }
-mark.selection-annotation--highlight { background: color-mix(in srgb, var(--selection-annotation-color) 55%, transparent); box-decoration-break: clone; -webkit-box-decoration-break: clone; }
+mark.selection-annotation--highlight { background: var(--selection-annotation-background, var(--selection-annotation-color)); box-decoration-break: clone; -webkit-box-decoration-break: clone; }
 mark.selection-annotation--underline { background: transparent; text-decoration: underline 2px var(--selection-annotation-color); text-decoration-skip-ink: none; text-underline-offset: 3px; }
 .selection-annotation-menu--card { width: 254px; transform: none; border: 1px solid #d9e1db; border-radius: 8px; background: #fffefa; box-shadow: 0 8px 22px rgba(37, 58, 50, .16); }
 .selection-annotation-card__header { display: flex; align-items: center; gap: 6px; height: 32px; box-sizing: border-box; padding: 0 10px; border-bottom: 1px solid #e4e9e4; color: #43584f; font: 13px/1.2 "Microsoft YaHei", Arial, sans-serif; }

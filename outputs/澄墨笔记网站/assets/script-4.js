@@ -20,6 +20,15 @@
   let observer = null;
   let applyTimer = 0;
   let touchSelectionTimer = 0;
+  let touchSelecting = false;
+  let lastPointerType = '';
+  const isTouchSelection = () => lastPointerType === 'touch' || window.matchMedia('(pointer: coarse)').matches;
+  const highlightBackground = color => {
+    const hex = displayColor(color);
+    if (!/^#[\da-f]{6}$/i.test(hex)) return hex;
+    const rgb = [1, 3, 5].map(offset => parseInt(hex.slice(offset, offset + 2), 16));
+    return `rgba(${rgb.join(', ')}, 0.35)`;
+  };
   const longPressDelay = 500;
   const longPressMoveTolerance = 8;
   let annotationPointer = null;
@@ -29,7 +38,7 @@
   let cachedItems = null;
   let renderFrame = 0;
   let lastRoot = null;
-  let lastSourceText = '';
+  let lastSourceText = null;
   let renderedSignature = '';
   let annotationsByNote = null;
   let annotationsById = null;
@@ -39,6 +48,21 @@
 
   const reader = () => document.querySelector('.reader-body');
   const readerContent = () => reader()?.firstElementChild || null;
+  const viewportBounds = () => {
+    const viewport = window.visualViewport;
+    if (!viewport) return { left: 0, top: 0, right: window.innerWidth, bottom: window.innerHeight };
+    return {
+      left: viewport.offsetLeft,
+      top: viewport.offsetTop,
+      right: viewport.offsetLeft + viewport.width,
+      bottom: viewport.offsetTop + viewport.height
+    };
+  };
+  const selectionIsInReader = (selection = window.getSelection()) => {
+    const root = readerContent();
+    const range = selection?.rangeCount ? selection.getRangeAt(0) : null;
+    return Boolean(root && range && root.contains(range.commonAncestorContainer));
+  };
   const currentNoteId = () => document.querySelector('.compact-note.selected')?.dataset.noteId || '';
   const read = () => cachedItems || (cachedItems = (() => {
     try {
@@ -75,7 +99,7 @@
     range.setEnd(container, offset);
     return range.toString().length;
   };
-  const rootText = root => root === lastRoot ? lastSourceText : (root?.textContent || '');
+  const rootText = root => root === lastRoot && lastSourceText !== null ? lastSourceText : (root?.textContent || '');
   const makeAnchor = (root, start, end) => {
     const text = rootText(root);
     return {
@@ -123,6 +147,7 @@
     const annotationKind = item.kind === 'underline' ? 'underline' : 'highlight';
     mark.className = `selection-annotation selection-annotation--${annotationKind}`;
     mark.style.setProperty('--selection-annotation-color', displayColor(item.color));
+    mark.style.setProperty('--selection-annotation-background', highlightBackground(item.color));
     mark.dataset.annotationId = item.id;
     mark.append(content);
     return mark;
@@ -176,9 +201,18 @@
     const root = readerContent();
     if (!root) return;
     const noteId = currentNoteId();
+    const noteItems = noteAnnotations(noteId);
+    // Most notes are unannotated. Do not read a long article's text or attach
+    // a subtree observer unless there is annotation work to keep in sync.
+    if (!noteItems.length) {
+      observer?.disconnect(); observer = null; observedRoot = null;
+      if (root.querySelector('mark.selection-annotation')) clearMarks(root);
+      lastRoot = root; lastSourceText = null;
+      renderedSignature = `${noteId}\u0000`;
+      return;
+    }
     const allItems = read();
     const currentText = root.textContent || '';
-    const noteItems = noteAnnotations(noteId);
     const signature = `${noteId}\u0000${currentText}\u0000${noteItems.map(item => `${item.id}:${item.start}:${item.end}:${item.color}:${item.kind}`).join('|')}`;
     // React can announce a UI mount without replacing the article. Avoid tearing
     // down every mark when both the text and its visual annotation state match.
@@ -226,18 +260,19 @@
     if (!rects.length) return removeMenu();
     const left = Math.min(...rects.map(part => part.left)); const right = Math.max(...rects.map(part => part.right));
     const top = Math.min(...rects.map(part => part.top)); const bottom = Math.max(...rects.map(part => part.bottom));
-    const outOfView = bottom < 0 || top > window.innerHeight || right < 0 || left > window.innerWidth;
+    const viewport = viewportBounds();
+    const outOfView = bottom < viewport.top || top > viewport.bottom || right < viewport.left || left > viewport.right;
     selectionBox.style.display = outOfView ? 'none' : '';
     menu.style.display = outOfView ? 'none' : '';
     if (outOfView) return;
     selectionBox.style.left = `${left - 4}px`; selectionBox.style.top = `${top - 4}px`; selectionBox.style.width = `${right - left + 8}px`; selectionBox.style.height = `${bottom - top + 8}px`;
     const menuHeight = menu.offsetHeight || 164;
     const menuWidth = menu.offsetWidth || 254;
-    const menuTop = bottom + menuHeight + 4 <= window.innerHeight
+    const menuTop = bottom + menuHeight + 4 <= viewport.bottom
       ? bottom + 4
-      : Math.max(8, top - menuHeight - 4);
-    menu.style.left = `${Math.min(window.innerWidth - menuWidth - 8, Math.max(8, left + (right - left - menuWidth) / 2))}px`;
-    menu.style.top = `${menuTop}px`;
+      : Math.max(viewport.top + 8, top - menuHeight - 4);
+    menu.style.left = `${Math.min(viewport.right - menuWidth - 8, Math.max(viewport.left + 8, left + (right - left - menuWidth) / 2))}px`;
+    menu.style.top = `${Math.min(viewport.bottom - menuHeight - 8, menuTop)}px`;
   }
   function updateAnnotation(id, changes) {
     const item = annotationForId(id);
@@ -279,7 +314,8 @@
     const anchor = parts[Number(menu.dataset.anchorPart || 0)] || parts[0];
     const rect = anchor?.getBoundingClientRect();
     if (!rect) return removeMenu();
-    const outOfView = rect.bottom < 0 || rect.top > window.innerHeight || rect.right < 0 || rect.left > window.innerWidth;
+    const viewport = viewportBounds();
+    const outOfView = rect.bottom < viewport.top || rect.top > viewport.bottom || rect.right < viewport.left || rect.left > viewport.right;
     menu.style.display = outOfView ? 'none' : '';
     if (outOfView) return;
     // Use the actual long-press point when available, so a wrapped annotation
@@ -289,12 +325,12 @@
     const point = menu._anchorPoint;
     const anchorLeft = point ? rect.left + point.offsetX : rect.left;
     const anchorBottom = point ? rect.top + point.offsetY : rect.bottom;
-    const left = Math.min(window.innerWidth - menuWidth - 8, Math.max(8, anchorLeft));
-    const top = anchorBottom + menuHeight + 8 <= window.innerHeight
+    const left = Math.min(viewport.right - menuWidth - 8, Math.max(viewport.left + 8, anchorLeft));
+    const top = anchorBottom + menuHeight + 8 <= viewport.bottom
       ? anchorBottom + 8
-      : Math.max(8, (point ? rect.top + point.offsetY : rect.top) - menuHeight - 8);
+      : Math.max(viewport.top + 8, (point ? rect.top + point.offsetY : rect.top) - menuHeight - 8);
     menu.style.left = `${left}px`;
-    menu.style.top = `${top}px`;
+    menu.style.top = `${Math.min(viewport.bottom - menuHeight - 8, top)}px`;
   }
   function showManageMenu(mark, point) {
     const id = mark.dataset.annotationId;
@@ -337,6 +373,7 @@
   }
   function choose(color) {
     if (!selected) return;
+    if (selected.root !== readerContent() || selected.noteId !== currentNoteId()) return removeMenu();
     const items = read();
     const anchor = makeAnchor(readerContent(), selected.start, selected.end);
     const item = { id: annotationId(), noteId: currentNoteId(), start: selected.start, end: selected.end, color, kind, text: anchor.quote, quote: anchor.quote, prefix: anchor.prefix, suffix: anchor.suffix, comment: '', tags: [] };
@@ -347,22 +384,31 @@
     renderAnnotations();
     announce(kind === 'highlight' ? '已添加高亮标注' : '已添加下划线标注');
   }
-  const isMobileViewport = () => window.matchMedia('(max-width: 760px)').matches;
   function positionSelectionMenu(rect) {
     if (!menu || menu.classList.contains('selection-annotation-menu--card') || menu.classList.contains('selection-annotation-menu--manage')) return;
     const menuWidth = menu.offsetWidth || 238;
     const menuHeight = menu.offsetHeight || 88;
-    const left = Math.min(Math.max(rect.left + rect.width / 2, menuWidth / 2 + 8), window.innerWidth - menuWidth / 2 - 8);
+    const viewport = viewportBounds();
+    if (menu.classList.contains('selection-annotation-menu--touch')) {
+      menu.style.left = `${viewport.left + (viewport.right - viewport.left) / 2}px`;
+      menu.style.top = `${Math.max(viewport.top + 8, viewport.bottom - menuHeight - 12)}px`;
+      return;
+    }
+    const left = Math.min(Math.max(rect.left + rect.width / 2, viewport.left + menuWidth / 2 + 8), viewport.right - menuWidth / 2 - 8);
     const below = rect.bottom + 10;
+    const top = below + menuHeight <= viewport.bottom - 8 ? below : Math.max(viewport.top + 8, rect.top - menuHeight - 10);
     menu.style.left = `${left}px`;
-    menu.style.top = `${below + menuHeight <= window.innerHeight - 8 ? below : Math.max(8, rect.top - menuHeight - 10)}px`;
+    menu.style.top = `${Math.min(viewport.bottom - menuHeight - 8, top)}px`;
   }
   function showMenu() {
     const root = readerContent();
     const selection = window.getSelection();
     const range = selection?.rangeCount ? selection.getRangeAt(0) : null;
     const text = selection?.toString().trim();
-    if (!root || !range || !text || !root.contains(range.commonAncestorContainer)) return removeMenu();
+    if (!root || !range || !text || !root.contains(range.commonAncestorContainer)) {
+      if (selected?.detached && selected.root === root && selected.noteId === currentNoteId()) return;
+      return removeMenu();
+    }
     const rect = range.getBoundingClientRect();
     const start = offsetOf(root, range.startContainer, range.startOffset);
     const end = offsetOf(root, range.endContainer, range.endOffset);
@@ -372,15 +418,37 @@
       return;
     }
     removeMenu();
-    selected = { start, end };
+    selected = { start, end, root, noteId: currentNoteId(), rect, detached: false };
     menu = document.createElement('div');
-    menu.className = 'selection-annotation-menu';
+    menu.className = `selection-annotation-menu${isTouchSelection() ? ' selection-annotation-menu--touch' : ''}`;
+    menu.setAttribute('role', 'region');
+    menu.setAttribute('aria-label', '\u6587\u5b57\u6807\u6ce8');
+    // Capture the final native range before a touch on a control collapses it.
+    // Clearing it now also dismisses the browser's copy/share callout.
+    menu.addEventListener('pointerdown', event => {
+      if (!menu?.classList.contains('selection-annotation-menu--touch') || !selected) return;
+      selected.detached = true;
+      window.getSelection()?.removeAllRanges();
+    });
+    if (isTouchSelection()) {
+      const header = document.createElement('div');
+      header.className = 'selection-annotation-menu__touch-header';
+      const hint = document.createElement('span');
+      hint.textContent = '\u9009\u597d\u6587\u5b57\u540e\uff0c\u70b9\u989c\u8272\u6807\u6ce8';
+      const close = document.createElement('button');
+      close.type = 'button'; close.textContent = '\u00d7';
+      close.setAttribute('aria-label', '\u53d6\u6d88\u6807\u6ce8');
+      close.addEventListener('click', () => { window.getSelection()?.removeAllRanges(); removeMenu(); });
+      header.append(hint, close); menu.append(header);
+    }
     const colorRow = document.createElement('div');
     colorRow.className = 'selection-annotation-menu__colors';
     colors.forEach(color => {
       const button = document.createElement('button');
       button.className = 'selection-annotation-menu__color';
       button.style.backgroundColor = color;
+      button.type = 'button';
+      button.setAttribute('aria-label', `\u5e94\u7528\u6807\u6ce8\u989c\u8272 ${color}`);
       button.title = '应用颜色';
       button.addEventListener('mousedown', event => event.preventDefault());
       button.addEventListener('click', () => choose(color));
@@ -391,10 +459,13 @@
     [['highlight', 'A', '高亮'], ['underline', 'A', '下划线']].forEach(([value, label, title]) => {
       const button = document.createElement('button');
       button.className = `selection-annotation-menu__action ${value === 'underline' ? 'selection-annotation-menu__action--underline' : ''} ${kind === value ? 'is-active' : ''}`;
-      button.textContent = label;
+      button.type = 'button';
+      button.textContent = isTouchSelection() ? (value === 'highlight' ? '\u9ad8\u4eae' : '\u4e0b\u5212\u7ebf') : label;
+      button.setAttribute('aria-label', value === 'highlight' ? '\u9ad8\u4eae' : '\u4e0b\u5212\u7ebf');
+      button.setAttribute('aria-pressed', String(kind === value));
       button.title = title;
       button.addEventListener('mousedown', event => event.preventDefault());
-      button.addEventListener('click', () => { kind = value; actionRow.querySelectorAll('button').forEach(item => item.classList.toggle('is-active', item === button)); });
+      button.addEventListener('click', () => { kind = value; actionRow.querySelectorAll('button').forEach(item => { item.classList.toggle('is-active', item === button); item.setAttribute('aria-pressed', String(item === button)); }); });
       actionRow.append(button);
     });
     menu.append(colorRow, actionRow);
@@ -402,8 +473,8 @@
     positionSelectionMenu(rect);
   }
   function scheduleTouchSelectionMenu() {
-    if (!isMobileViewport()) return;
     window.clearTimeout(touchSelectionTimer);
+    if (!isTouchSelection() || touchSelecting || !selectionIsInReader()) return;
     // Mobile browsers finalize a handle drag after touchend. Waiting one short
     // turn reads the completed native selection instead of a partial range.
     touchSelectionTimer = window.setTimeout(() => {
@@ -411,23 +482,35 @@
       const selection = window.getSelection();
       if (selection?.isCollapsed || !selection?.toString().trim()) return;
       showMenu();
-    }, 80);
+    }, 200);
   }
   document.addEventListener('mouseup', event => {
+    if (isTouchSelection()) return;
     if (suppressSelectionMenuOnce) { suppressSelectionMenuOnce = false; return; }
     if (event.target.closest('mark.selection-annotation')) return;
     if (menu?.contains(event.target)) return;
     window.setTimeout(showMenu, 0);
   });
   document.addEventListener('touchend', event => {
-    if (event.target.closest?.('mark.selection-annotation, .selection-annotation-menu')) return;
+    touchSelecting = false;
+    if (event.target.closest?.('.selection-annotation-menu')) return;
     if (readerContent()?.contains(event.target)) scheduleTouchSelectionMenu();
   }, true);
+  document.addEventListener('touchstart', event => {
+    lastPointerType = 'touch';
+    if (event.target.closest?.('.selection-annotation-menu')) return;
+    touchSelecting = true;
+    window.clearTimeout(touchSelectionTimer);
+    if (menu && !menu.dataset.annotationId) removeMenu();
+  }, { capture: true, passive: true });
+  document.addEventListener('touchcancel', () => { touchSelecting = false; window.clearTimeout(touchSelectionTimer); }, { passive: true });
   document.addEventListener('selectionchange', () => {
     const selection = window.getSelection();
-    if (isMobileViewport() && selection && !selection.isCollapsed && selection.toString().trim()) scheduleTouchSelectionMenu();
+    if (!isTouchSelection()) return;
+    if (selection && !selection.isCollapsed && selection.toString().trim() && selectionIsInReader(selection)) scheduleTouchSelectionMenu();
+    else if (menu?.classList.contains('selection-annotation-menu--touch') && !selected?.detached) removeMenu();
   });
-  document.addEventListener('mousedown', event => { if (menu && !menu.contains(event.target)) removeMenu(); });
+  document.addEventListener('mousedown', event => { if (menu && !menu.contains(event.target) && !isTouchSelection()) removeMenu(); });
   const clearAnnotationPointer = () => {
     if (!annotationPointer) return null;
     const pointer = annotationPointer;
@@ -437,6 +520,8 @@
     return pointer;
   };
   document.addEventListener('pointerdown', event => {
+    lastPointerType = event.pointerType;
+    if (menu?.classList.contains('selection-annotation-menu--touch') && !menu.contains(event.target)) removeMenu();
     if (event.button !== 0 || event.isPrimary === false) return;
     const mark = event.target.closest('mark.selection-annotation');
     if (!mark) return;
@@ -449,6 +534,8 @@
       opened: false,
       timer: 0
     };
+    // Touch selection handles must stay under browser control.
+    if (event.pointerType === 'touch') return;
     mark.setPointerCapture?.(event.pointerId);
     pointer.timer = window.setTimeout(() => {
       if (annotationPointer !== pointer) return;
@@ -473,7 +560,7 @@
       // Click follows pointerup synchronously. Clear the guard afterwards so a
       // missing synthetic click cannot suppress a later normal activation.
       window.setTimeout(() => { if (suppressAnnotationClickId === annotationId) suppressAnnotationClickId = ''; }, 0);
-    } else if (event.pointerType === 'touch') {
+    } else if (event.pointerType === 'touch' && !window.getSelection()?.toString().trim()) {
       // Some mobile browsers omit the synthetic click after a text interaction.
       // Resolve a normal tap directly, then ignore any duplicate synthetic click.
       suppressAnnotationClickId = pointer.target.dataset.annotationId || '';
@@ -488,22 +575,45 @@
   document.addEventListener('click', event => {
     const mark = event.target.closest('mark.selection-annotation');
     if (!mark) return;
+    if (window.getSelection()?.toString().trim() && selectionIsInReader()) return;
     if (suppressAnnotationClickId && mark.dataset.annotationId === suppressAnnotationClickId) { suppressAnnotationClickId = ''; return; }
     event.preventDefault(); event.stopPropagation(); showCommentCard(mark);
   });
   document.addEventListener('contextmenu', event => {
     // Long-press already opens this app's annotation controls on touch devices.
-    if (event.target.closest?.('mark.selection-annotation')) event.preventDefault();
+    if (!isTouchSelection() && event.target.closest?.('mark.selection-annotation')) event.preventDefault();
   });
   document.addEventListener('keydown', event => {
     if (event.key !== 'Escape' || !menu) return;
     event.preventDefault(); removeMenu();
   }, true);
-  window.addEventListener('resize', removeMenu);
+  let viewportPositionFrame = 0;
+  const repositionForViewport = () => {
+    if (viewportPositionFrame) return;
+    viewportPositionFrame = window.requestAnimationFrame(() => {
+      viewportPositionFrame = 0;
+      const id = menu?.dataset.annotationId;
+      if (id) {
+        if (menu.classList.contains('selection-annotation-menu--manage')) positionManageMenu(id);
+        else positionCommentCard(id);
+        return;
+      }
+      const selection = window.getSelection();
+      if (menu && selectionIsInReader(selection) && selection?.rangeCount) positionSelectionMenu(selection.getRangeAt(0).getBoundingClientRect());
+      else if (menu && selected?.detached) positionSelectionMenu(selected.rect);
+      else if (menu) removeMenu();
+    });
+  };
+  window.addEventListener('resize', repositionForViewport, { passive: true });
+  window.visualViewport?.addEventListener('resize', repositionForViewport, { passive: true });
+  window.visualViewport?.addEventListener('scroll', repositionForViewport, { passive: true });
   // Scroll events do not bubble. Capture them at document level so the card
   // follows marks even when the reader component swaps its scroll container.
   let scrollPositionFrame = 0;
   document.addEventListener('scroll', () => {
+    // A closed annotation menu has no geometry to follow. Avoid scheduling a
+    // frame for every reader scroll in the normal reading state.
+    if (!menu?.dataset.annotationId) return;
     if (scrollPositionFrame) return;
     scrollPositionFrame = window.requestAnimationFrame(() => {
       scrollPositionFrame = 0;

@@ -46,6 +46,35 @@
     return value && !Array.isArray(value) ? value : null;
   };
   const noteTitle = note => note?.title?.trim() || '\u672a\u547d\u540d\u7b14\u8bb0';
+  const deleteIcon = '<svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13M10 10v7M14 10v7" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+  const decorateDeleteControl = (control, title) => {
+    control.innerHTML = deleteIcon;
+    control.title = `\u5220\u9664\u300c${title}\u300d`;
+    control.setAttribute('aria-label', control.title);
+  };
+  let deletionDialogOpen = false;
+  const confirmNoteDeletion = deletion => new Promise(resolve => {
+    if (deletionDialogOpen) return resolve(false);
+    deletionDialogOpen = true;
+    const previousFocus = document.activeElement;
+    const dialog = document.createElement('dialog');
+    dialog.className = 'note-delete-dialog';
+    dialog.setAttribute('aria-labelledby', 'note-delete-title');
+    dialog.setAttribute('aria-describedby', 'note-delete-description');
+    const heading = document.createElement('h2'); heading.id = 'note-delete-title'; heading.textContent = '\u5220\u9664\u7b14\u8bb0\uff1f';
+    const title = document.createElement('p'); title.className = 'note-delete-dialog__name'; title.textContent = noteTitle(deletion.target);
+    const description = document.createElement('p'); description.id = 'note-delete-description';
+    description.textContent = `\u5220\u9664\u540e\u65e0\u6cd5\u64a4\u9500\u3002${deletion.annotationCount || deletion.drawingCount ? `\u540c\u65f6\u5220\u9664 ${deletion.annotationCount} \u6761\u6587\u672c\u6807\u6ce8\u548c ${deletion.drawingCount} \u6761\u7ed8\u56fe\u7b14\u8ff9\u3002` : ''}`;
+    const actions = document.createElement('div'); actions.className = 'note-delete-dialog__actions';
+    const cancel = document.createElement('button'); cancel.type = 'button'; cancel.textContent = '\u4fdd\u7559\u7b14\u8bb0';
+    const remove = document.createElement('button'); remove.type = 'button'; remove.className = 'note-delete-dialog__confirm'; remove.textContent = '\u5220\u9664\u7b14\u8bb0';
+    const finish = confirmed => { dialog.close(); dialog.remove(); deletionDialogOpen = false; if (previousFocus?.isConnected) previousFocus.focus({preventScroll:true}); resolve(confirmed); };
+    cancel.addEventListener('click', () => finish(false));
+    remove.addEventListener('click', () => finish(true));
+    dialog.addEventListener('cancel', event => { event.preventDefault(); finish(false); });
+    actions.append(cancel, remove); dialog.append(heading, title, description, actions); document.body.append(dialog);
+    dialog.showModal(); cancel.focus();
+  });
   const noteSubtitle = note => (Array.isArray(note?.tags) ? note.tags.slice(0, 2).map(tag => `#${tag}`).join('  ') : '') || '\u672a\u6dfb\u52a0\u6807\u7b7e';
   const reactKey = (node, ids) => {
     const fiberKey = Object.keys(node).find(key => key.startsWith('__reactFiber$'));
@@ -171,6 +200,7 @@
         remove.className = 'mobile-course-note__delete'; remove.textContent = '\u00d7';
         remove.title = '\u5220\u9664\u7b14\u8bb0'; remove.setAttribute('role', 'button');
         remove.setAttribute('aria-label', `\u5220\u9664\u7b14\u8bb0\u300c${noteTitle(note)}\u300d`); remove.tabIndex = 0;
+        decorateDeleteControl(remove, noteTitle(note));
         remove.addEventListener('pointerdown', event => event.stopPropagation());
         remove.addEventListener('keydown', event => {
           if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); event.currentTarget.click(); }
@@ -214,6 +244,7 @@
       if (!noteId) { existing?.remove(); return; }
       if (existing) return;
       const close = document.createElement('span'); close.className = 'compact-note__delete'; close.textContent = '\u00d7'; close.title = '\u5220\u9664\u7b14\u8bb0'; close.setAttribute('role', 'button'); close.setAttribute('aria-label', '\u5220\u9664\u7b14\u8bb0'); close.tabIndex = 0;
+      decorateDeleteControl(close, noteTitle(state.notes.find(note => note.id === noteId)));
       close.addEventListener('pointerdown', event => event.stopPropagation()); close.addEventListener('keydown', event => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); event.currentTarget.click(); } }); noteButton.append(close);
     });
     return true;
@@ -339,13 +370,18 @@
     }
   };
   const deleteNote = async ({ targetId, mobile = false }) => {
-    const state = readState(); const notes = state.notes || [];
-    const deletion = prepareNoteDeletion(state, targetId);
+    let state = readState();
+    let deletion = prepareNoteDeletion(state, targetId);
     if (!deletion) { alert('\u65e0\u6cd5\u786e\u8ba4\u8fd9\u7bc7\u7b14\u8bb0\u3002\u8bf7\u5237\u65b0\u540e\u91cd\u8bd5\u3002'); return; }
-    const related = [deletion.annotationCount && `${deletion.annotationCount} \u6761\u6587\u672c\u6807\u6ce8`, deletion.drawingCount && `${deletion.drawingCount} \u6761\u7ed8\u56fe\u7b14\u8ff9`].filter(Boolean).join('\u3001');
-    const relatedHint = related ? `\n\n\u540c\u65f6\u4f1a\u5220\u9664\uff1a${related}\u3002` : '';
-    if (!confirm(`\u786e\u5b9a\u5220\u9664\u300c${noteTitle(deletion.target)}\u300d\uff1f${relatedHint}`)) return;
+    if (!await confirmNoteDeletion(deletion)) return;
+    // The editor can save while the modal is open. Delete from the latest
+    // state so confirmation never overwrites another note's recent edits.
+    state = readState();
+    deletion = prepareNoteDeletion(state, targetId);
+    if (!deletion) return;
+    const notes = state.notes || [];
     const listContext = noteListContext();
+    const scrollTop = listContext.list?.scrollTop || 0;
     const buttons = courseButtons(); const context = courseContext(state, buttons);
     applyDeleteControls(state, listContext.cards, buttons, context, listContext.searchInput?.value?.toLowerCase() || '');
     const knownIds = new Set(notes.map(note => note.id));
@@ -367,6 +403,8 @@
     if (uiUpdated) {
       window.chengmoNotice?.(`\u5df2\u5220\u9664\u300c${noteTitle(deletion.target)}\u300d\u3002`);
       window.requestAnimationFrame(() => {
+        const list = document.querySelector('.note-index-scroll');
+        if (list) list.scrollTop = scrollTop;
         emit('chengmo:notes-state-updated', { source: 'note-delete' });
         emit('chengmo:note-selected', { source: 'note-delete' });
       });
