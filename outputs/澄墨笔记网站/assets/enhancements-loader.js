@@ -2,7 +2,7 @@
 (() => {
   const coreSources = [
     './assets/script-3.js?v=instant-stroke-delete-20260726',
-    './assets/script-4.js?v=touch-annotation-20261012',
+    './assets/script-4.js?v=touch-selection-retry-20261013',
     './assets/script-6.js',
     './assets/script-7.js?v=recent-reading-runtime-20260726',
     './assets/script-8.js?v=reader-title-runtime-20260726',
