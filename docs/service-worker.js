@@ -1,4 +1,4 @@
-const CACHE_NAME = 'azuresora-notes-offline-20261012-touch-delete-2';
+const CACHE_NAME = 'azuresora-notes-offline-20261013-math-fix-3';
 // Install only what is needed to reopen the shell. The full offline bundle is
 // filled after first paint so service-worker installation never competes with it.
 const CORE_ASSETS = [
@@ -8,7 +8,7 @@ const CORE_ASSETS = [
   './manifest.webmanifest',
   './assets/offline-runtime.js',
   './assets/storage-bridge.js',
-  './assets/script-1.js', './assets/script-2.js',
+  './assets/script-1.js', './assets/script-2.js?v=math-fix-20261012',
   './assets/style-1.css', './assets/brand-layout.css', './assets/azure-theme.css'
 ];
 const DEFERRED_ASSETS = [
@@ -54,7 +54,7 @@ self.addEventListener('fetch', event => {
     }).catch(() => caches.match('./index.html')));
     return;
   }
-  event.respondWith(caches.match(event.request, { ignoreSearch: true }).then(cached => cached || fetch(event.request).then(response => {
+  event.respondWith(caches.match(event.request).then(cached => cached || fetch(event.request).then(response => {
     if (new URL(event.request.url).origin === self.location.origin && response.ok) {
       caches.open(CACHE_NAME).then(cache => cache.put(event.request, response.clone()));
     }
@@ -71,3 +71,4 @@ self.addEventListener('message', event => {
     })))
   )));
 });
+
