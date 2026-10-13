@@ -60,7 +60,10 @@ assert.equal(menu.removed,true,'cancel clears the pending annotation');
 collapsed = false;
 dispatch('touchstart',{target:{closest:()=>null}});
 dispatch('selectionchange');
-assert.equal(timers.size,0,'do not interrupt native handle dragging');
+assert.equal(timers.size,1,'wait for native handle dragging to finish before showing controls');
+for (const [id,fn] of [...timers]) {timers.delete(id);fn();}
+assert.equal(timers.size,1,'keep waiting while the native selection is still active');
+timers.clear();
 root.contains = () => true;
 dispatch('touchend',{target:{closest:()=>null}});
 assert.equal(timers.size,1,'controls appear after finger release');

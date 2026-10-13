@@ -20,6 +20,7 @@
   let observer = null;
   let applyTimer = 0;
   let touchSelectionTimer = 0;
+  let touchSelectionRetries = 0;
   let touchSelecting = false;
   let lastPointerType = '';
   const isTouchSelection = () => lastPointerType === 'touch' || window.matchMedia('(pointer: coarse)').matches;
@@ -474,15 +475,23 @@
   }
   function scheduleTouchSelectionMenu() {
     window.clearTimeout(touchSelectionTimer);
-    if (!isTouchSelection() || touchSelecting || !selectionIsInReader()) return;
-    // Mobile browsers finalize a handle drag after touchend. Waiting one short
-    // turn reads the completed native selection instead of a partial range.
+    if (!isTouchSelection() || !selectionIsInReader()) return;
+    // iPadOS and Android finalize selection handles over several frames. Retry
+    // briefly instead of reading the first, often-collapsed range.
+    touchSelectionRetries = 0;
     touchSelectionTimer = window.setTimeout(() => {
       touchSelectionTimer = 0;
       const selection = window.getSelection();
-      if (selection?.isCollapsed || !selection?.toString().trim()) return;
-      showMenu();
-    }, 200);
+      if (touchSelecting) {
+        if (touchSelectionRetries++ < 8) scheduleTouchSelectionMenu();
+        return;
+      }
+      if (selection && !selection.isCollapsed && selection.toString().trim() && selectionIsInReader(selection)) {
+        showMenu();
+        return;
+      }
+      if (touchSelectionRetries++ < 5 && selectionIsInReader()) scheduleTouchSelectionMenu();
+    }, 120);
   }
   document.addEventListener('mouseup', event => {
     if (isTouchSelection()) return;
@@ -494,7 +503,9 @@
   document.addEventListener('touchend', event => {
     touchSelecting = false;
     if (event.target.closest?.('.selection-annotation-menu')) return;
-    if (readerContent()?.contains(event.target)) scheduleTouchSelectionMenu();
+    // The touchend target may be the browser selection UI rather than a text
+    // node. Read the selection itself instead of relying on event.target.
+    if (selectionIsInReader()) scheduleTouchSelectionMenu();
   }, true);
   document.addEventListener('touchstart', event => {
     lastPointerType = 'touch';
@@ -508,7 +519,8 @@
     const selection = window.getSelection();
     if (!isTouchSelection()) return;
     if (selection && !selection.isCollapsed && selection.toString().trim() && selectionIsInReader(selection)) scheduleTouchSelectionMenu();
-    else if (menu?.classList.contains('selection-annotation-menu--touch') && !selected?.detached) removeMenu();
+    // Do not close a pending touch menu on the transient collapsed states
+    // emitted while the native selection handles are being adjusted.
   });
   document.addEventListener('mousedown', event => { if (menu && !menu.contains(event.target) && !isTouchSelection()) removeMenu(); });
   const clearAnnotationPointer = () => {
@@ -534,15 +546,15 @@
       opened: false,
       timer: 0
     };
-    // Touch selection handles must stay under browser control.
-    if (event.pointerType === 'touch') return;
-    mark.setPointerCapture?.(event.pointerId);
+    // Keep the native selection handles, but still arm a long press on an
+    // existing mark so its management menu remains available on touch screens.
+    if (event.pointerType !== 'touch') mark.setPointerCapture?.(event.pointerId);
     pointer.timer = window.setTimeout(() => {
       if (annotationPointer !== pointer) return;
       pointer.opened = true;
       suppressAnnotationClickId = mark.dataset.annotationId || '';
       showManageMenu(mark, { x: pointer.x, y: pointer.y });
-    }, longPressDelay);
+    }, event.pointerType === 'touch' ? 620 : longPressDelay);
   });
   document.addEventListener('pointermove', event => {
     const pointer = annotationPointer;

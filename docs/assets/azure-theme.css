@@ -2140,3 +2140,48 @@ html .reader-header .data-tools__actions button {
 .note-delete-dialog__actions button { flex: 1; min-height: 44px; border: 1px solid #d5dee5; border-radius: 8px; background: #fff; color: #354654; font: inherit; cursor: pointer; touch-action: manipulation; }
 .note-delete-dialog__actions .note-delete-dialog__confirm { background: #a44b40; border-color: #a44b40; color: #fff; }
 .note-delete-dialog__actions button:focus-visible { outline: 3px solid #80a3c4; outline-offset: 3px; }
+
+/* Mobile view is a single stage. Both the library and reader are mounted at
+   once so the bottom navigation can switch them without stacking two full
+   viewport panels vertically. */
+@media (max-width: 760px) {
+  .app-shell,
+  .app-shell.library-collapsed {
+    position: relative !important;
+    display: block !important;
+    height: 100dvh !important;
+    min-height: 0 !important;
+    overflow: hidden !important;
+  }
+  .app-shell > .panel,
+  .app-shell > .sidebar {
+    position: absolute !important;
+    inset: 0 0 calc(54px + env(safe-area-inset-bottom)) 0 !important;
+    width: 100% !important;
+    height: auto !important;
+    min-height: 0 !important;
+    max-height: none !important;
+    transform: none !important;
+  }
+  .app-shell > .panel:not(.mobile-active),
+  .app-shell > .sidebar:not(.mobile-active) {
+    display: none !important;
+  }
+  .app-shell > .panel.mobile-active,
+  .app-shell > .sidebar.mobile-active {
+    display: flex !important;
+  }
+  .app-shell > .reader.mobile-active {
+    overflow: hidden !important;
+    flex-direction: column !important;
+  }
+  .app-shell > .reader.mobile-active .reading-layout,
+  .app-shell > .reader.mobile-active .editor-content {
+    min-height: 0 !important;
+    flex: 1 1 auto !important;
+  }
+  .app-shell > .library.mobile-active .library-content {
+    min-height: 0 !important;
+    height: 100% !important;
+  }
+}

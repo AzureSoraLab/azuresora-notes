@@ -1,4 +1,4 @@
-const CACHE_NAME = 'azuresora-notes-offline-20261013-math-fix-3';
+const CACHE_NAME = 'azuresora-notes-offline-20261013-touch-selection-4';
 // Install only what is needed to reopen the shell. The full offline bundle is
 // filled after first paint so service-worker installation never competes with it.
 const CORE_ASSETS = [
@@ -8,7 +8,7 @@ const CORE_ASSETS = [
   './manifest.webmanifest',
   './assets/offline-runtime.js',
   './assets/storage-bridge.js',
-  './assets/script-1.js', './assets/script-2.js?v=math-fix-20261012',
+  './assets/script-1.js', './assets/script-2.js?v=math-fix-20261012', './assets/enhancements-loader.js?v=touch-selection-retry-20261013',
   './assets/style-1.css', './assets/brand-layout.css', './assets/azure-theme.css'
 ];
 const DEFERRED_ASSETS = [
