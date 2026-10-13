@@ -1,0 +1,10 @@
+{
+  "name": "AzureSora Notes",
+  "short_name": "AzureSora Notes",
+  "icons": [{ "src": "./favicon.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }],
+  "start_url": "./",
+  "display": "standalone",
+  "background_color": "#f8f7f3",
+  "theme_color": "#f8f7f3",
+  "description": "Offline personal notes with local browser storage."
+}

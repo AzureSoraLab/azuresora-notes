@@ -27,12 +27,14 @@
     recentCache = { raw, value };
     localStorage.setItem(recentKey, raw);
   };
-  const noteState = () => cachedJson(stateKey, stateCache, {});
+  // The storage bridge has already parsed the latest React snapshot. Reusing
+  // it avoids reparsing every long note body while the user is typing.
+  const noteState = () => window.chengmoStorage?.peekNotes?.() || cachedJson(stateKey, stateCache, {});
   const noteTitle = note => note?.title?.trim() || '未命名笔记';
   const noteSubtitle = note => (Array.isArray(note?.tags) ? note.tags.slice(0, 2).map(tag => `#${tag}`).join('  ') : '') || '未添加标签';
   const recentRecord = note => ({ id: note.id, courseId: note.courseId || '', title: noteTitle(note), subtitle: noteSubtitle(note) });
   const sameRecentRecord = (left, right) => left?.id === right.id && left?.courseId === right.courseId && left?.title === right.title && left?.subtitle === right.subtitle;
-  const notesById = state => new Map((Array.isArray(state.notes) ? state.notes : []).filter(note => note?.id).map(note => [note.id, note]));
+  const noteForId = (state, id) => (state.notes || []).find(note => note?.id === id) || null;
 
   // React does not expose course IDs in attributes, so resolve them through
   // its keyed list and retain an index fallback for the static layout.
@@ -67,22 +69,22 @@
     const matches = cards.filter(button => button.querySelector('strong')?.textContent?.trim() === title && button.querySelector('small')?.textContent?.trim() === subtitle);
     return matches.length === 1 ? matches[0] : null;
   };
-  function selectedNote(state, index = notesById(state)) {
+  function selectedNote(state) {
     const button = document.querySelector('.compact-note.selected');
     const noteId = button?.dataset.noteId;
     const notes = state.notes || [];
-    const note = noteId ? index.get(noteId) : null;
+    const note = noteId ? noteForId(state, noteId) : null;
     if (note) return note;
     const title = button?.querySelector('strong')?.textContent?.trim();
     if (!title) return null;
     const matches = notes.filter(item => noteTitle(item) === title);
     return matches.length === 1 ? matches[0] : null;
   }
-  function validRecentNotes(state, index = notesById(state)) {
+  function validRecentNotes(state) {
     const seen = new Set();
     const notes = [];
     for (const item of readRecent()) {
-      const note = index.get(item?.id);
+      const note = noteForId(state, item?.id);
       if (note && !seen.has(note.id)) { seen.add(note.id); notes.push(note); }
     }
     return notes.slice(0, maxRecent);
@@ -98,7 +100,7 @@
   }
   let activeNavigation = null;
   function navigate(noteId) {
-    const state = noteState(); const index = notesById(state); const note = index.get(noteId);
+    const state = noteState(); const note = noteForId(state, noteId);
     if (!note) { render(state, true); return; }
     const courses = courseContext(state);
     const courseButton = courseButtonForId(note.courseId, courses);
@@ -139,7 +141,7 @@
     courseButton.click();
     window.requestAnimationFrame(tryOpen);
   }
-  function render(state = noteState(), force = false, index = notesById(state)) {
+  function render(state = noteState(), force = false) {
     const content = document.querySelector('.library-content'); if (!content) return;
     let section = content.querySelector('.recent-notes');
     if (!section) {
@@ -150,7 +152,7 @@
       });
       const storage = content.querySelector('.storage-note'); content.insertBefore(section, storage || null);
     }
-    const items = validRecentNotes(state, index);
+    const items = validRecentNotes(state);
     const currentId = document.querySelector('.compact-note.selected')?.dataset.noteId || '';
     const signature = `${currentId}\u001e${items.map(note => `${note.id}|${noteTitle(note)}|${noteSubtitle(note)}`).join('\u001f')}`;
     if (!force && section.dataset.recentSignature === signature) return;
@@ -169,9 +171,9 @@
   let previous = ''; let syncFrame = 0; let syncForce = false;
   const sync = force => {
     syncFrame = 0;
-    const state = noteState(); const index = notesById(state); const note = selectedNote(state, index); const token = note?.id || '';
+    const state = noteState(); const note = selectedNote(state); const token = note?.id || '';
     if (token && token !== previous) { previous = token; remember(note); }
-    render(state, force || !document.querySelector('.recent-notes'), index);
+    render(state, force || !document.querySelector('.recent-notes'));
   };
   const scheduleSync = force => {
     syncForce ||= Boolean(force);
@@ -203,7 +205,9 @@
       if (event.key === recentKey) recentCache.raw = undefined;
       if (event.key === stateKey || event.key === recentKey) scheduleSync(true);
     });
-    listen('chengmo:notes-state-updated', 'recent-notes-state', () => { stateCache.raw = undefined; scheduleSync(true); });
+    // A content edit does not normally change this compact list. The render
+    // signature prevents DOM work when title, tags, and selection are stable.
+    listen('chengmo:notes-state-updated', 'recent-notes-state', () => { stateCache.raw = undefined; scheduleSync(false); });
     syncAndWatch();
   };
   (runtime?.whenReady || (task => document.readyState === 'loading' ? document.addEventListener('DOMContentLoaded', task, { once: true }) : task()))(start);

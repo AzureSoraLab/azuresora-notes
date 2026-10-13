@@ -5,21 +5,29 @@
   const listen = runtime?.on || ((type, _, listener) => { document.addEventListener(type, listener); return () => document.removeEventListener(type, listener); });
 
   let root = null;
-  let observer = null;
   let resizeObserver = null;
   let observedContent = null;
   let lastNoteId = '';
   let settledFrame = 0;
   let progressFrame = 0;
   let progressWidth = '';
+  let scrollRange = 0;
 
   const noteId = () => document.querySelector('.compact-note.selected')?.dataset.noteId || '';
+  const syncContentState = content => {
+    if (!content) return;
+    // Avoid a reader-wide `:has()` match whenever annotation spans or formula
+    // nodes change. The rendered Markdown wrapper is the only state we need.
+    content.classList.toggle('is-empty-note', content.children.length === 1 && content.firstElementChild?.matches('h1'));
+  };
+  const refreshScrollRange = () => {
+    scrollRange = root ? Math.max(0, root.scrollHeight - root.clientHeight) : 0;
+  };
   const updateProgress = () => {
     if (!root) return;
     const track = document.querySelector('.progress-track > i');
     if (!track) return;
-    const range = root.scrollHeight - root.clientHeight;
-    const percent = range > 0 ? Math.min(100, Math.max(0, root.scrollTop / range * 100)) : 0;
+    const percent = scrollRange > 0 ? Math.min(100, Math.max(0, root.scrollTop / scrollRange * 100)) : 0;
     const width = `${Math.round(percent * 100) / 100}%`;
     if (progressWidth !== width) { track.style.width = width; progressWidth = width; }
   };
@@ -30,6 +38,9 @@
   const settle = () => {
     settledFrame = 0;
     if (!root) return;
+    // Content height only changes after a layout mutation or resize, not while
+    // a reader is simply scrolling. Keep those expensive geometry reads here.
+    refreshScrollRange();
     updateProgress();
   };
   const scheduleSettle = () => {
@@ -43,20 +54,14 @@
     const nextNoteId = noteId();
     const changedNote = nextNoteId && nextNoteId !== lastNoteId;
     if (nextRoot !== root) {
-      observer?.disconnect(); resizeObserver?.disconnect();
+      resizeObserver?.disconnect();
       if (root) root.removeEventListener('scroll', scheduleProgress);
       root = nextRoot;
       progressWidth = '';
+      scrollRange = 0;
       root.addEventListener('scroll', scheduleProgress, { passive: true });
-      observer = new MutationObserver(records => {
-        // Ink chunks and annotation cards are overlays. Only content replacement
-        // needs a fresh body observer or a post-layout progress calculation.
-        if (records.some(record => {
-          if (record.target.closest?.('.drawing-layer, .selection-annotation-menu, .annotation-shelf')) return false;
-          return record.type === 'characterData' || record.addedNodes.length || record.removedNodes.length;
-        })) scheduleSettle();
-      });
-      observer.observe(root, { childList: true, subtree: true, characterData: true });
+      // ResizeObserver catches real geometry changes. Watching every child
+      // mutation here made marking and drawing needlessly rescan the reader.
       if (window.ResizeObserver) {
         resizeObserver = new ResizeObserver(scheduleSettle);
         resizeObserver.observe(root);
@@ -71,6 +76,7 @@
       if (observedContent) resizeObserver?.observe(observedContent);
       scheduleSettle();
     }
+    syncContentState(nextContent);
     if (changedNote) {
       root.scrollTop = 0;
       // React's own reset may run just before this listener. Reassert once
@@ -79,6 +85,7 @@
         if (root === nextRoot && noteId() === nextNoteId) {
           root.scrollTop = 0;
           progressWidth = '';
+          refreshScrollRange();
           updateProgress();
         }
       });
@@ -90,6 +97,9 @@
   const scheduleSync = () => enqueue('reader-display-sync', sync);
   listen('chengmo:ui-mounted', 'reader-display-ui', scheduleSync);
   listen('chengmo:note-selected', 'reader-display-note', scheduleSync);
+  document.addEventListener('click', event => {
+    if (event.target.closest?.('.edit-switch')) window.setTimeout(scheduleSync, 0);
+  }, true);
   window.addEventListener('load', scheduleSync, { once: true });
   scheduleSync();
 })();

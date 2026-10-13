@@ -40,10 +40,13 @@
   const bootCache = new Map();
   let noteStateCache = null;
   let latestNotesState = null;
+  let protectedNoteIds = null;
+  let protectedNotesUntil = 0;
   let notesRevision = 0;
   let drawingStateCache = null;
   let drawingBootCacheDirty = false;
   let bootCacheTimer = 0;
+  let bootCacheIdle = 0;
   const jsonCache = new Map();
   const toJson = value => {
     try { return JSON.parse(value); } catch { return undefined; }
@@ -105,6 +108,7 @@
   let noteFlushPromise = null;
   let pendingNotesState = null;
   let notesTimer = 0;
+  let notesStateEventTimer = 0;
   let noteRevision = 0;
   let noteWrittenRevision = 0;
   let notesRetryTimer = 0;
@@ -257,10 +261,42 @@
     }, 260);
     return noteWritePromise;
   };
+  const scheduleNotesStateUpdated = () => {
+    // React can save on every keystroke. These controls only display compact
+    // metadata, so wait for a real typing pause before touching the DOM again.
+    window.clearTimeout(notesStateEventTimer);
+    notesStateEventTimer = window.setTimeout(() => {
+      notesStateEventTimer = 0;
+      emit('chengmo:notes-state-updated');
+    }, 650);
+  };
   const saveNotesFromObject = state => {
+    // A library action can replace the store immediately before reload. React's
+    // pagehide cleanup still holds the pre-action state, so do not let it put
+    // deleted notes back into the pending persistence queue.
+    if (protectedNoteIds && Array.isArray(state?.notes)) {
+      if (Date.now() < protectedNotesUntil && state.notes.some(note => note?.id && !protectedNoteIds.has(note.id))) return true;
+      // The React view has now accepted the replacement, so future creates
+      // and imports must be saved normally without a page reload.
+      protectedNoteIds = null; protectedNotesUntil = 0;
+    }
     saveNotes(state);
     queueNoteBootCache(state);
-    emit('chengmo:notes-state-updated');
+    scheduleNotesStateUpdated();
+    // The React shell uses this truthy result to avoid synchronously writing
+    // its complete note library to localStorage after every input event.
+    return true;
+  };
+  const replaceNotesState = state => {
+    if (!state || typeof state !== 'object' || !Array.isArray(state.notes)) return false;
+    protectedNoteIds = new Set(state.notes.map(note => note?.id).filter(Boolean));
+    protectedNotesUntil = Date.now() + 1200;
+    pendingNotesState = state;
+    latestNotesState = state;
+    notesRevision += 1;
+    queueNoteBootCache(state);
+    saveNotes(state, true);
+    return true;
   };
   const flushAnnotations = async () => {
     if (annotationFlushPromise) return annotationFlushPromise;
@@ -313,8 +349,14 @@
     bootCache.clear();
   };
   const scheduleBootCacheFlush = () => {
-    if (bootCacheTimer) return;
-    bootCacheTimer = window.setTimeout(flushBootCache, 1800);
+    if (bootCacheTimer || bootCacheIdle) return;
+    bootCacheTimer = window.setTimeout(() => {
+      bootCacheTimer = 0;
+      // Serializing a large notebook can briefly block typing. Let the browser
+      // choose an idle gap, while retaining a bounded timeout for reliability.
+      const flush = () => { bootCacheIdle = 0; flushBootCache(); };
+      bootCacheIdle = window.requestIdleCallback ? window.requestIdleCallback(flush, { timeout: 1000 }) : window.setTimeout(flush, 0);
+    }, 1800);
   };
   const queueBootCache = (key, value) => {
     bootCache.set(key, value);
@@ -428,6 +470,10 @@
     }
     if (metaTimer) { window.clearTimeout(metaTimer); metaTimer = 0; }
     if (bootCacheTimer) { window.clearTimeout(bootCacheTimer); bootCacheTimer = 0; }
+    if (bootCacheIdle) {
+      if (window.cancelIdleCallback) window.cancelIdleCallback(bootCacheIdle); else window.clearTimeout(bootCacheIdle);
+      bootCacheIdle = 0;
+    }
     flushBootCache();
     await Promise.all([flushNotesUntilStable(), flushMeta(), flushDrawingsUntilStable(), flushAnnotationsUntilStable()]);
     await flushDatabaseUntilStable();
@@ -564,7 +610,7 @@
         latestNotesState = state && typeof state === 'object' ? state : null;
         notesRevision += 1;
         queueBootCache(key, value);
-        emit('chengmo:notes-state-updated');
+        scheduleNotesStateUpdated();
         return;
       }
       if (key === KEYS.annotations) {
@@ -601,7 +647,7 @@
   document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') flush().catch(() => {}); }, { capture: true });
   window.addEventListener('pagehide', () => { flush().catch(() => {}); }, { capture: true });
   const peekNotes = () => noteStateCache || latestNotesState || readJson(KEYS.notes, {});
-  window.chengmoStorage = { database, saveNotes: saveNotesFromObject, queueNoteBootCache, peekNotes, saveDrawing, persistDrawingSnapshot, getDrawingRecovery, queueDrawing, removeDrawing, getDrawing, getAllDrawings, replaceSnapshot, flush, unpackStroke, packStroke, version: 2 };
+  window.chengmoStorage = { database, saveNotes: saveNotesFromObject, replaceNotesState, queueNoteBootCache, peekNotes, saveDrawing, persistDrawingSnapshot, getDrawingRecovery, queueDrawing, removeDrawing, getDrawing, getAllDrawings, replaceSnapshot, flush, unpackStroke, packStroke, version: 2 };
   document.documentElement.dataset.chengmoPersistence = 'loading';
   window.chengmoStorageReady = database()
     .then(migrate)
