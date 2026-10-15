@@ -14,7 +14,7 @@ const withoutPreload = bundle.replace(/\(function\(\)\{[\s\S]*?\}\)\(\);/, '');
 const mount = withoutPreload.lastIndexOf('(0,u.createRoot)');
 assert.ok(mount > 0);
 const context = vm.createContext({ console, setTimeout, clearTimeout });
-vm.runInContext(withoutPreload.slice(0, mount) + ';this.renderMarkdown = Is;', context);
+vm.runInContext(withoutPreload.slice(0, mount) + ';this.renderMarkdown = Is;this.normalizeMarkdown = Js;', context);
 for (const formula of [
   '$x(t)$', '$$\nx^2\n$$', '\\[\r\nx^2\r\n\\]',
   '$$\n\\begin{cases} x & x>0 \\\\ 0 & x<0 \\end{cases}\n$$'
@@ -24,6 +24,49 @@ for (const formula of [
   assert.ok(!rendered.includes('katex-error'));
 }
 assert.ok(context.renderMarkdown('`$x$`').includes('<code>$x$</code>'));
+
+// Block math must interrupt prose even when pasted without blank lines.
+const adjacentMath = String.raw`自由空间中的矢量位满足亥姆霍兹方程，其线电流源解为
+$$
+\mathbf A(\mathbf r)=\frac{\mu_0}{4\pi}\int_{-\Delta l/2}^{\Delta l/2}
+\tilde I \frac{e^{-j\beta R}}{R}\,\mathrm dz'
+$$
+其中 R = |r-r'|，当 r ≫ Δl 时，取
+$$
+R\approx r,\qquad \frac{e^{-j\beta R}}{R}\approx \frac{e^{-j\beta r}}{r},
+$$
+于是
+$$
+\mathbf A\approx \hat{\mathbf z}\frac{\mu_0\tilde I\Delta l}{4\pi r}e^{-j\beta r}.
+$$`;
+for (const [markdown, displayCount, prose] of [
+  [adjacentMath, 3, ['自由空间中的矢量位', '其中 R', '于是']],
+  ['正文 $$\nx^2\n$$ 后文', 1, ['正文', '后文']],
+  ['正文\r\n　$$  \r\nx^2\r\n $$\r\n后文', 1, ['正文', '后文']],
+  [String.raw`正文
+\[
+x^2
+\]
+后文`, 1, ['正文', '后文']]
+]) {
+  const rendered = context.renderMarkdown(markdown);
+  assert.equal((rendered.match(/class="katex-display"/g) || []).length, displayCount);
+  assert.ok(!rendered.includes('$$'), 'Block delimiters must not remain visible');
+  assert.ok(!rendered.includes('katex-error'), 'Pasted math must render successfully');
+  for (const text of prose) assert.ok(rendered.includes(text), `Must preserve ${text}`);
+}
+for (const code of [
+  '`$$x^2$$`', '``$$\nx^2\n$$``',
+  '```latex\n$$\nx^2\n$$\n```', '~~~latex\n\\[\nx^2\n\\]\n~~~'
+]) {
+  assert.equal(context.normalizeMarkdown(code), code, 'Code examples must remain unchanged');
+  const rendered = context.renderMarkdown(code + '\n\n正文\n$$\ny^2\n$$');
+  assert.equal((rendered.match(/class="katex-display"/g) || []).length, 1,
+    'Only math outside code should render');
+}
+for (const inline of ['$x^2$', '$$x^2$$', String.raw`转义 \$$ 与 \$`]) {
+  assert.equal(context.normalizeMarkdown(inline), inline, 'Single-line and escaped math stays intact');
+}
 
 const migration = read('docs/assets/release-migration.js');
 const legacy = { categories: [{ id: 'course', name: 'Course' }], notes: [
@@ -73,13 +116,15 @@ await installed;
 assert.ok(installedRequests.every(request => request.cache === 'reload'), 'Installation must revalidate HTTP cache');
 
 const fetchHandler = events.get('fetch');
-const request = { method: 'GET', mode: 'cors', url: 'https://example.test/notes/assets/script-2.js?v=release-ui-20261013' };
+const scriptUrl = assets.find(asset => asset.startsWith('./assets/script-2.js?'));
+assert.ok(scriptUrl, 'The reader bundle must have a release version');
+const request = { method: 'GET', mode: 'cors', url: new URL(scriptUrl, 'https://example.test/notes/').href };
 stored.set(request.url, { release: 'current' });
 let response;
 fetchHandler({ request, respondWith: promise => { response = promise; }, waitUntil: () => {} });
 assert.equal((await response).release, 'current', 'Offline visits retain current versioned assets');
 stored.clear();
-stored.set(request.url.replace('release-ui-20261013', 'older'), { release: 'old' });
+stored.set(request.url.replace(/\?v=.*/, '?v=older'), { release: 'old' });
 fetchHandler({ request, respondWith: promise => { response = promise; }, waitUntil: () => {} });
 await assert.rejects(response, /offline/, 'Never substitute a differently versioned cached asset');
 

@@ -1,4 +1,4 @@
-const CACHE_NAME = 'azuresora-notes-offline-20261013-release-ui';
+const CACHE_NAME = 'azuresora-notes-offline-20261015-math-blocks';
 // Install only what is needed to reopen the shell. The full offline bundle is
 // filled after first paint so service-worker installation never competes with it.
 const CORE_ASSETS = [
@@ -10,7 +10,7 @@ const CORE_ASSETS = [
   './assets/release-migration.js?v=release-ui-20261013',
   './assets/storage-bridge.js?v=instant-note-delete-20260728',
   './assets/script-1.js?v=runtime-cross-feature-20260726',
-  './assets/script-2.js?v=release-ui-20261013',
+  './assets/script-2.js?v=math-blocks-20261015',
   './assets/enhancements-loader.js?v=release-ui-20261013',
   './assets/style-1.css?v=release-ui-20261013',
   './assets/brand-layout.css?v=20260725-final',
@@ -22,7 +22,7 @@ const DEFERRED_ASSETS = [
   "./assets/script-1.js?v=runtime-cross-feature-20260726",
   "./assets/release-migration.js?v=release-ui-20261013",
   "./assets/storage-bridge.js?v=instant-note-delete-20260728",
-  "./assets/script-2.js?v=release-ui-20261013",
+  "./assets/script-2.js?v=math-blocks-20261015",
   "./assets/style-1.css?v=release-ui-20261013",
   "./assets/katex-fonts.css?v=20260727",
   "./assets/style-2.css?v=annotation-underline-20260726",
